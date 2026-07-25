@@ -30,22 +30,23 @@ import ImageUploadButton from "./ImageUploadButton";
 
 interface AdminDashboardProps {
   pousadas: Pousada[];
-  guides: Guide[];
   species?: Species[];
   onRefreshData: () => void;
 }
 
 export default function AdminDashboard({
   pousadas,
-  guides,
   species = [],
   onRefreshData
 }: AdminDashboardProps) {
-  // Notifications and full booking records (with customer name/email/phone)
-  // are admin-only now, fetched here with an authenticated request instead
-  // of via the public App.tsx loader.
+  // Notifications, full booking records (with customer name/email/phone) and
+  // guides (with personal email/phone) are admin-only, fetched here with an
+  // authenticated request instead of via the public App.tsx loader — guides
+  // used to be fetched publicly by mistake, leaking every guide's contact
+  // info to anyone opening the browser's network tab.
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [guides, setGuides] = useState<Guide[]>([]);
 
   const fetchNotifications = async () => {
     try {
@@ -65,9 +66,19 @@ export default function AdminDashboard({
     }
   };
 
+  const fetchGuides = async () => {
+    try {
+      const response = await adminFetch("/api/guides");
+      if (response.ok) setGuides(await response.json());
+    } catch (err) {
+      console.error("Erro ao carregar guias:", err);
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
     fetchBookings();
+    fetchGuides();
     const interval = setInterval(() => {
       fetchNotifications();
       fetchBookings();
@@ -350,7 +361,7 @@ export default function AdminDashboard({
 
       if (response.ok) {
         setShowAddGuide(false);
-        onRefreshData();
+        fetchGuides();
       }
     } catch (err) {
       console.error(err);
@@ -399,7 +410,7 @@ export default function AdminDashboard({
     if (!window.confirm("Deseja realmente remover este guia turístico?")) return;
     try {
       const response = await adminFetch(`/api/guides/${id}`, { method: "DELETE" });
-      if (response.ok) onRefreshData();
+      if (response.ok) fetchGuides();
     } catch (err) {
       console.error(err);
     }

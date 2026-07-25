@@ -456,7 +456,11 @@ app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
 });
 
 // GUIDES CRUD
-app.get("/api/guides", async (req, res) => {
+// Admin-only: guide records include personal email/phone, and nothing on
+// the public site actually displays this list (it's only consumed by the
+// admin dashboard) — it was public by mistake before, meaning anyone could
+// read every guide's contact info straight from the network tab.
+app.get("/api/guides", requireAdmin, async (req, res) => {
   const { data, error } = await supabase.from("guides").select("*");
   if (error) return res.status(500).json({ error: "Erro ao buscar guias" });
   res.json(data);

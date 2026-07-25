@@ -19,7 +19,7 @@ import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { useRoute, navigate } from "./lib/router";
-import { Pousada, Guide, Sighting, Review, Species, PublicBookingSummary } from "./types";
+import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./types";
 
 // Code-split: AdminDashboard (~2000 lines) is dead weight in the bundle for
 // the ~99% of visitors who never touch /admin, and MobileSimulator is a
@@ -112,31 +112,29 @@ export default function App() {
 
   // States fetched from Full-Stack Express Backend
   const [pousadas, setPousadas] = useState<Pousada[]>([]);
-  const [guides, setGuides] = useState<Guide[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<PublicBookingSummary[]>([]);
   const [sightings, setSightings] = useState<Sighting[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [species, setSpecies] = useState<Species[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load and refresh state function. Notifications and full booking records
-  // (with customer name/email/phone) are NOT fetched here — those are
-  // admin-only now and fetched separately, with auth, inside AdminDashboard.
-  // The mobile check-in demo only gets a PII-free booking summary.
+  // Load and refresh state function. Notifications, full booking records
+  // (with customer name/email/phone) and guides (with personal email/phone)
+  // are NOT fetched here — those are admin-only, fetched separately with
+  // auth inside AdminDashboard. The mobile check-in demo only gets a
+  // PII-free booking summary.
   const fetchData = async () => {
     try {
-      const [pRes, gRes, bRes, sRes, rRes, spRes] = await Promise.all([
+      const [pRes, bRes, sRes, rRes, spRes] = await Promise.all([
         fetch("/api/pousadas"),
-        fetch("/api/guides"),
         fetch("/api/bookings/public-confirmed"),
         fetch("/api/sightings"),
         fetch("/api/reviews"),
         fetch("/api/species")
       ]);
 
-      const [pData, gData, bData, sData, rData, spData] = await Promise.all([
+      const [pData, bData, sData, rData, spData] = await Promise.all([
         pRes.json(),
-        gRes.json(),
         bRes.json(),
         sRes.json(),
         rRes.json(),
@@ -144,7 +142,6 @@ export default function App() {
       ]);
 
       setPousadas(pData);
-      setGuides(gData);
       setConfirmedBookings(bData);
       setSightings(sData);
       setReviews(rData);
@@ -398,7 +395,6 @@ export default function App() {
               <Suspense fallback={<LazyFallback />}>
                 <AdminDashboard
                   pousadas={pousadas}
-                  guides={guides}
                   species={species}
                   onRefreshData={fetchData}
                 />
