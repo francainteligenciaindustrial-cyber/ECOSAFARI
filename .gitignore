@@ -13,3 +13,7 @@ IMAGENS/
 images/
 vagalume/
 assets/
+
+.vercel
+.env*
+.claude/

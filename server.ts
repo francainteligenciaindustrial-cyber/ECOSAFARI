@@ -8,8 +8,8 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { Resend } from "resend";
 import PDFDocument from "pdfkit";
-import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource } from "./src/types";
-import { slugify } from "./src/lib/slug";
+import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource } from "./src/types.js";
+import { slugify } from "./src/lib/slug.js";
 
 dotenv.config();
 
