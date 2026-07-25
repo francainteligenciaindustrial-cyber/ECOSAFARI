@@ -23,14 +23,25 @@ const distPath = path.join(process.cwd(), 'dist');
 // On Vercel each cold start re-runs this module from scratch (no long-lived
 // process like Render/local), so the in-memory data arrays start out as the
 // hardcoded seed until Supabase sync finishes. This middleware makes every
-// request wait for that sync exactly once per warm instance instead of
-// racing it, memoized so subsequent requests on the same instance are free.
+// request wait for that sync, memoized with a short TTL rather than forever:
+// Vercel load-balances requests across several concurrent warm instances,
+// each with its own in-memory copy of these arrays, so a write (e.g. an
+// admin delete) landing on instance A never updates instance B's copy —
+// without a TTL, B would keep serving the "undeleted" item for its entire
+// lifetime (which can be many minutes) and it would look like deletions
+// don't stick. Re-syncing periodically bounds that staleness instead.
+const DATA_SYNC_TTL_MS = 15000;
 let dataSyncPromise: Promise<void> | null = null;
+let dataSyncedAt = 0;
 function ensureDataSynced(): Promise<void> {
-  if (!dataSyncPromise) {
-    dataSyncPromise = syncFromSupabase().catch(err => {
-      console.error("Falha ao sincronizar com o Supabase:", err);
-    });
+  if (!dataSyncPromise || Date.now() - dataSyncedAt > DATA_SYNC_TTL_MS) {
+    dataSyncPromise = syncFromSupabase()
+      .catch(err => {
+        console.error("Falha ao sincronizar com o Supabase:", err);
+      })
+      .finally(() => {
+        dataSyncedAt = Date.now();
+      });
   }
   return dataSyncPromise;
 }
@@ -900,10 +911,11 @@ app.put("/api/pousadas/:id", requireAdmin, async (req, res) => {
 app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   pousadas = pousadas.filter(p => p.id !== id);
-  
+
   // Save to Supabase in background
   try {
-    await supabase.from("pousadas").delete().eq("id", id);
+    const { error } = await supabase.from("pousadas").delete().eq("id", id);
+    if (error) console.warn("Erro ao excluir pousada no Supabase:", error.message);
   } catch (err: any) {
     console.warn("Erro ao excluir pousada no Supabase:", err.message);
   }
@@ -965,10 +977,11 @@ app.put("/api/guides/:id", requireAdmin, async (req, res) => {
 app.delete("/api/guides/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   guides = guides.filter(g => g.id !== id);
-  
+
   // Save to Supabase in background
   try {
-    await supabase.from("guides").delete().eq("id", id);
+    const { error } = await supabase.from("guides").delete().eq("id", id);
+    if (error) console.warn("Erro ao excluir guia no Supabase:", error.message);
   } catch (err: any) {
     console.warn("Erro ao excluir guia no Supabase:", err.message);
   }
