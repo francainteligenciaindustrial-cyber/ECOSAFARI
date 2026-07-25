@@ -64,7 +64,7 @@ export default function PrivacyPolicyPage() {
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">7. Cookies</h3>
       <p>
-        Usamos cookies e armazenamento local (localStorage) essenciais para o funcionamento do site, como manter sua sessão de administrador ativa e lembrar que você já respondeu ao aviso de cookies. Ao aceitar no banner exibido na primeira visita, você também autoriza cookies de análise (quando ativados, ex: Google Analytics), usados apenas para entender de forma agregada como o site é utilizado — nunca para identificá-lo individualmente. Você pode recusar os cookies de análise a qualquer momento no banner ou limpando os dados de navegação do seu navegador.
+        Usamos cookies e armazenamento local (localStorage) essenciais para o funcionamento do site, como manter sua sessão de administrador ativa e lembrar que você já respondeu ao aviso de cookies. Ao aceitar no banner exibido na primeira visita, você também autoriza cookies de publicidade/análise (Meta Pixel do Facebook/Instagram e, quando ativado, Google Analytics), usados para medir a eficácia dos nossos anúncios e entender de forma agregada como o site é utilizado. Você pode recusar esses cookies a qualquer momento no banner ou limpando os dados de navegação do seu navegador.
       </p>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">8. Contato</h3>

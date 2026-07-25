@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Users, Building2, CheckCircle2, ArrowLeft, MessageSquare } from "lucide-react";
+import { Compass, Users, Building2, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet } from "lucide-react";
+import { trackMetaEvent } from "../lib/metaPixel";
 
 const WHATSAPP_NUMBER = "5565999868334";
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
@@ -90,6 +91,10 @@ export default function PartnerSignupPage() {
         const email = type === "guia" ? guiaForm.email : pousadaForm.email;
         setStatusLink(`${window.location.origin}/status-candidatura?email=${encodeURIComponent(email)}&token=${created.statusToken}`);
       }
+      // Conversion event for Meta Ads — this is the actual "did the ad work"
+      // signal; without it, campaigns pointed at this page have no way to
+      // measure or optimize toward real signups.
+      trackMetaEvent("Lead", { content_name: type === "guia" ? "cadastro_guia" : "cadastro_pousada" });
       setSubmitted(true);
     } catch (err) {
       setError("Não foi possível enviar seu cadastro agora. Tente novamente em instantes.");
@@ -175,8 +180,28 @@ export default function PartnerSignupPage() {
           Cadastre-se para prestar serviços conosco
         </h2>
         <p className="text-editorial-muted text-sm mb-8 leading-relaxed">
-          Você é guia turístico ou representa uma pousada e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo. Suas informações vão direto para nossa equipe, que entrará em contato.
+          Você é guia turístico ou representa uma pousada e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
         </p>
+
+        {/* Why partner with us — cold traffic from an ad needs the "what's
+            in it for me" before being asked to fill out a form. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+          <div className="bg-white border border-editorial-border rounded-lg p-4">
+            <Wallet className="h-5 w-5 text-editorial-primary mb-2" />
+            <p className="text-xs font-bold text-editorial-text mb-1">Sem custo de adesão</p>
+            <p className="text-[11px] text-editorial-muted leading-relaxed">Cadastro e participação na rede EcoSafari são 100% gratuitos.</p>
+          </div>
+          <div className="bg-white border border-editorial-border rounded-lg p-4">
+            <Sparkles className="h-5 w-5 text-editorial-primary mb-2" />
+            <p className="text-xs font-bold text-editorial-text mb-1">Mais reservas, mais exposição</p>
+            <p className="text-[11px] text-editorial-muted leading-relaxed">Seu perfil fica visível pra viajantes que já estão buscando experiências como a sua.</p>
+          </div>
+          <div className="bg-white border border-editorial-border rounded-lg p-4">
+            <Handshake className="h-5 w-5 text-editorial-primary mb-2" />
+            <p className="text-xs font-bold text-editorial-text mb-1">Suporte da nossa equipe</p>
+            <p className="text-[11px] text-editorial-muted leading-relaxed">Ajudamos com agenda, pagamento e atendimento ao cliente — você foca na experiência.</p>
+          </div>
+        </div>
 
         {/* Type toggle */}
         <div className="flex gap-3 mb-8">
