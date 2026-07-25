@@ -424,10 +424,10 @@ app.post("/api/upload-image", requireAdmin, (req, res) => {
 // string scalar instead of a jsonb array.
 app.post("/api/pousadas", requireAdmin, async (req, res) => {
   const newPousada: Pousada = {
+    ...req.body,
     id: `p_${randomUUID()}`,
     verified: false,
     viewCount: 0,
-    ...req.body
   };
   const { error } = await supabase.from("pousadas").insert(newPousada);
   if (error) {
@@ -470,8 +470,8 @@ app.get("/api/guides", requireAdmin, async (req, res) => {
 // JSON.stringify (see the pousadas insert route further down for why).
 app.post("/api/guides", requireAdmin, async (req, res) => {
   const newGuide: Guide = {
+    ...req.body,
     id: `g_${randomUUID()}`,
-    ...req.body
   };
   const { error } = await supabase.from("guides").insert(newGuide);
   if (error) {
@@ -1240,7 +1240,7 @@ app.get("/api/turistas", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/turistas", requireAdmin, async (req, res) => {
-  const newTurista: Turista = { id: `t_${randomUUID()}`, ...req.body };
+  const newTurista: Turista = { ...req.body, id: `t_${randomUUID()}` };
   const { error } = await supabase.from("turistas").insert(newTurista);
   if (error) {
     console.error("Erro ao salvar turista no Supabase:", error.message);
@@ -1271,7 +1271,7 @@ app.get("/api/roteiros", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/roteiros", requireAdmin, async (req, res) => {
-  const newRoteiro: Roteiro = { id: `rt_${randomUUID()}`, ...req.body };
+  const newRoteiro: Roteiro = { ...req.body, id: `rt_${randomUUID()}` };
   const { error } = await supabase.from("roteiros").insert(newRoteiro);
   if (error) {
     console.error("Erro ao salvar roteiro no Supabase:", error.message);
@@ -1302,7 +1302,7 @@ app.get("/api/reservas", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/reservas", requireAdmin, async (req, res) => {
-  const newReserva: Reserva = { id: `rv_${randomUUID()}`, ...req.body };
+  const newReserva: Reserva = { ...req.body, id: `rv_${randomUUID()}` };
   const { error } = await supabase.from("reservas").insert(newReserva);
   if (error) {
     console.error("Erro ao salvar reserva no Supabase:", error.message);
@@ -1333,7 +1333,7 @@ app.get("/api/pagamentos", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/pagamentos", requireAdmin, async (req, res) => {
-  const newPagamento: Pagamento = { id: `pg_${randomUUID()}`, ...req.body };
+  const newPagamento: Pagamento = { ...req.body, id: `pg_${randomUUID()}` };
   const { error } = await supabase.from("pagamentos").insert(newPagamento);
   if (error) {
     console.error("Erro ao salvar pagamento no Supabase:", error.message);
@@ -1364,7 +1364,7 @@ app.get("/api/guias", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/guias", requireAdmin, async (req, res) => {
-  const newGuia: GuiaTuristico = { id: `gt_${randomUUID()}`, ...req.body };
+  const newGuia: GuiaTuristico = { ...req.body, id: `gt_${randomUUID()}` };
   const { error } = await supabase.from("guias").insert(newGuia);
   if (error) {
     console.error("Erro ao salvar guia no Supabase:", error.message);
@@ -1395,15 +1395,24 @@ app.get("/api/candidaturas", requireAdmin, async (req, res) => {
   res.json(data);
 });
 
-// Consulta pública de status por email — para o parceiro acompanhar a
-// candidatura sem precisar ligar. Só retorna as candidaturas daquele email.
+// Consulta pública de status por email + token — para o parceiro acompanhar
+// a candidatura sem precisar ligar. Exige os dois (não só o email) porque um
+// email sozinho é fácil de adivinhar/saber de outra pessoa; o token só o
+// próprio candidato recebe, na hora em que envia o formulário. Só devolve os
+// campos necessários pra mostrar o status — nunca telefone/mensagem/email,
+// mesmo pra quem acertar o par certo.
 app.get("/api/candidaturas/status", async (req, res) => {
   const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email) {
-    return res.status(400).json({ error: "Informe um email" });
+  const token = String(req.query.token || "").trim();
+  if (!email || !token) {
+    return res.status(400).json({ error: "Informe o email e o código de acompanhamento enviados na confirmação do cadastro." });
   }
   // ilike with no wildcards = exact match, case-insensitive
-  const { data, error } = await supabase.from("candidaturas").select("*").ilike("email", email);
+  const { data, error } = await supabase
+    .from("candidaturas")
+    .select("id,type,status,dateCreated,name,pousadaName")
+    .ilike("email", email)
+    .eq("statusToken", token);
   if (error) return res.status(500).json({ error: "Erro ao buscar candidatura" });
   res.json(data);
 });
@@ -1414,14 +1423,26 @@ app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
     return res.status(400).json({ error: "Falha na verificação de segurança. Recarregue a página e tente novamente." });
   }
 
+  // Server-controlled fields go last so a malicious body can't override them
+  // (e.g. submitting status: "aprovado" directly, or a chosen statusToken).
   const newCandidatura: Candidatura = {
+    ...body,
     id: `cand_${randomUUID()}`,
     status: "pendente",
     dateCreated: new Date().toISOString(),
-    ...body
+    statusToken: randomUUID(),
   };
 
-  const { error } = await supabase.from("candidaturas").insert(newCandidatura);
+  let { error } = await supabase.from("candidaturas").insert(newCandidatura);
+  // Degrades gracefully if scripts/add-candidatura-status-token.sql hasn't
+  // been run yet — the submission itself must not break just because the
+  // status-token column doesn't exist in the DB yet (status lookup by
+  // email+token just won't work for this one until the column is added and
+  // it's resubmitted, which is a much smaller problem than losing candidates).
+  if (error?.message?.includes("statusToken")) {
+    const { statusToken, ...withoutToken } = newCandidatura as any;
+    ({ error } = await supabase.from("candidaturas").insert(withoutToken));
+  }
   if (error) {
     console.error("Erro ao salvar candidatura no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar candidatura" });
@@ -1453,9 +1474,9 @@ app.delete("/api/candidaturas/:id", requireAdmin, async (req, res) => {
 // POST é público (qualquer visitante responde); GET é admin-only (estatísticas).
 app.post("/api/referral-sources", publicFormLimiter, async (req, res) => {
   const newSource: ReferralSource = {
+    ...req.body,
     id: `ref_${randomUUID()}`,
     timestamp: new Date().toISOString(),
-    ...req.body
   };
   // referral_sources may not exist (see scripts/add-referral-sources-table.sql)
   // — this endpoint's only caller in the frontend was already removed, so it
@@ -1482,7 +1503,7 @@ app.get("/api/config", (req, res) => {
   res.json({ supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY });
 });
 
-app.get("/api/supabase/status", async (req, res) => {
+app.get("/api/supabase/status", requireAdmin, async (req, res) => {
   const status: Record<string, boolean> = {};
   const tables = ["pousadas", "guides", "bookings", "reviews", "sightings", "notifications", "species", "turistas", "roteiros", "reservas", "pagamentos", "guias", "candidaturas", "referral_sources"];
   
@@ -1503,7 +1524,51 @@ app.get("/api/supabase/status", async (req, res) => {
   });
 });
 
-app.get("/api/supabase/sql", (req, res) => {
+// Guards against a known failure mode: a stale/duplicate deployment of an
+// older build (e.g. one left running from before this app moved off
+// hardcoded demo data) can still write its old seed rows straight into the
+// shared Supabase database, independent of anything this deployment does.
+// The old demo dataset used short sequential ids ("1".."7" for pousadas,
+// "b1"/"b2", "r1".."r3", etc.) that this codebase hasn't generated since
+// switching to crypto.randomUUID()-based ids — so any row with one of these
+// exact ids appearing again is a reliable signal that something else is
+// still seeding fake data, not a false positive from real usage.
+const KNOWN_FAKE_IDS: Record<string, string[]> = {
+  pousadas: ["1", "2", "3", "4", "5", "6", "7"],
+  guides: ["g1", "g2", "g3", "g4"],
+  guias: ["gt1", "gt2", "gt3"],
+  bookings: ["b1", "b2"],
+  reviews: ["r1", "r2", "r3"],
+  turistas: ["t1", "t2"],
+  roteiros: ["rt1", "rt2", "rt3"],
+  reservas: ["rv1", "rv2"],
+  pagamentos: ["pg1", "pg2"],
+  notifications: ["n1", "n2"],
+};
+
+app.get("/api/integrity/fake-data-check", requireAdmin, async (req, res) => {
+  const found: Record<string, string[]> = {};
+  for (const [table, ids] of Object.entries(KNOWN_FAKE_IDS)) {
+    const { data } = await supabase.from(table).select("id").in("id", ids);
+    if (data && data.length > 0) found[table] = data.map((r: any) => r.id);
+  }
+  res.json({ clean: Object.keys(found).length === 0, found });
+});
+
+app.post("/api/integrity/purge-fake-data", requireAdmin, async (req, res) => {
+  const removed: Record<string, number> = {};
+  for (const [table, ids] of Object.entries(KNOWN_FAKE_IDS)) {
+    const { error, count } = await supabase.from(table).delete({ count: "exact" }).in("id", ids);
+    if (!error && count) removed[table] = count;
+  }
+  res.json({ removed });
+});
+
+// Admin-only: this dumps the full DB schema/DDL (table structure, RLS setup)
+// — nothing in the frontend actually calls it (it was a leftover setup
+// convenience URL), so it was pure information disclosure to anyone who
+// guessed the path.
+app.get("/api/supabase/sql", requireAdmin, (req, res) => {
   const sql = `-- ECOSAFARI BRASIL: COPIE E COLE ESTE SCRIPT NO EDITOR SQL DO SEU PAINEL SUPABASE PARA CRIAR AS TABELAS E POLÍTICAS DE SEGURANÇA (RLS)
 
 -- 1. TABELA DE POUSADAS

@@ -176,6 +176,10 @@ export interface Candidatura {
   type: 'guia' | 'pousada';
   status: 'pendente' | 'contatado' | 'aprovado' | 'rejeitado';
   dateCreated: string;
+  // Opaque token returned once at submission time — required (alongside the
+  // email) to look up status publicly, so knowing/guessing someone's email
+  // alone isn't enough to see their application.
+  statusToken?: string;
   // comuns
   name: string; // nome do guia OU nome do responsável pela pousada
   email: string;

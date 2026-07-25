@@ -101,6 +101,38 @@ export default function AdminDashboard({
   const [loadingSupabase, setLoadingSupabase] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
+  // Detects rows matching the old hardcoded demo dataset's ids — a reliable
+  // sign that some other deployment is still writing straight into this
+  // Supabase project (see the comment on KNOWN_FAKE_IDS in server.ts).
+  const [fakeDataCheck, setFakeDataCheck] = useState<{ clean: boolean; found: Record<string, string[]> } | null>(null);
+  const [checkingFakeData, setCheckingFakeData] = useState(false);
+  const [purgingFakeData, setPurgingFakeData] = useState(false);
+
+  const fetchFakeDataCheck = async () => {
+    setCheckingFakeData(true);
+    try {
+      const response = await adminFetch("/api/integrity/fake-data-check");
+      if (response.ok) setFakeDataCheck(await response.json());
+    } catch (err) {
+      console.error("Erro ao verificar dados fake:", err);
+    } finally {
+      setCheckingFakeData(false);
+    }
+  };
+
+  const handlePurgeFakeData = async () => {
+    if (!window.confirm("Confirma apagar esses registros? Essa ação não pode ser desfeita.")) return;
+    setPurgingFakeData(true);
+    try {
+      const response = await adminFetch("/api/integrity/purge-fake-data", { method: "POST" });
+      if (response.ok) await fetchFakeDataCheck();
+    } catch (err) {
+      console.error("Erro ao limpar dados fake:", err);
+    } finally {
+      setPurgingFakeData(false);
+    }
+  };
+
   const fetchGoogleCalendarStatus = async () => {
     try {
       const response = await fetch("/api/auth/google/status");
@@ -116,7 +148,7 @@ export default function AdminDashboard({
   const fetchSupabaseStatus = async () => {
     setLoadingSupabase(true);
     try {
-      const response = await fetch("/api/supabase/status");
+      const response = await adminFetch("/api/supabase/status");
       if (response.ok) {
         const data = await response.json();
         setSupabaseStatus(data);
@@ -132,6 +164,7 @@ export default function AdminDashboard({
     fetchGoogleCalendarStatus();
     if (activeTab === "supabase") {
       fetchSupabaseStatus();
+      fetchFakeDataCheck();
     }
   }, [activeTab]);
 
@@ -1569,7 +1602,7 @@ export default function AdminDashboard({
                     <span className="font-bold text-sm text-zinc-900">Supabase Conectado</span>
                   </div>
                   <div className="text-[11px] text-zinc-500 break-all bg-white p-2 border border-zinc-200 font-mono rounded mt-2">
-                    URL: {supabaseStatus?.url || "https://wahmsrsnastxtqrxuufp.supabase.co"}
+                    URL: {supabaseStatus?.url || "Carregando..."}
                   </div>
                 </div>
 
@@ -1594,6 +1627,46 @@ export default function AdminDashboard({
                     </div>
                   ) : (
                     <div className="text-xs text-zinc-500 animate-pulse">Carregando status das tabelas...</div>
+                  )}
+                </div>
+
+                {/* Fake-data guard: flags rows matching the old hardcoded
+                    demo dataset's ids, which this app hasn't written since
+                    switching to UUIDs — a reliable sign that some other
+                    deployment is still seeding fake data into this database. */}
+                <div className={`p-4 rounded-xl border space-y-3 ${fakeDataCheck && !fakeDataCheck.clean ? "border-red-300 bg-red-50" : "border-zinc-200 bg-white"}`}>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-xs text-zinc-500 uppercase tracking-wider">Verificação de Dados Fake</h4>
+                    <button
+                      onClick={fetchFakeDataCheck}
+                      disabled={checkingFakeData}
+                      className="text-[10px] font-bold text-zinc-500 hover:text-zinc-800 transition cursor-pointer"
+                    >
+                      {checkingFakeData ? "Verificando..." : "🔄 Verificar"}
+                    </button>
+                  </div>
+                  {!fakeDataCheck ? (
+                    <div className="text-xs text-zinc-500 animate-pulse">Verificando...</div>
+                  ) : fakeDataCheck.clean ? (
+                    <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">✓ Nenhum dado fake encontrado</div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-red-700 font-semibold">
+                        Encontrados registros com os IDs do antigo dataset de demonstração — sinal de que algo (provavelmente um deploy antigo ainda ativo) está gravando dado fake direto no banco:
+                      </p>
+                      <ul className="text-[11px] font-mono text-red-800 space-y-0.5">
+                        {Object.entries(fakeDataCheck.found).map(([table, ids]) => (
+                          <li key={table}>{table}: {ids.join(", ")}</li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={handlePurgeFakeData}
+                        disabled={purgingFakeData}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white text-[10px] uppercase tracking-widest font-bold py-2.5 rounded-lg transition disabled:opacity-60 cursor-pointer"
+                      >
+                        {purgingFakeData ? "Removendo..." : "🗑️ Remover esses registros"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

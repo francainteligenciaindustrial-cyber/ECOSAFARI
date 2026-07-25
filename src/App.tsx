@@ -7,13 +7,6 @@ import VideoPlayerView from "./components/VideoPlayerView";
 import WhatsAppChatbot from "./components/WhatsAppChatbot";
 import WhatsAppGateView from "./components/WhatsAppGateView";
 import AdminLoginModal from "./components/AdminLoginModal";
-import PartnerSignupPage from "./components/PartnerSignupPage";
-import AboutPage from "./components/AboutPage";
-import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
-import TermsPage from "./components/TermsPage";
-import FaqPage from "./components/FaqPage";
-import CandidateStatusPage from "./components/CandidateStatusPage";
-import PaymentConfirmationPage from "./components/PaymentConfirmationPage";
 import PousadaOfficialSite from "./components/PousadaOfficialSite";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
@@ -28,6 +21,17 @@ import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./type
 // main bundle every visitor downloads today.
 const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
 const MobileSimulator = lazy(() => import("./components/MobileSimulator"));
+
+// Same reasoning for the standalone institutional/utility pages below — a
+// given visitor only ever lands on one of these at a time (if any), so there
+// is no reason to ship all seven in the main bundle up front.
+const PartnerSignupPage = lazy(() => import("./components/PartnerSignupPage"));
+const AboutPage = lazy(() => import("./components/AboutPage"));
+const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
+const TermsPage = lazy(() => import("./components/TermsPage"));
+const FaqPage = lazy(() => import("./components/FaqPage"));
+const CandidateStatusPage = lazy(() => import("./components/CandidateStatusPage"));
+const PaymentConfirmationPage = lazy(() => import("./components/PaymentConfirmationPage"));
 
 function LazyFallback() {
   return (
@@ -206,7 +210,11 @@ export default function App() {
   };
 
   if (StandalonePage) {
-    return <StandalonePage />;
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <StandalonePage />
+      </Suspense>
+    );
   }
 
   if (officialSiteMatch) {
@@ -311,12 +319,6 @@ export default function App() {
               <Lock className="h-3.5 w-3.5" />
             </button>
           )}
-
-          {/* Quick developer note styled elegantly */}
-          <div className="hidden lg:flex items-center gap-2 text-[10px] uppercase tracking-wider text-editorial-muted font-bold">
-            <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full animate-pulse"></div>
-            <span>API 3000 Live</span>
-          </div>
         </div>
       </header>
 

@@ -34,6 +34,8 @@ export default function PartnerSignupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [statusLink, setStatusLink] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [guiaForm, setGuiaForm] = useState({
     name: "", email: "", phone: "", languages: "", availability: "", age: "", experienceYears: "", specialty: "", message: ""
@@ -83,6 +85,11 @@ export default function PartnerSignupPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Falha ao enviar cadastro");
+      const created = await res.json();
+      if (created.statusToken) {
+        const email = type === "guia" ? guiaForm.email : pousadaForm.email;
+        setStatusLink(`${window.location.origin}/status-candidatura?email=${encodeURIComponent(email)}&token=${created.statusToken}`);
+      }
       setSubmitted(true);
     } catch (err) {
       setError("Não foi possível enviar seu cadastro agora. Tente novamente em instantes.");
@@ -105,6 +112,32 @@ export default function PartnerSignupPage() {
           <p className="text-editorial-muted text-sm mb-6">
             Obrigado pelo interesse em fazer parte da EcoSafari Brasil. Nossa equipe vai analisar suas informações e entrar em contato em breve.
           </p>
+
+          {statusLink && (
+            <div className="bg-editorial-secondary/40 border border-editorial-border rounded-md p-4 mb-6 text-left">
+              <p className="text-editorial-text text-xs font-bold mb-1">Guarde este link para acompanhar o status:</p>
+              <p className="text-editorial-muted text-[11px] mb-3">Só ele (junto com o email cadastrado) permite consultar o andamento — guarde-o com cuidado.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={statusLink}
+                  onFocus={e => e.target.select()}
+                  className="flex-1 min-w-0 bg-white border border-editorial-border px-2.5 py-2 text-[11px] rounded-md font-mono truncate"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(statusLink);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="flex-shrink-0 bg-editorial-primary text-white text-[10px] uppercase tracking-widest font-bold px-3 py-2 rounded-md hover:opacity-90 transition cursor-pointer"
+                >
+                  {linkCopied ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <a
             href={`https://wa.me/${WHATSAPP_NUMBER}?text=${waMessage}`}
