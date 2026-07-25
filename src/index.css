@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Theme colors corresponding to the Editorial Aesthetic */
+  --color-editorial-bg: #FDFCF8;
+  --color-editorial-primary: #2D4635;
+  --color-editorial-secondary: #F9F7F2;
+  --color-editorial-beige: #EFECE6;
+  --color-editorial-text: #1A1A1A;
+  --color-editorial-muted: #6B6B66;
+  --color-editorial-dark-muted: #8A8A82;
+  --color-editorial-border: #E5E2D9;
+}
+
+/* Google Translate widget — kept invisible, driven entirely by our own
+   LanguageSwitcher UI instead of Google's default banner/gadget. */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-gadget-icon,
+#google_translate_element {
+  display: none !important;
+}
+body {
+  top: 0px !important;
+}
+body.skiptranslate > .skiptranslate {
+  display: none !important;
+}
