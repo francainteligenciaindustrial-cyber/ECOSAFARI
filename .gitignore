@@ -10,6 +10,8 @@ coverage/
 # Raw photo staging folders — not referenced by any code, only public/ is
 # actually served. Keeping these out of git avoids ~25MB of unused binaries.
 IMAGENS/
+IMAGENS VAGALUME/
+_backup_originais_vagalume/
 images/
 vagalume/
 assets/

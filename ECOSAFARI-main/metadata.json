@@ -1,6 +1,0 @@
-{
-  "name": "Portal de Turismo e Safári",
-  "description": "Plataforma completa de turismo para pousadas parceiras com bot WhatsApp inteligente (Gemini), painel administrativo completo (CRUDs, aprovações, agenda), e aplicativo móvel de avistamentos.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
