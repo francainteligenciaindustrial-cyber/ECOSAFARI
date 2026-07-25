@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { google } from "googleapis";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
@@ -39,7 +38,12 @@ app.use((req, res, next) => {
   ensureDataSynced().then(() => next(), next);
 });
 
-let viteDevServer: Awaited<ReturnType<typeof createViteServer>> | null = null;
+// "vite" is dev-only and imported dynamically below (inside startLocalServer,
+// never called on Vercel) so its whole dependency tree stays out of the
+// serverless function bundle — a static top-level import here was pulling it
+// in regardless and is the likely cause of past FUNCTION_INVOCATION_FAILED
+// crashes on Vercel. Type-only reference below has no runtime cost.
+let viteDevServer: import("vite").ViteDevServer | null = null;
 
 // Initialize Supabase client safely
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://yqgyjfcygulolwxcuwow.supabase.co";
@@ -2590,6 +2594,7 @@ async function startLocalServer() {
   await ensureDataSynced();
 
   if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     viteDevServer = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
