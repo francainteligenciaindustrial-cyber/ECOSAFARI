@@ -8,6 +8,7 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/sitemap.xml", "destination": "/api/index" },
     { "source": "/pousadas/:id", "destination": "/api/index" },
     { "source": "/site/:slug", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }

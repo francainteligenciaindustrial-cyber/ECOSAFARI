@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertTriangle, RotateCcw, MessageSquare } from "lucide-react";
+import { captureException } from "../lib/errorReporting";
 
 interface Props {
   children: React.ReactNode;
@@ -21,6 +22,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: unknown, info: React.ErrorInfo) {
     console.error("Erro não tratado na aplicação:", error, info.componentStack);
+    captureException(error, { componentStack: info.componentStack ?? undefined });
   }
 
   render() {

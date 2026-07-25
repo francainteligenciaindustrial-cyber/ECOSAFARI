@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck } from "lucide-react";
 import { Pousada, Review, Species, Sighting, PublicBookingSummary } from "../types";
 import MobileSimulator from "./MobileSimulator";
+import PictureImg from "./PictureImg";
 
 const WILD_SPECIES = [
   {
@@ -296,7 +297,7 @@ export default function PousadaCatalog({
             >
               {/* Image Container with Tag */}
               <div className="relative h-64 overflow-hidden">
-                <img
+                <PictureImg
                   src={(pousada.images && pousada.images[0]) || "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80"}
                   alt={pousada.name || "Pousada"}
                   referrerPolicy="no-referrer"
@@ -399,10 +400,13 @@ export default function PousadaCatalog({
           {/* Carousel Viewport Wrapper */}
           <div className="relative group/carousel">
             
-            {/* Left Button */}
+            {/* Left Button — sits in the gutter created by the scroll
+                container's px-16 padding below, clear of card content at
+                every breakpoint (it used to sit partly on top of the first/
+                last card's text). */}
             <button
               onClick={scrollSpeciesLeft}
-              className="absolute -left-2 md:left-2 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full border border-amber-500/30 bg-[#121613]/85 hover:bg-amber-500 hover:text-[#121613] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#121613]/85 hover:bg-amber-500 hover:text-[#121613] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label="Anterior"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -411,7 +415,7 @@ export default function PousadaCatalog({
             {/* Right Button */}
             <button
               onClick={scrollSpeciesRight}
-              className="absolute -right-2 md:right-2 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full border border-amber-500/30 bg-[#121613]/85 hover:bg-amber-500 hover:text-[#121613] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#121613]/85 hover:bg-amber-500 hover:text-[#121613] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label="Próximo"
             >
               <ChevronRight className="h-6 w-6" />
@@ -420,7 +424,7 @@ export default function PousadaCatalog({
             {/* Horizontal Scroll container */}
             <div
               ref={speciesCarouselRef}
-              className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-8 px-4 md:px-12"
+              className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-8 px-14 md:px-16"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
               {displaySpecies.map((specie) => (
@@ -430,16 +434,12 @@ export default function PousadaCatalog({
                 >
                   {/* Image container */}
                   <div className="relative h-60 md:h-64 overflow-hidden">
-                    <img
+                    <PictureImg
                       src={specie.image}
                       alt={specie.name}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
                     />
-                    {/* Scientific name capsule bottom left inside image */}
-                    <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-md border border-amber-500/30 text-amber-500 font-mono text-[9px] px-3 py-1 uppercase tracking-widest font-semibold">
-                      {specie.scientificName}
-                    </div>
                   </div>
 
                   {/* Body Content */}
@@ -492,9 +492,6 @@ export default function PousadaCatalog({
           
           {/* Left Column: Advertising Copy */}
           <div className="lg:col-span-7 flex flex-col justify-center text-left">
-            <span className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-3.5 py-1.5 text-[9px] font-mono tracking-widest font-bold uppercase mb-4 inline-block w-fit rounded-full">
-              ⚡ TECNOLOGIA EM CAMPO
-            </span>
             <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight mb-6 text-balance text-white">
               Baixe o App Oficial <br className="hidden md:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400">
@@ -630,10 +627,11 @@ export default function PousadaCatalog({
 
             {/* Left: Image Side */}
             <div className="w-full md:w-1/2 relative h-64 md:h-auto min-h-[300px]">
-              <img
+              <PictureImg
                 src={selectedSpecies.image}
                 alt={selectedSpecies.name}
                 referrerPolicy="no-referrer"
+                loading="eager"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>

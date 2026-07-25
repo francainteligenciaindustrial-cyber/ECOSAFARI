@@ -4,6 +4,7 @@ import { Pousada, Review } from "../types";
 import { slugify } from "../lib/slug";
 import { navigate } from "../lib/router";
 import LanguageSwitcher from "./LanguageSwitcher";
+import PictureImg from "./PictureImg";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -88,10 +89,12 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
 
       {/* Hero */}
       <section className="relative h-[65vh] min-h-[420px] flex items-end">
-        <img
+        <PictureImg
           src={pousada.images[0]}
           alt={pousada.name}
           referrerPolicy="no-referrer"
+          loading="eager"
+          fetchPriority="high"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -120,7 +123,7 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
         <section className="bg-editorial-secondary border-y border-editorial-border py-16">
           <div className="max-w-5xl mx-auto px-6 md:px-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
             <div className="aspect-[4/3] overflow-hidden border border-editorial-border order-2 md:order-1">
-              <img
+              <PictureImg
                 src={pousada.teamPhotoUrl}
                 alt={pousada.teamSectionTitle || "Quem vai te receber"}
                 referrerPolicy="no-referrer"
@@ -156,7 +159,7 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {pousada.images.slice(0, 6).map((img, idx) => (
               <div key={idx} className="aspect-square overflow-hidden border border-editorial-border">
-                <img src={img} alt={`${pousada.name} ${idx + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover hover:scale-105 transition duration-500" />
+                <PictureImg src={img} alt={`${pousada.name} ${idx + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover hover:scale-105 transition duration-500" />
               </div>
             ))}
           </div>

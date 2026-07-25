@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram } from "lucide-react";
 import { Pousada } from "../types";
 import { slugify } from "../lib/slug";
+import PictureImg from "./PictureImg";
 
 interface PousadaDetailsViewProps {
   pousada: Pousada;
@@ -107,10 +108,12 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             onClick={() => setLightboxIndex(0)}
             className="h-[420px] md:h-[480px] overflow-hidden rounded-none border border-editorial-border relative cursor-pointer group mb-4"
           >
-            <img
+            <PictureImg
               src={images[0]}
               alt={pousada.name}
               referrerPolicy="no-referrer"
+              loading="eager"
+              fetchPriority="high"
               className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
             />
             <div className="absolute bottom-4 left-4 bg-editorial-primary/95 text-[#FDFCF8] text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-none font-bold">
@@ -131,7 +134,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                   onClick={() => setLightboxIndex(idx + 1)}
                   className="aspect-square overflow-hidden border border-editorial-border relative cursor-pointer group"
                 >
-                  <img
+                  <PictureImg
                     src={img}
                     alt={`${pousada.name} ${idx + 2}`}
                     referrerPolicy="no-referrer"
@@ -164,10 +167,11 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
               </button>
             )}
 
-            <img
+            <PictureImg
               src={images[lightboxIndex]}
               alt={`${pousada.name} ${lightboxIndex + 1}`}
               referrerPolicy="no-referrer"
+              loading="eager"
               onClick={(e) => e.stopPropagation()}
               className="max-h-[85vh] max-w-[90vw] object-contain"
             />

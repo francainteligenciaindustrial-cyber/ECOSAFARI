@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import fs from "fs";
 import { google } from "googleapis";
@@ -14,7 +15,51 @@ import { slugify } from "./src/lib/slug.js";
 dotenv.config();
 
 const app = express();
+
+// Stripe requires the raw, untouched request body to verify the webhook
+// signature, so this route (and its express.raw() body parser) must be
+// registered before the blanket express.json() below would otherwise
+// consume and re-serialize the body first.
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+
 app.use(express.json());
+
+// Rate limiting — bounds brute-force and spam abuse per IP. Vercel sits in
+// front as a proxy, so `trust proxy` is required for express-rate-limit to
+// key off the real client IP (X-Forwarded-For) instead of Vercel's own.
+app.set("trust proxy", 1);
+
+const authLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas tentativas. Tente novamente em alguns minutos." },
+});
+
+const publicFormLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitos envios em pouco tempo. Tente novamente mais tarde." },
+});
+
+const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas tentativas de pagamento. Tente novamente mais tarde." },
+});
+
+const chatLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Muitas mensagens em pouco tempo. Aguarde um instante." },
+});
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const isProd = process.env.NODE_ENV === "production";
@@ -86,22 +131,62 @@ const supabaseAdminAuth = SUPABASE_SERVICE_ROLE_KEY
 // app_metadata.role === "admin") before allowing access to admin-only routes.
 // The Gestão tab hides itself client-side for non-admins, but that's cosmetic —
 // this is what actually stops someone from calling the API directly.
-async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+const requireAdmin: express.RequestHandler[] = [
+  authLimiter,
+  async (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
-  if (!token) {
-    return res.status(401).json({ error: "Autenticação necessária." });
-  }
-
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data.user || data.user.app_metadata?.role !== "admin") {
-      return res.status(403).json({ error: "Acesso restrito a administradores." });
+    if (!token) {
+      return res.status(401).json({ error: "Autenticação necessária." });
     }
-    next();
+
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data.user || data.user.app_metadata?.role !== "admin") {
+        return res.status(403).json({ error: "Acesso restrito a administradores." });
+      }
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Token inválido." });
+    }
+  },
+];
+
+// Optional Sentry error reporting — lazy-imported only when SENTRY_DSN is
+// set, so an unconfigured deployment doesn't pay for the dependency at
+// startup. Same graceful-degradation pattern as Stripe/Resend/Gemini above.
+const SENTRY_DSN = process.env.SENTRY_DSN;
+let sentryReady: Promise<typeof import("@sentry/node")> | null = null;
+if (SENTRY_DSN) {
+  sentryReady = import("@sentry/node").then((Sentry) => {
+    Sentry.init({ dsn: SENTRY_DSN, tracesSampleRate: 0.1 });
+    return Sentry;
+  });
+}
+async function reportServerError(err: unknown) {
+  if (!sentryReady) return;
+  const Sentry = await sentryReady.catch(() => null);
+  Sentry?.captureException(err);
+}
+
+// reCAPTCHA v3 (invisible — no checkbox challenge). Verifies a token the
+// frontend gets from Google before accepting a public-form submission, to
+// keep bots from scripting POSTs straight at the API. Fails open (allows the
+// submission) when RECAPTCHA_SECRET_KEY isn't configured yet, or when Google's
+// endpoint itself is unreachable — a captcha outage shouldn't block real users.
+const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+async function verifyRecaptcha(token: unknown): Promise<boolean> {
+  if (!RECAPTCHA_SECRET_KEY) return true;
+  if (typeof token !== "string" || !token) return false;
+  try {
+    const params = new URLSearchParams({ secret: RECAPTCHA_SECRET_KEY, response: token });
+    const resp = await fetch("https://www.google.com/recaptcha/api/siteverify", { method: "POST", body: params });
+    const data: any = await resp.json();
+    return data.success === true && (typeof data.score !== "number" || data.score >= 0.5);
   } catch (err) {
-    res.status(401).json({ error: "Token inválido." });
+    console.warn("Falha ao verificar reCAPTCHA (permitindo o envio):", err);
+    return true;
   }
 }
 
@@ -127,6 +212,7 @@ if (GEMINI_API_KEY && GEMINI_API_KEY !== "MY_GEMINI_API_KEY") {
 // Initialize Stripe safely — checkout falls back to the payment simulation
 // button in the chatbot until a real key is provided.
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 let stripe: Stripe | null = null;
 if (STRIPE_SECRET_KEY && STRIPE_SECRET_KEY !== "MY_STRIPE_SECRET_KEY") {
   try {
@@ -135,6 +221,9 @@ if (STRIPE_SECRET_KEY && STRIPE_SECRET_KEY !== "MY_STRIPE_SECRET_KEY") {
   } catch (err) {
     console.error("Failed to initialize Stripe client:", err);
   }
+}
+if (stripe && !STRIPE_WEBHOOK_SECRET) {
+  console.warn("STRIPE_WEBHOOK_SECRET não configurada — o webhook /api/stripe/webhook ficará inativo e a confirmação de pagamento dependerá só do retorno do navegador.");
 }
 
 // Initialize Resend safely — booking confirmation emails are skipped
@@ -458,9 +547,12 @@ let reviews: Review[] = [
 ];
 
 let sightings: Sighting[] = [
-  { id: "s1", pousadaId: "1", pousadaName: "Araras Eco Lodge", userName: "Bruno Rezende", animalName: "Onça-Pintada (Panthera onca)", imageUrl: "https://images.unsplash.com/photo-1575550959106-5a7defe28b56?auto=format&fit=crop&w=600&q=80", location: "Rio Clarinho, Pantanal", timestamp: "2026-07-15T10:00:00.000Z", likes: 24 },
-  { id: "s2", pousadaId: "2", pousadaName: "Pousada Trijunção", userName: "Leticia Castro", animalName: "Lobo-Guará (Chrysocyon brachyurus)", imageUrl: "https://images.unsplash.com/photo-1590005354167-6da97870c913?auto=format&fit=crop&w=600&q=80", location: "Veredas das Três Divisas", timestamp: "2026-07-14T18:40:00.000Z", likes: 18 },
-  { id: "s3", pousadaId: "3", pousadaName: "Anavilhanas Jungle Lodge", userName: "Alice Dupont", animalName: "Boto-Cor-de-Rosa (Inia geoffrensis)", imageUrl: "https://images.unsplash.com/photo-1550411294-b3b1bd5fce12?auto=format&fit=crop&w=600&q=80", location: "Margens do Rio Negro", timestamp: "2026-07-13T14:20:00.000Z", likes: 32 }
+  { id: "s1", pousadaId: "p_1784944422389", pousadaName: "Pesqueiro Vagalume", userName: "Bruno Rezende", animalName: "Onça-Pintada (Panthera onca)", imageUrl: "/species/onca-pintada.png", location: "Lago do Pesqueiro Vagalume, Mato Grosso", timestamp: "2026-07-15T10:00:00.000Z", likes: 24 },
+  // Giant otter photo: Charles J. Sharp, Wikimedia Commons, CC BY-SA 4.0 —
+  // https://commons.wikimedia.org/wiki/File:Giant_otters_(Pteronura_brasiliensis).jpg
+  // No local asset exists for this species yet, unlike onça/capivara.
+  { id: "s2", pousadaId: "p_1784944422389", pousadaName: "Pesqueiro Vagalume", userName: "Leticia Castro", animalName: "Ariranha (Pteronura brasiliensis)", imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Giant_otters_%28Pteronura_brasiliensis%29.jpg/1200px-Giant_otters_%28Pteronura_brasiliensis%29.jpg", location: "Lago do Pesqueiro Vagalume, Mato Grosso", timestamp: "2026-07-14T18:40:00.000Z", likes: 18 },
+  { id: "s3", pousadaId: "p_1784944422389", pousadaName: "Pesqueiro Vagalume", userName: "Alice Dupont", animalName: "Capivara (Hydrochoerus hydrochaeris)", imageUrl: "/species/capivara.png", location: "Lago do Pesqueiro Vagalume, Mato Grosso", timestamp: "2026-07-13T14:20:00.000Z", likes: 32 }
 ];
 
 let notifications: Notification[] = [
@@ -1378,7 +1470,7 @@ app.get("/api/stripe/status", (req, res) => {
   res.json({ configured: !!stripe });
 });
 
-app.post("/api/create-checkout-session", async (req, res) => {
+app.post("/api/create-checkout-session", checkoutLimiter, async (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: "Stripe não configurado. Defina STRIPE_SECRET_KEY para ativar o checkout real." });
   }
@@ -1416,7 +1508,41 @@ app.post("/api/create-checkout-session", async (req, res) => {
   }
 });
 
-app.get("/api/payments/confirm", async (req, res) => {
+// Signature-verified webhook: Stripe calls this directly (server-to-server),
+// so it confirms payment even if the customer's browser never makes it back
+// to /pagamento-confirmado. constructEvent() throws if the "stripe-signature"
+// header doesn't match STRIPE_WEBHOOK_SECRET, which is what stops anyone
+// from POSTing a fake "payment succeeded" event at this endpoint.
+async function handleStripeWebhook(req: express.Request, res: express.Response) {
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).send("Stripe webhook não configurado");
+  }
+
+  const signature = req.headers["stripe-signature"];
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, signature as string, STRIPE_WEBHOOK_SECRET);
+  } catch (err: any) {
+    console.error("Assinatura do webhook Stripe inválida:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const bookingId = session.metadata?.bookingId;
+    if (session.payment_status === "paid" && bookingId) {
+      try {
+        await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
+      } catch (err: any) {
+        console.error("Erro ao confirmar reserva via webhook Stripe:", err.message);
+      }
+    }
+  }
+
+  res.json({ received: true });
+}
+
+app.get("/api/payments/confirm", checkoutLimiter, async (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: "Stripe não configurado" });
   }
@@ -1549,16 +1675,19 @@ app.get("/api/sightings", (req, res) => {
   res.json(sightings);
 });
 
-app.post("/api/sightings", (req, res) => {
+app.post("/api/sightings", publicFormLimiter, (req, res) => {
   const { pousadaId, userName, animalName, imageUrl, location } = req.body;
-  const targetPousada = pousadas.find(p => p.id === pousadaId);
+  const targetPousada = pousadas.find(p => p.id === pousadaId) || pousadas[0];
   const newSighting: Sighting = {
     id: `s_${Date.now()}`,
-    pousadaId: pousadaId || "1",
-    pousadaName: targetPousada ? targetPousada.name : "Araras Eco Lodge",
+    pousadaId: targetPousada ? targetPousada.id : (pousadaId || ""),
+    pousadaName: targetPousada ? targetPousada.name : "",
     userName: userName || "Turista Anônimo",
     animalName,
-    imageUrl: imageUrl || "https://images.unsplash.com/photo-1575550959106-5a7defe28b56?auto=format&fit=crop&w=600&q=80",
+    // Generic nature scene, not a specific species — a sighting can be of any
+    // animal, so falling back to one species' photo (like the old jaguar
+    // default) mislabels every other animal that gets posted without a photo.
+    imageUrl: imageUrl || "/pousadas/vagalume-lago-deck.png",
     location: location || "Pantanal",
     timestamp: new Date().toISOString(),
     likes: 0
@@ -1574,7 +1703,7 @@ app.post("/api/sightings", (req, res) => {
   res.status(201).json(newSighting);
 });
 
-app.post("/api/sightings/:id/like", (req, res) => {
+app.post("/api/sightings/:id/like", publicFormLimiter, (req, res) => {
   const { id } = req.params;
   const idx = sightings.findIndex(s => s.id === id);
   if (idx !== -1) {
@@ -1596,7 +1725,7 @@ app.get("/api/reviews", (req, res) => {
   res.json(reviews);
 });
 
-app.post("/api/reviews", (req, res) => {
+app.post("/api/reviews", publicFormLimiter, (req, res) => {
   const newReview: Review = {
     id: `r_${Date.now()}`,
     pousadaId: req.body.pousadaId,
@@ -1963,12 +2092,17 @@ app.get("/api/candidaturas/status", (req, res) => {
   res.json(matches);
 });
 
-app.post("/api/candidaturas", async (req, res) => {
+app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
+  const { recaptchaToken, ...body } = req.body;
+  if (!(await verifyRecaptcha(recaptchaToken))) {
+    return res.status(400).json({ error: "Falha na verificação de segurança. Recarregue a página e tente novamente." });
+  }
+
   const newCandidatura: Candidatura = {
     id: `cand_${Date.now()}`,
     status: "pendente",
     dateCreated: new Date().toISOString(),
-    ...req.body
+    ...body
   };
   candidaturas.unshift(newCandidatura);
 
@@ -2018,7 +2152,7 @@ app.delete("/api/candidaturas/:id", requireAdmin, async (req, res) => {
 
 // REFERRAL SOURCES — pesquisa "como você chegou até nós?" no primeiro acesso.
 // POST é público (qualquer visitante responde); GET é admin-only (estatísticas).
-app.post("/api/referral-sources", async (req, res) => {
+app.post("/api/referral-sources", publicFormLimiter, async (req, res) => {
   const newSource: ReferralSource = {
     id: `ref_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
     timestamp: new Date().toISOString(),
@@ -2414,7 +2548,7 @@ function getPousadasContext() {
 
 const AGENCY_WHATSAPP = "+55 65 99986-8334";
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", chatLimiter, async (req, res) => {
   const { messages } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
@@ -2499,6 +2633,24 @@ function injectPousadaMeta(html: string, pousada: Pousada): string {
     .replace(/<meta name="twitter:image" content=".*?"\s*\/>/, `<meta name="twitter:image" content="${escapeHtml(image)}" />`);
 }
 
+// SITE_URL: base URL used to build absolute links in the sitemap. Falls back
+// to a placeholder — set this env var once the real domain (item 14) is live
+// so the sitemap doesn't need a code change.
+const SITE_URL = (process.env.SITE_URL || "https://www.ecosafaribrasil.com.br").replace(/\/$/, "");
+
+app.get("/sitemap.xml", (req, res) => {
+  const staticPaths = ["/", "/sobre", "/faq", "/privacidade", "/termos", "/seja-parceiro"];
+  const urls = [
+    ...staticPaths.map(p => `${SITE_URL}${p}`),
+    ...pousadas.flatMap(p => [`${SITE_URL}/pousadas/${p.id}`, `${SITE_URL}/site/${slugify(p.name)}`]),
+  ];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+    .map(u => `  <url><loc>${u}</loc></url>`)
+    .join("\n")}\n</urlset>`;
+  res.setHeader("Content-Type", "application/xml");
+  res.send(xml);
+});
+
 // Registered at module scope (not inside startLocalServer) so these also run
 // as a Vercel serverless function, where app.listen() never executes and the
 // static/SPA-fallback branch below is handled by Vercel's CDN + vercel.json
@@ -2539,6 +2691,17 @@ app.get('/site/:slug', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// Catches errors passed to next(err) by any route above (routes that handle
+// their own try/catch and respond directly never reach this). Must be
+// registered with all 4 params — that arity is how Express recognizes an
+// error handler instead of regular middleware.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("Erro não tratado:", err);
+  reportServerError(err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: "Erro interno do servidor" });
 });
 
 // Long-lived Node process entrypoint — used locally (npm run dev) and on

@@ -1,9 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Compass, Users, Building2, CheckCircle2, ArrowLeft, MessageSquare } from "lucide-react";
 
 const WHATSAPP_NUMBER = "5565999868334";
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
 type PartnerType = "guia" | "pousada";
+
+// Loads the reCAPTCHA v3 script once and resolves a fresh token per submit.
+// No-op (resolves undefined) when VITE_RECAPTCHA_SITE_KEY isn't configured —
+// the backend accepts submissions without a token in that case too.
+function useRecaptcha() {
+  useEffect(() => {
+    if (!RECAPTCHA_SITE_KEY || document.getElementById("recaptcha-v3-script")) return;
+    const script = document.createElement("script");
+    script.id = "recaptcha-v3-script";
+    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
+    document.head.appendChild(script);
+  }, []);
+
+  return async (action: string): Promise<string | undefined> => {
+    const grecaptcha = (window as any).grecaptcha;
+    if (!RECAPTCHA_SITE_KEY || !grecaptcha) return undefined;
+    return new Promise((resolve) => {
+      grecaptcha.ready(() => {
+        grecaptcha.execute(RECAPTCHA_SITE_KEY, { action }).then(resolve).catch(() => resolve(undefined));
+      });
+    });
+  };
+}
 
 export default function PartnerSignupPage() {
   const [type, setType] = useState<PartnerType>("guia");
@@ -17,15 +41,19 @@ export default function PartnerSignupPage() {
   const [pousadaForm, setPousadaForm] = useState({
     pousadaName: "", name: "", email: "", phone: "", location: "", capacity: "", message: ""
   });
+  const getRecaptchaToken = useRecaptcha();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError("");
 
+    const recaptchaToken = await getRecaptchaToken("candidatura_parceiro");
+
     const payload = type === "guia"
       ? {
           type,
+          recaptchaToken,
           name: guiaForm.name,
           email: guiaForm.email,
           phone: guiaForm.phone,
@@ -38,6 +66,7 @@ export default function PartnerSignupPage() {
         }
       : {
           type,
+          recaptchaToken,
           name: pousadaForm.name,
           email: pousadaForm.email,
           phone: pousadaForm.phone,

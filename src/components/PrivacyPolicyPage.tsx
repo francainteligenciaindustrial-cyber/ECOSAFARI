@@ -62,7 +62,12 @@ export default function PrivacyPolicyPage() {
         Adotamos medidas técnicas razoáveis para proteger seus dados, incluindo criptografia em trânsito (TLS) e em repouso, fornecidas pela nossa infraestrutura de banco de dados. Nenhum sistema é 100% imune a incidentes, e nos comprometemos a notificar titulares e autoridades competentes em caso de incidentes de segurança relevantes, conforme exigido pela LGPD.
       </p>
 
-      <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">7. Contato</h3>
+      <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">7. Cookies</h3>
+      <p>
+        Usamos cookies e armazenamento local (localStorage) essenciais para o funcionamento do site, como manter sua sessão de administrador ativa e lembrar que você já respondeu ao aviso de cookies. Ao aceitar no banner exibido na primeira visita, você também autoriza cookies de análise (quando ativados, ex: Google Analytics), usados apenas para entender de forma agregada como o site é utilizado — nunca para identificá-lo individualmente. Você pode recusar os cookies de análise a qualquer momento no banner ou limpando os dados de navegação do seu navegador.
+      </p>
+
+      <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">8. Contato</h3>
       <p>
         Dúvidas sobre esta política podem ser enviadas para{" "}
         <a href="mailto:francainteligenciaindustrial@gmail.com" className="text-editorial-primary font-semibold hover:underline">francainteligenciaindustrial@gmail.com</a>{" "}

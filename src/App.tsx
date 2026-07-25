@@ -17,8 +17,8 @@ import FaqPage from "./components/FaqPage";
 import CandidateStatusPage from "./components/CandidateStatusPage";
 import PaymentConfirmationPage from "./components/PaymentConfirmationPage";
 import PousadaOfficialSite from "./components/PousadaOfficialSite";
-import FirstVisitSurvey from "./components/FirstVisitSurvey";
 import LanguageSwitcher from "./components/LanguageSwitcher";
+import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { useRoute, navigate } from "./lib/router";
 import { Pousada, Guide, Sighting, Review, Species, PublicBookingSummary } from "./types";
@@ -374,9 +374,6 @@ export default function App() {
                 {portalView !== "whatsapp-gate" && (
                   <WhatsAppChatbot onOpen={() => openWhatsAppGate()} />
                 )}
-
-                {/* First-visit "how did you find us?" survey — shows once, ever */}
-                <FirstVisitSurvey />
               </>
             )}
 
@@ -402,16 +399,6 @@ export default function App() {
             <span className="font-serif font-bold text-lg tracking-normal capitalize text-white">
               EcoSafari Brasil
             </span>
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-[9px] text-[#FDFCF8]/65 font-bold">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                <span>WhatsApp API: Connected</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                <span>Calendar Sync: Active</span>
-              </div>
-            </div>
             <a
               href="/seja-parceiro"
               onClick={(e) => { e.preventDefault(); navigate("/seja-parceiro"); }}
@@ -475,8 +462,17 @@ export default function App() {
           <a href="/termos" onClick={(e) => { e.preventDefault(); navigate("/termos"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Termos de Uso e Cancelamento</a>
           <a href="/status-candidatura" onClick={(e) => { e.preventDefault(); navigate("/status-candidatura"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Status da Candidatura</a>
         </div>
+
+        {/* Institutional identity — required for a public booking/payment
+            site to look legitimate (and for LGPD's data-controller
+            disclosure). TODO: swap the placeholders for the real CNPJ and
+            registered address before launch. */}
+        <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#FDFCF8]/50 font-normal normal-case tracking-normal">
+          EcoSafari Brasil • CNPJ: 00.000.000/0001-00 (atualizar) • (Endereço a atualizar — Cidade/UF)
+        </div>
       </footer>
-      
+
+      <CookieConsentBanner />
     </div>
   );
 }
