@@ -7,7 +7,15 @@ import PictureImg from "./PictureImg";
 // here since this page embeds it directly too).
 const MobileSimulator = lazy(() => import("./MobileSimulator"));
 
-const WILD_SPECIES = [
+// Educational fallback content shown only while the admin hasn't registered
+// any real species yet (see displaySpecies below). Deliberately has no
+// bestPousadaId/bestPousadaName of its own — those used to be hardcoded to
+// fake demo lodge names ("Araras Eco Lodge", "Cristalino Lodge", etc.) that
+// don't exist in the real database, which silently mismatched whatever real
+// pousada the "Conhecer Pousada Ideal" button actually opened (it always
+// fell back to pousadas[0] since the fake id never matched). Real pousadas
+// are bound in dynamically at render time instead.
+const WILD_SPECIES_INFO = [
   {
     id: "capivara",
     name: "Capivara",
@@ -16,9 +24,7 @@ const WILD_SPECIES = [
     description: "O maior roedor do mundo vive harmoniosamente em grandes grupos familiares ao longo das margens ensolaradas do Rio Cuiabá.",
     details: "As capivaras são animais extremamente sociáveis e excelentes nadadoras. No Pantanal, elas desempenham um papel crucial no ecossistema, servindo como uma das principais presas para jacarés e onças-pintadas. Podem permanecer submersas por até 5 minutos para escapar de predadores.",
     sightings: "95%+ AVISTAMENTOS",
-    image: "/species/capivara.png",
-    bestPousadaId: "1", // Araras Eco Lodge
-    bestPousadaName: "Araras Eco Lodge"
+    image: "/species/capivara.png"
   },
   {
     id: "jacare",
@@ -28,9 +34,7 @@ const WILD_SPECIES = [
     description: "Soberano das águas calmas, é comumente visto regulando sua temperatura sob o sol quente nas praias de areia branca.",
     details: "O jacaré-do-pantanal alimenta-se principalmente de peixes e moluscos. Após quase serem extintos devido à caça ilegal nas décadas de 1970 e 1980, hoje a população está totalmente recuperada e estimada em milhões de indivíduos, sendo um dos maiores casos de sucesso em conservação ambiental no Brasil.",
     sightings: "95%+ AVISTAMENTOS",
-    image: "/species/jacare-do-pantanal.png",
-    bestPousadaId: "1", // Araras Eco Lodge
-    bestPousadaName: "Araras Eco Lodge"
+    image: "/species/jacare-do-pantanal.png"
   },
   {
     id: "tucano",
@@ -40,9 +44,7 @@ const WILD_SPECIES = [
     description: "Com seu bico laranja vibrante, é a ave mais reconhecível do Pantanal, avistada com frequência nas copas das árvores à beira-rio.",
     details: "O bico do tucano, embora pareça pesado, é extremamente leve pois sua estrutura interna é esponjosa. Ele funciona como um sofisticado regulador térmico, dissipando o calor do corpo em dias quentes. Alimentam-se de frutos, mas também de ovos e filhotes de outras aves.",
     sightings: "90%+ AVISTAMENTOS",
-    image: "/species/tucano-toco.png",
-    bestPousadaId: "6", // Cristalino Lodge
-    bestPousadaName: "Cristalino Lodge"
+    image: "/species/tucano-toco.png"
   },
   {
     id: "cardeal",
@@ -52,9 +54,7 @@ const WILD_SPECIES = [
     description: "Reconhecível por seu topete vermelho vibrante contrastando com o peito branco, é presença certa nas margens arborizadas do Pantanal.",
     details: "Esta pequena ave destaca-se pela crista vermelha pontiaguda e canto melodioso. Vivem em pares ou pequenos bandos familiares e habitam vegetações arbustivas próximas à água, onde alimentam-se de sementes, insetos e pequenos frutos caídos.",
     sightings: "85%+ AVISTAMENTOS",
-    image: "/species/cardeal.png",
-    bestPousadaId: "1", // Araras Eco Lodge
-    bestPousadaName: "Araras Eco Lodge"
+    image: "/species/cardeal.png"
   },
   {
     id: "arara",
@@ -64,9 +64,7 @@ const WILD_SPECIES = [
     description: "Com plumagem azul e amarela vibrante, voa em casais que permanecem juntos por toda a vida, um símbolo de fidelidade na natureza pantaneira.",
     details: "As araras-canindé utilizam seus bicos fortes como um terceiro membro para escaladas e para quebrar sementes duras de palmeiras. Elas nidificam em troncos ocos de palmeiras mortas e o casal divide todas as tarefas de cuidado com os ovos e filhotes.",
     sightings: "95%+ AVISTAMENTOS",
-    image: "/species/arara-caninde.png",
-    bestPousadaId: "5", // Refúgio Ecológico Caiman
-    bestPousadaName: "Refúgio Ecológico Caiman"
+    image: "/species/arara-caninde.png"
   },
   {
     id: "onca",
@@ -76,9 +74,7 @@ const WILD_SPECIES = [
     description: "A rainha indiscutível do Pantanal, observada espreitando entre a folhagem densa — o avistamento mais desejado de toda expedição.",
     details: "A onça-pintada é o maior felino das Américas. No Pantanal, devido à abundância de presas e proteção estrita, elas atingem quase o dobro do peso de suas parentes amazônicas. São excelentes nadadoras e caçam jacarés e capivaras diretamente nas margens dos rios.",
     sightings: "95%+ AVISTAMENTOS",
-    image: "/species/onca-pintada.png",
-    bestPousadaId: "5", // Refúgio Ecológico Caiman
-    bestPousadaName: "Refúgio Ecológico Caiman"
+    image: "/species/onca-pintada.png"
   },
   {
     id: "coruja",
@@ -88,9 +84,7 @@ const WILD_SPECIES = [
     description: "Ao contrário da maioria das corujas, é ativa também durante o dia e vive em tocas no chão, observando o campo com seus olhos amarelos atentos.",
     details: "As corujas-buraqueiras escavam seus próprios ninhos no solo ou aproveitam buracos abandonados de tatu. Elas acumulam esterco ao redor de suas tocas para atrair besouros, que servem de alimento fácil, demonstrando um comportamento incrivelmente astuto de uso de ferramentas.",
     sightings: "90%+ AVISTAMENTOS",
-    image: "/species/coruja-buraqueira.png",
-    bestPousadaId: "7", // Pousada Canto das Águas (let's double check if we have 7, we'll map to first if not found)
-    bestPousadaName: "Pousada Canto das Águas"
+    image: "/species/coruja-buraqueira.png"
   },
   {
     id: "curicaca",
@@ -100,9 +94,7 @@ const WILD_SPECIES = [
     description: "De canto forte e característico ao amanhecer, é vista em campos abertos e praias fluviais com seu bico longo e curvado perfeito para alimentação.",
     details: "A curicaca possui um grito metálico muito alto e inconfundível, frequentemente ouvido no raiar do dia. Seu bico longo e curvado é perfeitamente adaptado para sondar o solo úmido e lodo em busca de insetos, aranhas, anfíbios e pequenos répteis.",
     sightings: "95%+ AVISTAMENTOS",
-    image: "/species/curicaca.png",
-    bestPousadaId: "1", // Araras Eco Lodge
-    bestPousadaName: "Araras Eco Lodge"
+    image: "/species/curicaca.png"
   }
 ];
 
@@ -133,7 +125,20 @@ export default function PousadaCatalog({
   onAddReview,
   onOpenBotWithPousada
 }: PousadaCatalogProps) {
-  const displaySpecies = species.length > 0 ? species : WILD_SPECIES;
+  // Binds each fallback species to a real partner pousada (round-robin) so
+  // "Onde avistar esta espécie" always names a lodge that actually exists —
+  // and that the "Conhecer Pousada Ideal" button actually opens — instead of
+  // a fixed fake name from demo data.
+  const displaySpecies = species.length > 0
+    ? species
+    : WILD_SPECIES_INFO.map((s, idx) => {
+        const realPousada = pousadas.length > 0 ? pousadas[idx % pousadas.length] : null;
+        return {
+          ...s,
+          bestPousadaId: realPousada?.id || "",
+          bestPousadaName: realPousada?.name || "Pousadas parceiras EcoSafari"
+        };
+      });
   const [filterLocation, setFilterLocation] = useState("all");
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState("");

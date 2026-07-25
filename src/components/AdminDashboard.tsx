@@ -79,10 +79,14 @@ export default function AdminDashboard({
     fetchNotifications();
     fetchBookings();
     fetchGuides();
+    // 15s (not the previous 6s) plus a background-tab pause is still fast
+    // enough for an admin actively watching the dashboard, without doubling
+    // load on every open admin tab left in a background browser tab.
     const interval = setInterval(() => {
+      if (document.hidden) return;
       fetchNotifications();
       fetchBookings();
-    }, 6000);
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
   const [activeTab, setActiveTab] = useState<"bookings" | "pousadas" | "guides" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas">("bookings");
@@ -452,7 +456,9 @@ export default function AdminDashboard({
   const handleAddSpeciesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const selectedPousada = pousadas.find(p => p.id === speciesForm.bestPousadaId);
+      // Falls back to the first real registered pousada (never a fake demo
+      // name) when the admin leaves the "melhor pousada" dropdown unset.
+      const selectedPousada = pousadas.find(p => p.id === speciesForm.bestPousadaId) || pousadas[0];
       const payload = {
         name: speciesForm.name,
         scientificName: speciesForm.scientificName,
@@ -461,8 +467,8 @@ export default function AdminDashboard({
         details: speciesForm.details,
         sightings: speciesForm.sightings,
         image: speciesForm.image || "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80",
-        bestPousadaId: speciesForm.bestPousadaId || "1",
-        bestPousadaName: selectedPousada ? selectedPousada.name : "Araras Eco Lodge"
+        bestPousadaId: selectedPousada?.id || "",
+        bestPousadaName: selectedPousada?.name || ""
       };
 
       const response = await adminFetch("/api/species", {

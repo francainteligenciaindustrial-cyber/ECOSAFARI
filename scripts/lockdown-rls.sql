@@ -31,6 +31,9 @@ ALTER TABLE candidaturas ENABLE ROW LEVEL SECURITY;
 -- banco (a pesquisa "como você nos encontrou" que a usava foi removida do
 -- site). Se ela existir no seu banco, rode scripts/add-referral-sources-table.sql
 -- primeiro e então adicione as linhas de volta aqui.
+-- app_secrets: idem — rode scripts/add-app-secrets-table.sql primeiro (ela já
+-- é criada com RLS ativada e sem policies públicas, então nada a fazer aqui
+-- depois).
 
 DROP POLICY IF EXISTS "Permitir leitura pública de pousadas" ON pousadas;
 DROP POLICY IF EXISTS "Permitir inserção pública de pousadas" ON pousadas;

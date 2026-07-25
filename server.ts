@@ -26,6 +26,42 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handl
 
 app.use(express.json());
 
+// Security headers on every response — applies to the Express app itself
+// (local dev, Render/Railway via startLocalServer, and any Vercel path that
+// actually reaches this function: /api/*, /sitemap.xml, /pousadas/:id,
+// /site/:slug). Static assets and the SPA shell on Vercel are served straight
+// from the CDN per vercel.json's rewrites and never touch this middleware —
+// those get the equivalent headers from the "headers" block in vercel.json.
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  // Allowlist reflects the third-party scripts this app actually loads:
+  // Google reCAPTCHA v3, Meta Pixel, Supabase (API + Storage), Sentry.
+  // If you add a new external script/embed later, this will block it until
+  // its domain is added here — check the browser console for the CSP
+  // violation, it names the exact directive/domain to add.
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self' https://www.google.com https://www.gstatic.com https://connect.facebook.net",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https://*.supabase.co https://www.google.com https://www.facebook.com https://*.sentry.io",
+      "frame-src https://www.google.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join("; ")
+  );
+  next();
+});
+
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const isProd = process.env.NODE_ENV === "production";
 const distPath = path.join(process.cwd(), 'dist');
@@ -37,9 +73,18 @@ const distPath = path.join(process.cwd(), 'dist');
 // crashes on Vercel. Type-only reference below has no runtime cost.
 let viteDevServer: import("vite").ViteDevServer | null = null;
 
-// Initialize Supabase client safely
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://yqgyjfcygulolwxcuwow.supabase.co";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxZ3lqZmN5Z3Vsb2x3eGN1d293Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzNjM5NTMsImV4cCI6MjA5ODkzOTk1M30.GkjTJNzqK85Lftzy-g9aPBJ5D7x8utMiqJXBT-ACJIg";
+// Initialize Supabase client safely — no hardcoded fallback on purpose: a
+// literal project URL/key baked into source code stays in git history forever
+// (even after rotation) and previously meant a missing .env silently pointed
+// at a real Supabase project instead of failing loudly. Configure these in
+// .env locally and in the deploy platform's environment variables.
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    "SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórias. Defina-as no .env (local) ou nas variáveis de ambiente do deploy (Vercel/Render)."
+  );
+}
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // The backend is a trusted intermediary: every legitimate read/write (public or
@@ -310,6 +355,37 @@ function parseJSONSafe(val: any) {
   return val;
 }
 
+// Whitelists which fields a client-supplied body may set on an insert/update.
+// Without this, `.update(req.body)` / `.insert({ ...req.body })` pass every
+// key the caller sent straight to Supabase, so a form field never meant to be
+// editable (or one the client shouldn't control at all) still gets written if
+// it's present in the payload — the routes below only ever set columns that
+// are actually meant to be admin/user editable for that entity.
+function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)[]): Partial<T> {
+  const result: Partial<T> = {};
+  if (!body || typeof body !== "object") return result;
+  for (const key of allowedKeys) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) {
+      result[key] = body[key];
+    }
+  }
+  return result;
+}
+
+// Per-entity field allowlists used with pickFields() above. "rating" and
+// "viewCount" are deliberately excluded from POUSADA_* — they're computed by
+// the system (average of reviews / view counter), never set directly by a
+// client payload.
+const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText"] as const;
+const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
+const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status"] as const;
+const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
+const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "age", "preferences"] as const;
+const ROTEIRO_FIELDS = ["name", "duration", "price", "difficulty", "capacity", "description"] as const;
+const RESERVA_FIELDS = ["turistaId", "roteiroId", "date", "status", "totalPrice"] as const;
+const PAGAMENTO_FIELDS = ["reservaId", "amount", "date", "method", "status"] as const;
+const GUIA_TURISTICO_FIELDS = ["name", "specialty", "phone", "availability", "rating"] as const;
+
 // Normalizes a raw pousadas row from Supabase into the shape the frontend
 // expects — parses the jsonb-ish fields, resolves multi-language text, and
 // fills in safe types. No fake-lodge fallback text here on purpose: earlier
@@ -396,17 +472,43 @@ const upload = multer({
   },
 });
 
+// multer's fileFilter above only checks the Content-Type header the browser
+// sent — that's just a client-supplied string, not a guarantee about the
+// actual bytes. Sniffing the file's magic-number signature confirms it's
+// really one of the four supported image formats before it's stored and
+// served back to the public with a supposedly-matching Content-Type; the
+// extension and Content-Type used below come from this detection, never
+// from the client-controlled filename/mimetype.
+function detectImageType(buffer: Buffer): { ext: string; contentType: string } | null {
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+    return { ext: "png", contentType: "image/png" };
+  }
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { ext: "jpg", contentType: "image/jpeg" };
+  }
+  if (buffer.length >= 6 && buffer.toString("ascii", 0, 3) === "GIF" && ["87a", "89a"].includes(buffer.toString("ascii", 3, 6))) {
+    return { ext: "gif", contentType: "image/gif" };
+  }
+  if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
+    return { ext: "webp", contentType: "image/webp" };
+  }
+  return null;
+}
+
 app.post("/api/upload-image", requireAdmin, (req, res) => {
   upload.single("file")(req, res, async (err: any) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
 
-    const ext = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
-    const objectPath = `uploads/${randomUUID()}.${ext}`;
+    const detected = detectImageType(req.file.buffer);
+    if (!detected) {
+      return res.status(400).json({ error: "O conteúdo do arquivo não corresponde a uma imagem PNG, JPEG, WebP ou GIF válida." });
+    }
+    const objectPath = `uploads/${randomUUID()}.${detected.ext}`;
 
     const { error } = await supabase.storage
       .from("site-media")
-      .upload(objectPath, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+      .upload(objectPath, req.file.buffer, { contentType: detected.contentType, upsert: false });
 
     if (error) {
       console.error("Erro ao subir imagem para o Supabase Storage:", error.message);
@@ -424,11 +526,11 @@ app.post("/api/upload-image", requireAdmin, (req, res) => {
 // string scalar instead of a jsonb array.
 app.post("/api/pousadas", requireAdmin, async (req, res) => {
   const newPousada: Pousada = {
-    ...req.body,
+    ...pickFields<Pousada>(req.body, POUSADA_CREATE_FIELDS),
     id: `p_${randomUUID()}`,
     verified: false,
     viewCount: 0,
-  };
+  } as Pousada;
   const { error } = await supabase.from("pousadas").insert(newPousada);
   if (error) {
     console.error("Erro ao salvar pousada no Supabase:", error.message);
@@ -439,7 +541,8 @@ app.post("/api/pousadas", requireAdmin, async (req, res) => {
 
 app.put("/api/pousadas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("pousadas").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Pousada>(req.body, POUSADA_UPDATE_FIELDS);
+  const { data, error } = await supabase.from("pousadas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Pousada não encontrada" });
   res.json(mapPousadaRow(data));
 });
@@ -470,9 +573,9 @@ app.get("/api/guides", requireAdmin, async (req, res) => {
 // JSON.stringify (see the pousadas insert route further down for why).
 app.post("/api/guides", requireAdmin, async (req, res) => {
   const newGuide: Guide = {
-    ...req.body,
+    ...pickFields<Guide>(req.body, GUIDE_FIELDS),
     id: `g_${randomUUID()}`,
-  };
+  } as Guide;
   const { error } = await supabase.from("guides").insert(newGuide);
   if (error) {
     console.error("Erro ao salvar guia no Supabase:", error.message);
@@ -483,7 +586,8 @@ app.post("/api/guides", requireAdmin, async (req, res) => {
 
 app.put("/api/guides/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("guides").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Guide>(req.body, GUIDE_FIELDS);
+  const { data, error } = await supabase.from("guides").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
   res.json(data);
 });
@@ -599,38 +703,35 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const TOKENS_PATH = path.join(process.cwd(), "google_tokens.json");
 
-function loadStoredTokens() {
-  if (fs.existsSync(TOKENS_PATH)) {
-    try {
-      const data = fs.readFileSync(TOKENS_PATH, "utf8");
-      return JSON.parse(data);
-    } catch (err) {
-      console.error("Erro ao carregar tokens do Google Calendar:", err);
-    }
-  }
-  return null;
+// Google Calendar OAuth tokens live in the "app_secrets" Supabase table (see
+// scripts/add-app-secrets-table.sql) instead of a local JSON file. A local
+// file doesn't survive Vercel's serverless filesystem (ephemeral and
+// read-only in production, so this integration silently never worked there),
+// and plaintext OAuth credentials belong in the same access-controlled store
+// as everything else, not on disk. Same shared/serverless-safe reasoning as
+// the rate_limits table above — one row per key, read/written by every
+// instance through the service_role-backed `supabase` client.
+const GOOGLE_TOKENS_KEY = "google_calendar_tokens";
+
+async function loadStoredTokens(): Promise<any | null> {
+  const { data, error } = await supabase.from("app_secrets").select("value").eq("key", GOOGLE_TOKENS_KEY).maybeSingle();
+  if (error || !data) return null;
+  return data.value;
 }
 
-function saveTokens(tokens: any) {
-  try {
-    fs.writeFileSync(TOKENS_PATH, JSON.stringify(tokens, null, 2), "utf8");
-    console.log("Tokens do Google Calendar salvos com sucesso.");
-  } catch (err) {
-    console.error("Erro ao salvar tokens do Google Calendar:", err);
-  }
+async function saveTokens(tokens: any): Promise<void> {
+  const { error } = await supabase
+    .from("app_secrets")
+    .upsert({ key: GOOGLE_TOKENS_KEY, value: tokens, updated_at: new Date().toISOString() });
+  if (error) console.error("Erro ao salvar tokens do Google Calendar no Supabase:", error.message);
+  else console.log("Tokens do Google Calendar salvos com sucesso.");
 }
 
-function deleteTokens() {
-  if (fs.existsSync(TOKENS_PATH)) {
-    try {
-      fs.unlinkSync(TOKENS_PATH);
-      console.log("Tokens do Google Calendar excluídos.");
-    } catch (err) {
-      console.error("Erro ao deletar tokens do Google Calendar:", err);
-    }
-  }
+async function deleteTokens(): Promise<void> {
+  const { error } = await supabase.from("app_secrets").delete().eq("key", GOOGLE_TOKENS_KEY);
+  if (error) console.error("Erro ao excluir tokens do Google Calendar no Supabase:", error.message);
+  else console.log("Tokens do Google Calendar excluídos.");
 }
 
 function getOAuthClient(req: express.Request) {
@@ -646,7 +747,7 @@ function getOAuthClient(req: express.Request) {
 }
 
 async function createCalendarEvent(booking: Booking, req: express.Request) {
-  const tokens = loadStoredTokens();
+  const tokens = await loadStoredTokens();
   if (!tokens) {
     console.log("Sem tokens salvos do Google Calendar. Pulando sincronização.");
     return null;
@@ -662,9 +763,11 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
     oauth2Client.setCredentials(tokens);
 
     oauth2Client.on("tokens", (newTokens) => {
-      const currentTokens = loadStoredTokens() || {};
-      const merged = { ...currentTokens, ...newTokens };
-      saveTokens(merged);
+      (async () => {
+        const currentTokens = (await loadStoredTokens()) || {};
+        const merged = { ...currentTokens, ...newTokens };
+        await saveTokens(merged);
+      })().catch(err => console.error("Erro ao persistir tokens renovados do Google Calendar:", err));
     });
 
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
@@ -716,7 +819,7 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
 
 // Status of Google connection
 app.get("/api/auth/google/status", async (req, res) => {
-  const tokens = loadStoredTokens();
+  const tokens = await loadStoredTokens();
   if (!tokens) {
     return res.json({ connected: false, email: null });
   }
@@ -765,7 +868,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
   try {
     const oauth2Client = getOAuthClient(req);
     const { tokens } = await oauth2Client.getToken(code);
-    saveTokens(tokens);
+    await saveTokens(tokens);
 
     res.redirect("/?google_cal_success=true");
   } catch (err) {
@@ -775,8 +878,8 @@ app.get("/api/auth/google/callback", async (req, res) => {
 });
 
 // Disconnect Google account
-app.get("/api/auth/google/disconnect", (req, res) => {
-  deleteTokens();
+app.get("/api/auth/google/disconnect", async (req, res) => {
+  await deleteTokens();
   res.redirect("/?google_cal_success=false");
 });
 
@@ -791,7 +894,10 @@ async function applyBookingStatusUpdate(id: string, body: Partial<Booking>, req:
   }
 
   const oldBooking = oldBookingRow as Booking;
-  const updated: Booking = { ...oldBooking, ...body };
+  // Only status/guideId are ever meant to be settable through this flow — the
+  // route exists to advance a booking's confirmation state, not to let a
+  // caller overwrite customer/price/date fields on an existing reservation.
+  const updated: Booking = { ...oldBooking, ...pickFields<Booking>(body, ["status", "guideId"]) };
 
   if (status) {
     updated.status = status;
@@ -1201,9 +1307,9 @@ app.get("/api/species", async (req, res) => {
 
 app.post("/api/species", requireAdmin, async (req, res) => {
   const newSpecie: Species = {
+    ...pickFields<Species>(req.body, SPECIES_FIELDS),
     id: req.body.id || `s_${randomUUID()}`,
-    ...req.body
-  };
+  } as Species;
   const { error } = await supabase.from("species").insert(newSpecie);
   if (error) {
     console.error("Erro ao salvar espécie no Supabase:", error.message);
@@ -1214,7 +1320,8 @@ app.post("/api/species", requireAdmin, async (req, res) => {
 
 app.put("/api/species/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("species").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Species>(req.body, SPECIES_FIELDS);
+  const { data, error } = await supabase.from("species").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Espécie não encontrada" });
   res.json(data);
 });
@@ -1240,7 +1347,7 @@ app.get("/api/turistas", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/turistas", requireAdmin, async (req, res) => {
-  const newTurista: Turista = { ...req.body, id: `t_${randomUUID()}` };
+  const newTurista: Turista = { ...pickFields<Turista>(req.body, TURISTA_FIELDS), id: `t_${randomUUID()}` } as Turista;
   const { error } = await supabase.from("turistas").insert(newTurista);
   if (error) {
     console.error("Erro ao salvar turista no Supabase:", error.message);
@@ -1251,7 +1358,8 @@ app.post("/api/turistas", requireAdmin, async (req, res) => {
 
 app.put("/api/turistas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("turistas").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Turista>(req.body, TURISTA_FIELDS);
+  const { data, error } = await supabase.from("turistas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Turista não encontrado" });
   res.json(data);
 });
@@ -1271,7 +1379,7 @@ app.get("/api/roteiros", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/roteiros", requireAdmin, async (req, res) => {
-  const newRoteiro: Roteiro = { ...req.body, id: `rt_${randomUUID()}` };
+  const newRoteiro: Roteiro = { ...pickFields<Roteiro>(req.body, ROTEIRO_FIELDS), id: `rt_${randomUUID()}` } as Roteiro;
   const { error } = await supabase.from("roteiros").insert(newRoteiro);
   if (error) {
     console.error("Erro ao salvar roteiro no Supabase:", error.message);
@@ -1282,7 +1390,8 @@ app.post("/api/roteiros", requireAdmin, async (req, res) => {
 
 app.put("/api/roteiros/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("roteiros").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Roteiro>(req.body, ROTEIRO_FIELDS);
+  const { data, error } = await supabase.from("roteiros").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Roteiro não encontrado" });
   res.json(data);
 });
@@ -1302,7 +1411,7 @@ app.get("/api/reservas", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/reservas", requireAdmin, async (req, res) => {
-  const newReserva: Reserva = { ...req.body, id: `rv_${randomUUID()}` };
+  const newReserva: Reserva = { ...pickFields<Reserva>(req.body, RESERVA_FIELDS), id: `rv_${randomUUID()}` } as Reserva;
   const { error } = await supabase.from("reservas").insert(newReserva);
   if (error) {
     console.error("Erro ao salvar reserva no Supabase:", error.message);
@@ -1313,7 +1422,8 @@ app.post("/api/reservas", requireAdmin, async (req, res) => {
 
 app.put("/api/reservas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("reservas").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Reserva>(req.body, RESERVA_FIELDS);
+  const { data, error } = await supabase.from("reservas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Reserva não encontrada" });
   res.json(data);
 });
@@ -1333,7 +1443,7 @@ app.get("/api/pagamentos", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/pagamentos", requireAdmin, async (req, res) => {
-  const newPagamento: Pagamento = { ...req.body, id: `pg_${randomUUID()}` };
+  const newPagamento: Pagamento = { ...pickFields<Pagamento>(req.body, PAGAMENTO_FIELDS), id: `pg_${randomUUID()}` } as Pagamento;
   const { error } = await supabase.from("pagamentos").insert(newPagamento);
   if (error) {
     console.error("Erro ao salvar pagamento no Supabase:", error.message);
@@ -1344,7 +1454,8 @@ app.post("/api/pagamentos", requireAdmin, async (req, res) => {
 
 app.put("/api/pagamentos/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("pagamentos").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Pagamento>(req.body, PAGAMENTO_FIELDS);
+  const { data, error } = await supabase.from("pagamentos").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Pagamento não encontrado" });
   res.json(data);
 });
@@ -1364,7 +1475,7 @@ app.get("/api/guias", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/guias", requireAdmin, async (req, res) => {
-  const newGuia: GuiaTuristico = { ...req.body, id: `gt_${randomUUID()}` };
+  const newGuia: GuiaTuristico = { ...pickFields<GuiaTuristico>(req.body, GUIA_TURISTICO_FIELDS), id: `gt_${randomUUID()}` } as GuiaTuristico;
   const { error } = await supabase.from("guias").insert(newGuia);
   if (error) {
     console.error("Erro ao salvar guia no Supabase:", error.message);
@@ -1375,7 +1486,8 @@ app.post("/api/guias", requireAdmin, async (req, res) => {
 
 app.put("/api/guias/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("guias").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<GuiaTuristico>(req.body, GUIA_TURISTICO_FIELDS);
+  const { data, error } = await supabase.from("guias").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
   res.json(data);
 });
@@ -1417,6 +1529,8 @@ app.get("/api/candidaturas/status", async (req, res) => {
   res.json(data);
 });
 
+const CANDIDATURA_PUBLIC_FIELDS = ["type", "name", "email", "phone", "message", "languages", "availability", "age", "experienceYears", "specialty", "pousadaName", "location", "capacity"] as const;
+
 app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
   const { recaptchaToken, ...body } = req.body;
   if (!(await verifyRecaptcha(recaptchaToken))) {
@@ -1426,12 +1540,12 @@ app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
   // Server-controlled fields go last so a malicious body can't override them
   // (e.g. submitting status: "aprovado" directly, or a chosen statusToken).
   const newCandidatura: Candidatura = {
-    ...body,
+    ...pickFields<Candidatura>(body, CANDIDATURA_PUBLIC_FIELDS),
     id: `cand_${randomUUID()}`,
     status: "pendente",
     dateCreated: new Date().toISOString(),
     statusToken: randomUUID(),
-  };
+  } as Candidatura;
 
   let { error } = await supabase.from("candidaturas").insert(newCandidatura);
   // Degrades gracefully if scripts/add-candidatura-status-token.sql hasn't
@@ -1456,9 +1570,14 @@ app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
   res.status(201).json(newCandidatura);
 });
 
+// Only "status" is ever editable from the admin panel (triage: pendente →
+// contatado/aprovado/rejeitado) — applicant-submitted fields (name, email,
+// message, etc.) are read-only here on purpose, so an admin session can't be
+// used to rewrite what a candidate actually submitted.
 app.put("/api/candidaturas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from("candidaturas").update(req.body).eq("id", id).select().single();
+  const updates = pickFields<Candidatura>(req.body, ["status"]);
+  const { data, error } = await supabase.from("candidaturas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Candidatura não encontrada" });
   res.json(data);
 });
@@ -1949,7 +2068,7 @@ Regras importantes:
       }));
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents,
         config: {
           systemInstruction,

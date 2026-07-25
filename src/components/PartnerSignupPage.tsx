@@ -162,26 +162,36 @@ export default function PartnerSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-editorial-bg font-sans text-editorial-text">
-      <header className="h-20 bg-editorial-bg border-b border-editorial-border flex items-center px-6 md:px-10">
-        <a href="/" className="flex items-center gap-3">
-          <div className="bg-editorial-primary p-2 rounded-lg text-white shadow-sm flex items-center justify-center">
-            <Compass className="h-5 w-5" />
-          </div>
-          <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary">
-            EcoSafari<span className="text-zinc-400 not-italic">.</span>
-          </h1>
-        </a>
-      </header>
+    <div className="min-h-screen relative bg-editorial-primary font-sans text-editorial-text overflow-hidden">
+      {/* Low-opacity jungle backdrop — reuses a real lodge photo (dense
+          Pantanal foliage) instead of a stock jungle image, so it's
+          consistent with what the rest of the site actually shows. */}
+      <div
+        className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none"
+        style={{ backgroundImage: "url('/pousadas/vagalume-lago-deck.png')" }}
+        aria-hidden="true"
+      />
 
-      <main className="max-w-2xl mx-auto px-6 py-12 md:py-16">
-        <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold block mb-2">Seja um Parceiro</span>
-        <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mb-3">
-          Cadastre-se para prestar serviços conosco
-        </h2>
-        <p className="text-editorial-muted text-sm mb-8 leading-relaxed">
-          Você é guia turístico ou representa uma pousada e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
-        </p>
+      <div className="relative z-10">
+        <header className="h-20 bg-editorial-bg border-b border-editorial-border flex items-center px-6 md:px-10">
+          <a href="/" className="flex items-center gap-3">
+            <div className="bg-editorial-primary p-2 rounded-lg text-white shadow-sm flex items-center justify-center">
+              <Compass className="h-5 w-5" />
+            </div>
+            <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary">
+              EcoSafari<span className="text-zinc-400 not-italic">.</span>
+            </h1>
+          </a>
+        </header>
+
+        <main className="max-w-2xl mx-auto px-6 py-12 md:py-16">
+          <span className="text-amber-400 text-[11px] uppercase tracking-[0.2em] font-bold block mb-2">Seja um Parceiro</span>
+          <h2 className="text-3xl md:text-4xl font-serif font-bold text-white mb-3">
+            Cadastre-se para prestar serviços conosco
+          </h2>
+          <p className="text-white/80 text-sm mb-8 leading-relaxed">
+            Você é guia turístico ou representa uma pousada e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
+          </p>
 
         {/* Why partner with us — cold traffic from an ad needs the "what's
             in it for me" before being asked to fill out a form. */}
@@ -209,7 +219,7 @@ export default function PartnerSignupPage() {
             type="button"
             onClick={() => setType("guia")}
             className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
-              type === "guia" ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-muted border-editorial-border hover:text-editorial-primary"
+              type === "guia" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
             }`}
           >
             <Users className="h-4 w-4" /> Sou Guia Turístico
@@ -218,7 +228,7 @@ export default function PartnerSignupPage() {
             type="button"
             onClick={() => setType("pousada")}
             className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
-              type === "pousada" ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-muted border-editorial-border hover:text-editorial-primary"
+              type === "pousada" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
             }`}
           >
             <Building2 className="h-4 w-4" /> Represento uma Pousada
@@ -300,7 +310,8 @@ export default function PartnerSignupPage() {
             {submitting ? "Enviando..." : "Enviar Cadastro"}
           </button>
         </form>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

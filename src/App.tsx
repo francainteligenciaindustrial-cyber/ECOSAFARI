@@ -161,8 +161,15 @@ export default function App() {
     // Standalone info/partner pages are self-contained and don't need the portal's data.
     if (StandalonePage || officialSiteMatch) return;
     fetchData();
-    // Poll notifications/bookings every 6 seconds to keep screens completely reactive
-    const interval = setInterval(fetchData, 6000);
+    // Refreshes the public catalog periodically so new pousadas/reviews/
+    // sightings show up without a manual reload. This runs in every visitor's
+    // browser, not just the admin's, so it was previously polling 5 endpoints
+    // every 6 seconds for the entire audience — a much longer interval plus
+    // skipping the fetch while the tab is in the background keeps the site
+    // reactive without hammering the backend as traffic grows.
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchData();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
