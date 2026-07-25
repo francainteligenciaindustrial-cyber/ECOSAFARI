@@ -24,9 +24,14 @@ import {
 import { Pousada, Guide, Booking, Notification, Species } from "../types";
 import TurismoPanel from "./TurismoPanel";
 import CandidaturasPanel from "./CandidaturasPanel";
+import AdminUsersPanel from "./AdminUsersPanel";
 import ReferralStatsWidget from "./ReferralStatsWidget";
 import { adminFetch } from "../lib/adminFetch";
 import ImageUploadButton from "./ImageUploadButton";
+import TagInput from "./TagInput";
+import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
+import Pagination from "./Pagination";
+import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
   pousadas: Pousada[];
@@ -89,7 +94,7 @@ export default function AdminDashboard({
     }, 15000);
     return () => clearInterval(interval);
   }, []);
-  const [activeTab, setActiveTab] = useState<"bookings" | "pousadas" | "guides" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas">("bookings");
+  const [activeTab, setActiveTab] = useState<"bookings" | "pousadas" | "guides" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins">("bookings");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddPousada, setShowAddPousada] = useState(false);
   const [showAddGuide, setShowAddGuide] = useState(false);
@@ -182,9 +187,9 @@ export default function AdminDashboard({
     longDescription: "",
     location: "",
     pricePerNight: 1500,
-    features: "Wi-Fi, Piscina, Ar Condicionado",
-    activities: "Safári, Trilha Noturna",
-    experiences: "Safári Onça-Pintada:300, Observação Aves:150",
+    features: ["Wi-Fi", "Piscina", "Ar Condicionado"] as string[],
+    activities: ["Safári", "Trilha Noturna"] as string[],
+    experiences: [{ title: "Safári Onça-Pintada", price: 300 }, { title: "Observação de Aves", price: 150 }] as ExperienceDraft[],
     capacity: 10,
     images: "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80",
     videoUrl: ""
@@ -199,9 +204,9 @@ export default function AdminDashboard({
     location: "",
     pricePerNight: 0,
     capacity: 1,
-    features: "",
-    activities: "",
-    experiences: "",
+    features: [] as string[],
+    activities: [] as string[],
+    experiences: [] as ExperienceDraft[],
     images: "",
     videoUrl: "",
     officialSiteUrl: ""
@@ -216,9 +221,9 @@ export default function AdminDashboard({
       location: p.location,
       pricePerNight: p.pricePerNight,
       capacity: p.capacity,
-      features: (p.features || []).join(", "),
-      activities: (p.activities || []).join(", "),
-      experiences: (p.experiences || []).map(e => `${e.title}:${e.price}`).join(", "),
+      features: [...(p.features || [])],
+      activities: [...(p.activities || [])],
+      experiences: (p.experiences || []).map(e => ({ title: e.title, price: e.price })),
       images: (p.images || []).join("\n"),
       videoUrl: p.videoUrl || "",
       officialSiteUrl: p.officialSiteUrl || ""
@@ -236,12 +241,11 @@ export default function AdminDashboard({
         location: editPousadaForm.location,
         pricePerNight: Number(editPousadaForm.pricePerNight),
         capacity: Number(editPousadaForm.capacity),
-        features: editPousadaForm.features.split(",").map(f => f.trim()).filter(Boolean),
-        activities: editPousadaForm.activities.split(",").map(a => a.trim()).filter(Boolean),
-        experiences: editPousadaForm.experiences.split(",").map(exp => {
-          const [title, price] = exp.split(":");
-          return { title: (title || "").trim(), description: `Expedição de ${(title || "").trim()}`, price: Number(price) || 200 };
-        }).filter(exp => exp.title),
+        features: editPousadaForm.features,
+        activities: editPousadaForm.activities,
+        experiences: editPousadaForm.experiences
+          .filter(exp => exp.title.trim())
+          .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
         images: editPousadaForm.images.split("\n").map(i => i.trim()).filter(Boolean),
         videoUrl: editPousadaForm.videoUrl.trim() || undefined,
         officialSiteUrl: editPousadaForm.officialSiteUrl.trim() || undefined
@@ -266,8 +270,8 @@ export default function AdminDashboard({
     name: "",
     email: "",
     phone: "",
-    languages: "Português, Inglês",
-    specialty: "Fotografia, Rastreamento",
+    languages: ["Português", "Inglês"] as string[],
+    specialty: ["Fotografia", "Rastreamento"] as string[],
     status: "disponivel" as "disponivel" | "indisponivel"
   });
 
@@ -352,12 +356,11 @@ export default function AdminDashboard({
         longDescription: pousadaForm.longDescription,
         location: pousadaForm.location,
         pricePerNight: Number(pousadaForm.pricePerNight),
-        features: pousadaForm.features.split(",").map(f => f.trim()),
-        activities: pousadaForm.activities.split(",").map(a => a.trim()),
-        experiences: pousadaForm.experiences.split(",").map(exp => {
-          const [title, price] = exp.split(":");
-          return { title: title.trim(), description: `Expedição de ${title.trim()}`, price: Number(price) || 200 };
-        }),
+        features: pousadaForm.features,
+        activities: pousadaForm.activities,
+        experiences: pousadaForm.experiences
+          .filter(exp => exp.title.trim())
+          .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
         capacity: Number(pousadaForm.capacity),
         images: [pousadaForm.images],
         videoUrl: pousadaForm.videoUrl.trim() || undefined
@@ -385,8 +388,8 @@ export default function AdminDashboard({
         name: guideForm.name,
         email: guideForm.email,
         phone: guideForm.phone,
-        languages: guideForm.languages.split(",").map(l => l.trim()),
-        specialty: guideForm.specialty.split(",").map(s => s.trim()),
+        languages: guideForm.languages,
+        specialty: guideForm.specialty,
         status: guideForm.status
       };
 
@@ -511,6 +514,10 @@ export default function AdminDashboard({
     const matchesSearch = b.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || b.pousadaName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
+  const bookingsPagination = usePagination(filteredBookings, 20);
+  const pousadasPagination = usePagination(pousadas, 10);
+  const guidesPagination = usePagination(guides, 20);
+  const speciesPagination = usePagination(species, 20);
 
   return (
     <div id="admin-panel" className="bg-editorial-bg min-h-screen py-8 text-editorial-text font-sans">
@@ -676,34 +683,29 @@ export default function AdminDashboard({
               </div>
 
               <div className="text-xs">
-                <label className="block text-zinc-700 font-semibold mb-1.5">Estrutura & Comodidades (separados por vírgula)</label>
-                <input
-                  type="text"
+                <label className="block text-zinc-700 font-semibold mb-1.5">Estrutura & Comodidades</label>
+                <TagInput
                   value={editPousadaForm.features}
-                  onChange={e => setEditPousadaForm(prev => ({ ...prev, features: e.target.value }))}
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
+                  onChange={features => setEditPousadaForm(prev => ({ ...prev, features }))}
+                  placeholder="Digite e pressione Enter (ex: Wi-Fi)"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
-                <div>
-                  <label className="block text-zinc-700 font-semibold mb-1.5">Atividades Inclusas (separadas por vírgula)</label>
-                  <input
-                    type="text"
-                    value={editPousadaForm.activities}
-                    onChange={e => setEditPousadaForm(prev => ({ ...prev, activities: e.target.value }))}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-zinc-700 font-semibold mb-1.5">Experiências Pagas (Ex: Safári:400, Trilha:200)</label>
-                  <input
-                    type="text"
-                    value={editPousadaForm.experiences}
-                    onChange={e => setEditPousadaForm(prev => ({ ...prev, experiences: e.target.value }))}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
+              <div className="text-xs">
+                <label className="block text-zinc-700 font-semibold mb-1.5">Atividades Inclusas</label>
+                <TagInput
+                  value={editPousadaForm.activities}
+                  onChange={activities => setEditPousadaForm(prev => ({ ...prev, activities }))}
+                  placeholder="Digite e pressione Enter (ex: Safári)"
+                />
+              </div>
+
+              <div className="text-xs">
+                <label className="block text-zinc-700 font-semibold mb-1.5">Experiências Pagas</label>
+                <ExperienceListEditor
+                  value={editPousadaForm.experiences}
+                  onChange={experiences => setEditPousadaForm(prev => ({ ...prev, experiences }))}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
@@ -903,6 +905,14 @@ export default function AdminDashboard({
           >
             🤝 Candidaturas de Parceiros
           </button>
+          <button
+            onClick={() => setActiveTab("admins")}
+            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
+              activeTab === "admins" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
+            }`}
+          >
+            🔐 Administradores
+          </button>
         </div>
 
         {/* TAB: TURISTAS, ROTEIROS, RESERVAS, PAGAMENTOS, GUIAS (camada adicional) */}
@@ -910,6 +920,9 @@ export default function AdminDashboard({
 
         {/* TAB: CANDIDATURAS DE PARCEIROS (cadastro público /seja-parceiro) */}
         {activeTab === "candidaturas" && <CandidaturasPanel />}
+
+        {/* TAB: GESTÃO DE ADMINISTRADORES (Supabase Auth) */}
+        {activeTab === "admins" && <AdminUsersPanel />}
 
         {/* TAB 1: RESERVAS & CONFIRMAÇÕES */}
         {activeTab === "bookings" && (
@@ -945,7 +958,7 @@ export default function AdminDashboard({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200">
-                    {filteredBookings.map((b) => (
+                    {bookingsPagination.pageItems.map((b) => (
                       <tr key={b.id} className="hover:bg-zinc-50/50">
                         <td className="p-4">
                           <span className="font-mono text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-semibold">#{b.id.split("_")[1] || b.id}</span>
@@ -1032,6 +1045,12 @@ export default function AdminDashboard({
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={bookingsPagination.page}
+                totalPages={bookingsPagination.totalPages}
+                totalItems={bookingsPagination.totalItems}
+                onPageChange={bookingsPagination.setPage}
+              />
             </div>
 
             {/* In-app administrative log activities */}
@@ -1161,34 +1180,29 @@ export default function AdminDashboard({
                 </div>
 
                 <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Estrutura & Comodidades (Separados por vírgula)</label>
-                  <input
-                    type="text"
+                  <label className="block text-zinc-700 font-semibold mb-1">Estrutura & Comodidades</label>
+                  <TagInput
                     value={pousadaForm.features}
-                    onChange={e => setPousadaForm(prev => ({ ...prev, features: e.target.value }))}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                    onChange={features => setPousadaForm(prev => ({ ...prev, features }))}
+                    placeholder="Digite e pressione Enter (ex: Wi-Fi)"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Atividades Inclusas (Separados por vírgula)</label>
-                    <input
-                      type="text"
-                      value={pousadaForm.activities}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, activities: e.target.value }))}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Experiências Pagas (Ex: Safári Onça:400, Trilha:200)</label>
-                    <input
-                      type="text"
-                      value={pousadaForm.experiences}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, experiences: e.target.value }))}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
+                <div className="text-xs">
+                  <label className="block text-zinc-700 font-semibold mb-1">Atividades Inclusas</label>
+                  <TagInput
+                    value={pousadaForm.activities}
+                    onChange={activities => setPousadaForm(prev => ({ ...prev, activities }))}
+                    placeholder="Digite e pressione Enter (ex: Safári)"
+                  />
+                </div>
+
+                <div className="text-xs">
+                  <label className="block text-zinc-700 font-semibold mb-1">Experiências Pagas</label>
+                  <ExperienceListEditor
+                    value={pousadaForm.experiences}
+                    onChange={experiences => setPousadaForm(prev => ({ ...prev, experiences }))}
+                  />
                 </div>
 
                 <div className="flex gap-2 justify-end pt-2 text-xs">
@@ -1211,7 +1225,7 @@ export default function AdminDashboard({
 
             {/* Pousadas Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {pousadas.map(p => (
+              {pousadasPagination.pageItems.map(p => (
                 <div key={p.id} className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm flex gap-4">
                   <img
                     src={p.images[0]}
@@ -1276,6 +1290,12 @@ export default function AdminDashboard({
                 </div>
               ))}
             </div>
+            <Pagination
+              page={pousadasPagination.page}
+              totalPages={pousadasPagination.totalPages}
+              totalItems={pousadasPagination.totalItems}
+              onPageChange={pousadasPagination.setPage}
+            />
           </div>
         )}
 
@@ -1335,25 +1355,19 @@ export default function AdminDashboard({
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados (Separados por vírgula)</label>
-                    <input
-                      type="text"
+                    <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados</label>
+                    <TagInput
                       value={guideForm.languages}
-                      onChange={e => setGuideForm(prev => ({ ...prev, languages: e.target.value }))}
-                      required
-                      placeholder="Português, Inglês"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                      onChange={languages => setGuideForm(prev => ({ ...prev, languages }))}
+                      placeholder="Ex: Português"
                     />
                   </div>
                   <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Especialidades (Separados por vírgula)</label>
-                    <input
-                      type="text"
+                    <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
+                    <TagInput
                       value={guideForm.specialty}
-                      onChange={e => setGuideForm(prev => ({ ...prev, specialty: e.target.value }))}
-                      required
-                      placeholder="Rastreamento, Biologia"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                      onChange={specialty => setGuideForm(prev => ({ ...prev, specialty }))}
+                      placeholder="Ex: Rastreamento"
                     />
                   </div>
                   <div>
@@ -1400,7 +1414,7 @@ export default function AdminDashboard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
-                  {guides.map(g => (
+                  {guidesPagination.pageItems.map(g => (
                     <tr key={g.id}>
                       <td className="p-4">
                         <span className="font-bold text-zinc-950 block">{g.name}</span>
@@ -1436,6 +1450,12 @@ export default function AdminDashboard({
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                page={guidesPagination.page}
+                totalPages={guidesPagination.totalPages}
+                totalItems={guidesPagination.totalItems}
+                onPageChange={guidesPagination.setPage}
+              />
             </div>
 
           </div>
@@ -2014,7 +2034,7 @@ CREATE POLICY "Permitir deleção de espécies" ON species FOR DELETE USING (tru
                         </td>
                       </tr>
                     ) : (
-                      species.map(s => (
+                      speciesPagination.pageItems.map(s => (
                         <tr key={s.id} className="hover:bg-zinc-50/55 transition">
                           <td className="p-4 flex items-center gap-3">
                             <img
@@ -2047,6 +2067,12 @@ CREATE POLICY "Permitir deleção de espécies" ON species FOR DELETE USING (tru
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={speciesPagination.page}
+                totalPages={speciesPagination.totalPages}
+                totalItems={speciesPagination.totalItems}
+                onPageChange={speciesPagination.setPage}
+              />
             </div>
           </div>
         )}

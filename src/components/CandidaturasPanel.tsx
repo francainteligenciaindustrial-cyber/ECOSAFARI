@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Users, Building2, Mail, Phone, Trash2, LoaderCircle } from "lucide-react";
 import { Candidatura } from "../types";
 import { adminFetch } from "../lib/adminFetch";
+import Pagination from "./Pagination";
+import { usePagination } from "../lib/usePagination";
 
 const STATUS_LABELS: Record<Candidatura["status"], string> = {
   pendente: "Pendente",
@@ -51,6 +53,7 @@ export default function CandidaturasPanel() {
   };
 
   const filtered = candidaturas.filter(c => filter === "todos" || c.type === filter);
+  const pagination = usePagination(filtered, 15);
 
   if (loading) {
     return (
@@ -88,7 +91,7 @@ export default function CandidaturasPanel() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filtered.map(c => (
+          {pagination.pageItems.map(c => (
             <div key={c.id} className="bg-white border border-editorial-border p-5">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2">
@@ -149,6 +152,12 @@ export default function CandidaturasPanel() {
           ))}
         </div>
       )}
+      <Pagination
+        page={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalItems}
+        onPageChange={pagination.setPage}
+      />
     </div>
   );
 }

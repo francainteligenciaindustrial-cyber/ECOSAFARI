@@ -41,6 +41,14 @@ function LazyFallback() {
   );
 }
 
+// Institutional identity for the footer (CNPJ/address) — required for a
+// public booking/payment site to look legitimate and for LGPD's
+// data-controller disclosure. Configurable via env var instead of hardcoded
+// in source, so filling in the real values on launch is a Vercel dashboard
+// change, not a code change/redeploy for a developer to make.
+const COMPANY_CNPJ = (import.meta.env.VITE_COMPANY_CNPJ as string | undefined) || "00.000.000/0001-00 (definir antes do lançamento)";
+const COMPANY_ADDRESS = (import.meta.env.VITE_COMPANY_ADDRESS as string | undefined) || "Endereço a definir — Cidade/UF";
+
 // Standalone public routes that render their own full page (no shared header/footer chrome).
 const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   "/seja-parceiro": PartnerSignupPage,
@@ -488,10 +496,10 @@ export default function App() {
 
         {/* Institutional identity — required for a public booking/payment
             site to look legitimate (and for LGPD's data-controller
-            disclosure). TODO: swap the placeholders for the real CNPJ and
-            registered address before launch. */}
+            disclosure). Values come from VITE_COMPANY_CNPJ/VITE_COMPANY_ADDRESS
+            (see .env.example) — set them before launch. */}
         <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#FDFCF8]/50 font-normal normal-case tracking-normal">
-          EcoSafari Brasil • CNPJ: 00.000.000/0001-00 (atualizar) • (Endereço a atualizar — Cidade/UF)
+          EcoSafari Brasil • CNPJ: {COMPANY_CNPJ} • {COMPANY_ADDRESS}
         </div>
       </footer>
 

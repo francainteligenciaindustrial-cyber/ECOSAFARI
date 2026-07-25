@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Users, MapIcon, CalendarCheck, CreditCard, Compass, Plus, Trash2, LoaderCircle } from "lucide-react";
 import { Turista, Roteiro, Reserva, Pagamento, GuiaTuristico } from "../types";
 import { adminFetch } from "../lib/adminFetch";
+import Pagination from "./Pagination";
+import { usePagination } from "../lib/usePagination";
 
 type Section = "turistas" | "roteiros" | "reservas" | "pagamentos" | "guias";
 
@@ -194,6 +196,7 @@ function TuristasSection({ items, showAddForm, onAdded, onDelete }: {
     setForm({ name: "", email: "", whatsapp: "", country: "", age: "", preferences: "" });
     onAdded();
   };
+  const pagination = usePagination(items, 15);
 
   return (
     <div>
@@ -213,7 +216,7 @@ function TuristasSection({ items, showAddForm, onAdded, onDelete }: {
           <thead><tr><Th>Nome</Th><Th>Email</Th><Th>WhatsApp</Th><Th>País</Th><Th>Idade</Th><Th>Preferências</Th><Th></Th></tr></thead>
           <tbody>
             {items.length === 0 && <EmptyRow colSpan={7} />}
-            {items.map(t => (
+            {pagination.pageItems.map(t => (
               <tr key={t.id} className="border-t border-editorial-border/60">
                 <Td>{t.name}</Td><Td>{t.email}</Td><Td>{t.whatsapp}</Td><Td>{t.country}</Td><Td>{t.age}</Td><Td>{t.preferences}</Td>
                 <Td><button onClick={() => onDelete(t.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
@@ -222,6 +225,7 @@ function TuristasSection({ items, showAddForm, onAdded, onDelete }: {
           </tbody>
         </table>
       </div>
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} totalItems={pagination.totalItems} onPageChange={pagination.setPage} />
     </div>
   );
 }
@@ -242,6 +246,7 @@ function RoteirosSection({ items, showAddForm, onAdded, onDelete }: {
     setForm({ name: "", duration: "", price: "", difficulty: "moderado", capacity: "", description: "" });
     onAdded();
   };
+  const pagination = usePagination(items, 15);
 
   return (
     <div>
@@ -265,7 +270,7 @@ function RoteirosSection({ items, showAddForm, onAdded, onDelete }: {
           <thead><tr><Th>Nome</Th><Th>Duração</Th><Th>Preço</Th><Th>Dificuldade</Th><Th>Capacidade</Th><Th>Descrição</Th><Th></Th></tr></thead>
           <tbody>
             {items.length === 0 && <EmptyRow colSpan={7} />}
-            {items.map(r => (
+            {pagination.pageItems.map(r => (
               <tr key={r.id} className="border-t border-editorial-border/60">
                 <Td>{r.name}</Td><Td>{r.duration}</Td><Td>R$ {r.price.toLocaleString('pt-BR')}</Td><Td className="capitalize">{r.difficulty}</Td><Td>{r.capacity}</Td><Td>{r.description}</Td>
                 <Td><button onClick={() => onDelete(r.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
@@ -274,6 +279,7 @@ function RoteirosSection({ items, showAddForm, onAdded, onDelete }: {
           </tbody>
         </table>
       </div>
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} totalItems={pagination.totalItems} onPageChange={pagination.setPage} />
     </div>
   );
 }
@@ -295,6 +301,7 @@ function ReservasSection({ items, turistas, roteiros, showAddForm, onAdded, onDe
     setForm({ turistaId: "", roteiroId: "", date: "", status: "pendente", totalPrice: "" });
     onAdded();
   };
+  const pagination = usePagination(items, 15);
 
   return (
     <div>
@@ -324,7 +331,7 @@ function ReservasSection({ items, turistas, roteiros, showAddForm, onAdded, onDe
           <thead><tr><Th>Turista</Th><Th>Roteiro</Th><Th>Data</Th><Th>Status</Th><Th>Preço Total</Th><Th></Th></tr></thead>
           <tbody>
             {items.length === 0 && <EmptyRow colSpan={6} />}
-            {items.map(r => (
+            {pagination.pageItems.map(r => (
               <tr key={r.id} className="border-t border-editorial-border/60">
                 <Td>{turistaName(r.turistaId)}</Td><Td>{roteiroName(r.roteiroId)}</Td><Td>{r.date}</Td><Td className="capitalize">{r.status}</Td><Td>R$ {r.totalPrice.toLocaleString('pt-BR')}</Td>
                 <Td><button onClick={() => onDelete(r.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
@@ -333,6 +340,7 @@ function ReservasSection({ items, turistas, roteiros, showAddForm, onAdded, onDe
           </tbody>
         </table>
       </div>
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} totalItems={pagination.totalItems} onPageChange={pagination.setPage} />
     </div>
   );
 }
@@ -354,6 +362,7 @@ function PagamentosSection({ items, reservas, showAddForm, onAdded, onDelete, re
     setForm({ reservaId: "", amount: "", date: "", method: "pix", status: "pendente" });
     onAdded();
   };
+  const pagination = usePagination(items, 15);
 
   return (
     <div>
@@ -385,7 +394,7 @@ function PagamentosSection({ items, reservas, showAddForm, onAdded, onDelete, re
           <thead><tr><Th>Reserva</Th><Th>Valor</Th><Th>Data</Th><Th>Método</Th><Th>Status</Th><Th></Th></tr></thead>
           <tbody>
             {items.length === 0 && <EmptyRow colSpan={6} />}
-            {items.map(p => (
+            {pagination.pageItems.map(p => (
               <tr key={p.id} className="border-t border-editorial-border/60">
                 <Td>{reservaLabel(p.reservaId)}</Td><Td>R$ {p.amount.toLocaleString('pt-BR')}</Td><Td>{p.date}</Td><Td className="capitalize">{p.method}</Td><Td className="capitalize">{p.status}</Td>
                 <Td><button onClick={() => onDelete(p.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
@@ -394,6 +403,7 @@ function PagamentosSection({ items, reservas, showAddForm, onAdded, onDelete, re
           </tbody>
         </table>
       </div>
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} totalItems={pagination.totalItems} onPageChange={pagination.setPage} />
     </div>
   );
 }
@@ -414,6 +424,7 @@ function GuiasSection({ items, showAddForm, onAdded, onDelete }: {
     setForm({ name: "", specialty: "", phone: "", availability: "true", rating: "" });
     onAdded();
   };
+  const pagination = usePagination(items, 15);
 
   return (
     <div>
@@ -435,7 +446,7 @@ function GuiasSection({ items, showAddForm, onAdded, onDelete }: {
           <thead><tr><Th>Nome</Th><Th>Especialidade</Th><Th>Telefone</Th><Th>Disponibilidade</Th><Th>Avaliação</Th><Th></Th></tr></thead>
           <tbody>
             {items.length === 0 && <EmptyRow colSpan={6} />}
-            {items.map(g => (
+            {pagination.pageItems.map(g => (
               <tr key={g.id} className="border-t border-editorial-border/60">
                 <Td>{g.name}</Td><Td>{g.specialty}</Td><Td>{g.phone}</Td>
                 <Td>{g.availability ? "Disponível" : "Indisponível"}</Td><Td>⭐ {g.rating}</Td>
@@ -445,6 +456,7 @@ function GuiasSection({ items, showAddForm, onAdded, onDelete }: {
           </tbody>
         </table>
       </div>
+      <Pagination page={pagination.page} totalPages={pagination.totalPages} totalItems={pagination.totalItems} onPageChange={pagination.setPage} />
     </div>
   );
 }

@@ -383,6 +383,23 @@ export default function PousadaCatalog({
             </div>
           ))}
         </div>
+
+        {/* Empty state — a freshly launched site (or a location filter with
+            no matches yet) shouldn't just render a blank grid, which reads
+            as broken rather than "nothing here yet". */}
+        {filteredPousadas.length === 0 && (
+          <div className="text-center py-20 border border-dashed border-editorial-border bg-white/40">
+            <Compass className="h-8 w-8 text-editorial-muted mx-auto mb-3" />
+            <p className="text-editorial-text font-serif text-lg font-bold mb-1">
+              {pousadas.length === 0 ? "Nossas pousadas parceiras chegam em breve" : "Nenhuma pousada encontrada para este filtro"}
+            </p>
+            <p className="text-editorial-muted text-sm max-w-md mx-auto">
+              {pousadas.length === 0
+                ? "Estamos selecionando as melhores pousadas do Pantanal para você. Volte em breve para conferir o catálogo completo."
+                : "Tente outra localização ou fale com a gente pelo WhatsApp para indicações personalizadas."}
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Wildlife Species Showcase (O que avistar) Section */}
@@ -824,6 +841,13 @@ export default function PousadaCatalog({
 
           {/* List of reviews column */}
           <div className="lg:col-span-7 space-y-6 max-h-[600px] overflow-y-auto pr-4 scrollbar-thin">
+            {reviews.length === 0 && (
+              <div className="text-center py-16 border border-dashed border-editorial-border">
+                <Star className="h-7 w-7 text-editorial-muted mx-auto mb-3" />
+                <p className="text-editorial-text font-serif font-bold mb-1">Seja o primeiro a avaliar</p>
+                <p className="text-editorial-muted text-xs max-w-xs mx-auto">Ainda não recebemos avaliações — a sua pode ser a primeira a aparecer aqui ao lado.</p>
+              </div>
+            )}
             {reviews.map((review) => {
               const matchedP = pousadas.find(p => p.id === review.pousadaId);
               return (

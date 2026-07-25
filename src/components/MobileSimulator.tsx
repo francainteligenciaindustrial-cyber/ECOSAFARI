@@ -171,6 +171,15 @@ export default function MobileSimulator({
                   </button>
                 </div>
 
+                {/* Empty state — a fresh install has no posted sightings yet */}
+                {sightings.length === 0 && (
+                  <div className="text-center py-14 border border-dashed border-zinc-800 rounded-2xl">
+                    <Camera className="h-7 w-7 text-zinc-600 mx-auto mb-3" />
+                    <p className="text-zinc-300 font-bold text-sm mb-1">Nenhum avistamento ainda</p>
+                    <p className="text-zinc-500 text-[11px] max-w-[220px] mx-auto">Seja o primeiro a postar um avistamento da sua expedição.</p>
+                  </div>
+                )}
+
                 {/* Sighting cards */}
                 {sightings.map(sight => (
                   <div key={sight.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-sm">

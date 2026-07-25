@@ -213,6 +213,9 @@ const requireAdmin: express.RequestHandler[] = [
       if (error || !data.user || data.user.app_metadata?.role !== "admin") {
         return res.status(403).json({ error: "Acesso restrito a administradores." });
       }
+      // Stashed for routes that need to know which admin is calling — e.g.
+      // preventing an admin from revoking their own access below.
+      res.locals.adminUser = data.user;
       next();
     } catch (err) {
       res.status(401).json({ error: "Token inválido." });
@@ -1613,6 +1616,75 @@ app.get("/api/referral-sources", requireAdmin, async (req, res) => {
   const { data, error } = await supabase.from("referral_sources").select("*");
   if (error) return res.json([]);
   res.json(data);
+});
+
+// ----------------------------------------------------
+// ADMIN USER MANAGEMENT (Supabase Auth)
+// Lets an existing admin invite/revoke other admins from the dashboard
+// itself, instead of requiring terminal + service_role access to run
+// scripts/create-admin.ts every time someone new needs access.
+// ----------------------------------------------------
+
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de administradores indisponível." });
+  const { data, error } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 200 });
+  if (error || !data?.users) return res.status(500).json({ error: "Erro ao listar administradores." });
+  const admins = data.users
+    .filter((u: any) => u.app_metadata?.role === "admin")
+    .map((u: any) => ({ id: u.id, email: u.email, createdAt: u.created_at, lastSignInAt: u.last_sign_in_at || null }));
+  res.json(admins);
+});
+
+app.post("/api/admin/users", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de administradores indisponível." });
+  const email = String(req.body.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Informe um email válido." });
+  }
+
+  // Created directly with app_metadata.role="admin" (same as
+  // scripts/create-admin.ts) with a random password the invitee never
+  // needs to know — they set their own via the recovery link below.
+  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+    email,
+    password: randomUUID(),
+    email_confirm: true,
+    app_metadata: { role: "admin" },
+  });
+  if (createErr || !created.user) {
+    return res.status(400).json({ error: createErr?.message || "Erro ao criar administrador (o email já pode estar em uso)." });
+  }
+
+  // A recovery link the new admin uses to set their own password —
+  // generated directly instead of relying on Supabase's transactional email
+  // (which needs SMTP configured and isn't guaranteed to be set up on every
+  // deploy). Returned to the calling admin to copy and send manually,
+  // mirroring the candidatura status-link pattern already used elsewhere.
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
+  if (linkErr) {
+    console.warn("Administrador criado, mas falha ao gerar link de acesso:", linkErr.message);
+  }
+
+  res.status(201).json({
+    user: { id: created.user.id, email: created.user.email },
+    actionLink: linkData?.properties?.action_link || null,
+  });
+});
+
+// Revokes admin access (clears app_metadata.role) rather than deleting the
+// Supabase Auth account outright — reversible from the Supabase dashboard if
+// it turns out to be a mistake. A caller can never revoke their own access
+// through this route, so one admin can't accidentally lock everyone out.
+app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de administradores indisponível." });
+  const { id } = req.params;
+  const requester = res.locals.adminUser as { id: string } | undefined;
+  if (requester?.id === id) {
+    return res.status(400).json({ error: "Você não pode remover seu próprio acesso por aqui." });
+  }
+  const { error } = await supabaseAdminAuth.auth.admin.updateUserById(id, { app_metadata: { role: null } });
+  if (error) return res.status(500).json({ error: "Erro ao revogar acesso." });
+  res.json({ success: true });
 });
 
 // SUPABASE SYSTEM STATUS & AUTO-CONFIGURATION ENDPOINTS
