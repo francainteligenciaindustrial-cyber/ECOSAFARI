@@ -239,153 +239,9 @@ if (RESEND_API_KEY && RESEND_API_KEY !== "MY_RESEND_API_KEY") {
   }
 }
 
-// ----------------------------------------------------
-// MEMORY DATABASE STATE (Initial Seed Data)
-// ----------------------------------------------------
-
-const DEFAULT_POUSADAS: Pousada[] = [
-  {
-    id: "1",
-    name: "Araras Eco Lodge",
-    description: "Um refúgio rústico e sofisticado no coração do Pantanal Norte, focado em conservação e imersão ecológica.",
-    longDescription: "A Araras Eco Lodge foi construída em harmonia com o ambiente, oferecendo uma experiência única no Pantanal. Com foco na sustentabilidade, a pousada desenvolve projetos de preservação e permite que os hóspedes observem a biodiversidade pantaneira bem de perto, acompanhados de guias altamente qualificados.",
-    location: "Pantanal Norte, Mato Grosso",
-    rating: 4.9,
-    pricePerNight: 1800,
-    images: [
-      "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Wi-Fi", "Piscina Ecológica", "Ar Condicionado", "Restaurante Regional", "Torre de Observação"],
-    activities: ["Focagem Noturna de Jacarés", "Safári Fotográfico", "Canoagem no Rio", "Cavalgada Pantaneira"],
-    experiences: [
-      { title: "Safári Onça-Pintada", description: "Safári fotográfico em jipe aberto ou barco em busca da rainha do Pantanal.", price: 450 },
-      { title: "Observação de Jacarés", description: "Caminhada suspensa e focagem noturna nos olhos avermelhados dos jacarés.", price: 200 }
-    ],
-    capacity: 12
-  },
-  {
-    id: "2",
-    name: "Pousada Trijunção",
-    description: "Vivencie o fascinante e misterioso Cerrado brasileiro na divisa de três estados, onde o luxo encontra a preservação.",
-    longDescription: "Localizada na divisa entre Bahia, Goiás e Minas Gerais, a Pousada Trijunção oferece acomodações de altíssimo padrão e expedições científicas para conhecer a fauna e a flora do Cerrado, incluindo o lobo-guará e o pato-mergulhão.",
-    location: "Divisa BA / GO / MG, Cerrado",
-    rating: 4.8,
-    pricePerNight: 2400,
-    images: [
-      "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Piscina Aquecida", "Jacuzzi Externa", "Pensão Completa", "Ar Condicionado", "Mirante Estelar"],
-    activities: ["Rastreamento de Lobo-Guará", "Safári Noturno com Visão Térmica", "Trilha das Três Divisas", "Caiaque na Lagoa das Marreca"],
-    experiences: [
-      { title: "Rastreamento do Lobo-Guará", description: "Expedição científica para buscar lobos-guarás com rádio-colar.", price: 500 },
-      { title: "Safári Noturno de Biodiversidade", description: "Uso de lanternas térmicas para ver tamanduás-bandeira e lobos.", price: 350 }
-    ],
-    capacity: 8
-  },
-  {
-    id: "3",
-    name: "Anavilhanas Jungle Lodge",
-    description: "Um hotel de selva exclusivo e intimista na margem do Rio Negro, em frente ao maior arquipélago fluvial do mundo.",
-    longDescription: "Projetada para causar o mínimo impacto ecológico, a pousada combina elegância rústica com a exuberância da Floresta Amazônica. Com bangalôs suspensos em palafitas no meio da mata, os hóspedes acordam com os sons dos pássaros e desfrutam da alta gastronomia amazônica.",
-    location: "Novo Airão, Amazônia (Rio Negro)",
-    rating: 5.0,
-    pricePerNight: 3200,
-    images: [
-      "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Piscina com borda infinita para o Rio Negro", "Bangalôs de luxo", "Ar Condicionado", "Deck de Contemplação", "Bar Flutuante"],
-    activities: ["Visita aos Botos Cor-de-Rosa", "Focagem de Jacarés e Animais Noturnos", "Canoagem nos Igapós", "Trekking de Sobrevivência na Selva"],
-    experiences: [
-      { title: "Interação com Botos", description: "Visita ética monitorada para avistamento e interação com os botos-cor-de-rosa livres.", price: 300 },
-      { title: "Caminhada de Sobrevivência", description: "Instrução de sobrevivência na floresta primária com guia nativo.", price: 400 }
-    ],
-    capacity: 15
-  },
-  {
-    id: "4",
-    name: "Pousada do Cerrado (Jalapão)",
-    description: "A base perfeita para explorar as águas azuis cristalinas dos fervedouros e as dunas douradas do Jalapão.",
-    longDescription: "Aconchegante e focada na cultura local, a Pousada do Cerrado oferece conforto após longas expedições de 4x4 pelos fervedouros, cânions e dunas do Jalapão, proporcionando jantares caseiros ao redor da fogueira.",
-    location: "Mateiros, Jalapão, Tocantins",
-    rating: 4.7,
-    pricePerNight: 1200,
-    images: [
-      "https://images.unsplash.com/photo-1506929562872-bb421503ef21?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Ar Condicionado", "Fogueira Sob as Estrelas", "Comida Caseira Fogão a Lenha", "Ducha Externa", "Estacionamento 4x4"],
-    activities: ["Banho nos Fervedouros", "Pôr do sol nas Dunas", "Rafting no Rio Novo", "Trilha da Serra do Espírito Santo"],
-    experiences: [
-      { title: "Expedição Fervedouros Noturna", description: "Acesso exclusivo e agendado a fervedouros iluminados sob as estrelas.", price: 150 },
-      { title: "Pôr do sol nas Dunas", description: "Transporte e guia para as dunas de areia dourada na hora dourada.", price: 180 }
-    ],
-    capacity: 20
-  },
-  {
-    id: "5",
-    name: "Refúgio Ecológico Caiman",
-    description: "Pioneiro no ecoturismo do Pantanal Sul, lar do renomado Projeto Onçafari de conservação de onças-pintadas.",
-    longDescription: "O Refúgio Ecológico Caiman estende-se por uma área de 53 mil hectares no Pantanal Sul. Além de oferecer hospedagem de altíssimo padrão com culinária pantaneira autêntica, é a base operacional do Projeto Onçafari. Os hóspedes têm a oportunidade única de acompanhar biólogos em campo e vivenciar de perto o rastreamento de onças habituadas e lobos-guará.",
-    location: "Pantanal Sul, Mato Grosso do Sul",
-    rating: 4.9,
-    pricePerNight: 2900,
-    images: [
-      "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Wi-Fi de Alta Velocidade", "Piscina Panorâmica", "Ar Condicionado", "Biblioteca Científica", "Pensão Completa Gourmet"],
-    activities: ["Rastreamento de Onças (Onçafari)", "Safári Noturno de Jipe", "Canoagem no Rio Aquidauana", "Caminhada de Interpretação Ambiental"],
-    experiences: [
-      { title: "Dia de Pesquisador Onçafari", description: "Acompanhe cientistas do Projeto Onçafari no monitoramento de onças-pintadas com telemetria.", price: 650 },
-      { title: "Cavalgada pelos Alagados", description: "Explore áreas de difícil acesso montado em cavalos pantaneiros treinados.", price: 300 }
-    ],
-    capacity: 10
-  },
-  {
-    id: "6",
-    name: "Cristalino Lodge",
-    description: "Um dos melhores hotéis ecológicos do mundo, inserido em uma vasta reserva particular na Floresta Amazônica.",
-    longDescription: "Localizado no sul da Amazônia brasileira, o Cristalino Lodge está situado em uma Reserva Particular do Patrimônio Natural (RPPN) de 11.399 hectares. Conhecido internacionalmente pelo design sustentável e pelas torres de observação de 50 metros que sobressaem da copa das árvores, o lodge oferece acesso inigualável à avifauna e fauna amazônica.",
-    location: "Alta Floresta, Amazônia Meridional",
-    rating: 4.9,
-    pricePerNight: 2600,
-    images: [
-      "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Torres de Observação (50m)", "Deck Flutuante no Rio Cristalino", "Energia Solar Integrada", "Restaurante Orgânico", "Acomodações Ventiladas Ecologicamente"],
-    activities: ["Observação de Aves do Dossel", "Canoagem no Rio Cristalino", "Trilha Ecológica da Castanheira", "Focagem de Fauna Aquática Noturna"],
-    experiences: [
-      { title: "Amanhecer na Torre de Observação", description: "Suba na torre de 50 metros antes do amanhecer para observar a floresta acordando acima das nuvens.", price: 250 },
-      { title: "Trilha Botânica Guiada", description: "Aprenda sobre árvores gigantescas, plantas medicinais e insetos raros com biólogos residentes.", price: 150 }
-    ],
-    capacity: 18
-  },
-  {
-    id: "7",
-    name: "Pousada Canto das Águas",
-    description: "Hospedagem sustentável às margens do Rio Lençóis, a base perfeita para desvendar as cachoeiras da Chapada Diamantina.",
-    longDescription: "Construída de forma integrada à natureza, a Pousada Canto das Águas é o primeiro hotel do Brasil a obter a certificação de sustentabilidade da ABNT. Localizada em Lençóis, na Chapada Diamantina, seus jardins sinuosos acompanham as curvas do rio, oferecendo um oásis de tranquilidade após um dia inteiro de caminhadas por cânions e cachoeiras espetaculares.",
-    location: "Lençóis, Chapada Diamantina, Bahia",
-    rating: 4.8,
-    pricePerNight: 1500,
-    images: [
-      "https://images.unsplash.com/photo-1432406186267-30a30b27ae27?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80"
-    ],
-    features: ["Jardins Paisagísticos de Burle Marx", "Piscina de Água Corrente", "Restaurante de Cozinha Autoral", "Espaço de Massagem e Meditação", "Selo de Sustentabilidade ABNT"],
-    activities: ["Trilha ao Cânion do Mixila", "Visita à Cachoeira da Fumaça", "Flutuação no Poço Azul", "Pôr do sol no Pai Inácio"],
-    experiences: [
-      { title: "Trilha Exclusiva Cachoeira do Sossego", description: "Caminhada guiada pelo leito de pedras do rio até a imponente cachoeira e poço para banho.", price: 220 },
-      { title: "Meditação e Yoga ao Som do Rio", description: "Sessão matinal particular conduzida no deck do rio com chá de ervas locais.", price: 120 }
-    ],
-    capacity: 22
-  }
-];
-
+// Wildlife catalog ("what you might spot") — generic educational content,
+// not tied to fake demo pousadas. bestPousadaId/Name point at the one real
+// pousada now (they used to reference the fake demo lodges).
 const DEFAULT_SPECIES: Species[] = [
   {
     id: "capivara",
@@ -396,8 +252,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "As capivaras são animais extremamente sociáveis e excelentes nadadoras. No Pantanal, elas desempenham um papel crucial no ecossistema, servindo como uma das principais presas para jacarés e onças-pintadas. Podem permanecer submersas por até 5 minutos para escapar de predadores.",
     sightings: "95%+ AVISTAMENTOS",
     image: "/species/capivara.png",
-    bestPousadaId: "1",
-    bestPousadaName: "Araras Eco Lodge"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "jacare",
@@ -408,8 +264,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "O jacaré-do-pantanal alimenta-se principalmente de peixes e moluscos. Após quase serem extintos devido à caça ilegal nas décadas de 1970 e 1980, hoje a population está totalmente recuperada e estimada em milhões de indivíduos, sendo um dos maiores casos de sucesso em conservação ambiental no Brasil.",
     sightings: "95%+ AVISTAMENTOS",
     image: "/species/jacare-do-pantanal.png",
-    bestPousadaId: "1",
-    bestPousadaName: "Araras Eco Lodge"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "tucano",
@@ -420,8 +276,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "O bico do tucano, embora pareça pesado, é extremamente leve pois sua estrutura interna é esponjosa. Ele funciona como um sofisticado regulador térmico, dissipando o calor do corpo em dias quentes. Alimentam-se de frutos, mas também de ovos e filhotes de outras aves.",
     sightings: "90%+ AVISTAMENTOS",
     image: "/species/tucano-toco.png",
-    bestPousadaId: "6",
-    bestPousadaName: "Cristalino Lodge"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "cardeal",
@@ -432,8 +288,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "Esta pequena ave destaca-se pela crista vermelha pontiaguda e canto melodioso. Vivem em pares ou pequenos bandos familiares e habitam vegetações arbustivas próximas à água, onde alimentam-se de sementes, insetos e pequenos frutos caídos.",
     sightings: "85%+ AVISTAMENTOS",
     image: "/species/cardeal.png",
-    bestPousadaId: "1",
-    bestPousadaName: "Araras Eco Lodge"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "arara",
@@ -444,8 +300,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "As araras-canindé utilizam seus bicos fortes como um terceiro membro para escaladas e para quebrar sementes duras de palmeiras. Elas nidificam em troncos ocos de palmeiras mortas e o casal divide todas as tarefas de cuidado com os ovos e filhotes.",
     sightings: "95%+ AVISTAMENTOS",
     image: "/species/arara-caninde.png",
-    bestPousadaId: "5",
-    bestPousadaName: "Refúgio Ecológico Caiman"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "onca",
@@ -456,8 +312,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "A onça-pintada é o maior felino das Américas. No Pantanal, devido à abundância de presas e proteção estrita, elas atingem quase o dobro do peso de suas parentes amazônicas. São excelentes nadadoras e caçam jacarés e capivaras diretamente nas margens dos rios.",
     sightings: "95%+ AVISTAMENTOS",
     image: "/species/onca-pintada.png",
-    bestPousadaId: "5",
-    bestPousadaName: "Refúgio Ecológico Caiman"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "coruja",
@@ -468,8 +324,8 @@ const DEFAULT_SPECIES: Species[] = [
     details: "As corujas-buraqueiras escavam seus próprios ninhos no solo ou aproveitam buracos abandonados de tatu. Elas acumulam esterco ao redor de suas tocas para atrair besouros, que servem de alimento fácil, demonstrando um comportamento incrivelmente astuto de uso de ferramentas.",
     sightings: "90%+ AVISTAMENTOS",
     image: "/species/coruja-buraqueira.png",
-    bestPousadaId: "7",
-    bestPousadaName: "Pousada Canto das Águas"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   },
   {
     id: "curicaca",
@@ -480,71 +336,26 @@ const DEFAULT_SPECIES: Species[] = [
     details: "A curicaca possui um grito metálico muito alto e inconfundível, frequentemente ouvido no raiar do dia. Seu bico longo e curvado é perfeitamente adaptado para sondar o solo úmido e lodo em busca de insetos, aranhas, anfíbios e pequenos répteis.",
     sightings: "95%+ AVISTAMENTOS",
     image: "/species/curicaca.png",
-    bestPousadaId: "1",
-    bestPousadaName: "Araras Eco Lodge"
+    bestPousadaId: "p_1784944422389",
+    bestPousadaName: "Pesqueiro Vagalume"
   }
 ];
 
-let pousadas: Pousada[] = [...DEFAULT_POUSADAS];
+// Real pousadas, added through the admin dashboard — starts empty rather
+// than pre-seeded with demo listings (Araras Eco Lodge etc.), which used to
+// leak into production as fake business data.
+let pousadas: Pousada[] = [];
 let species: Species[] = [...DEFAULT_SPECIES];
 
-let guides: Guide[] = [
-  { id: "g1", name: "Carlos Silva", languages: ["Português", "Inglês"], specialty: ["Rastreamento de Onça-pintada", "Safáris de Jipe"], status: "disponivel", email: "carlos.guiapantanal@gmail.com", phone: "+55 65 99912-3456" },
-  { id: "g2", name: "Elena Torres", languages: ["Português", "Espanhol", "Inglês"], specialty: ["Observação de Aves (Ornitologia)", "Identificação de Anfíbios"], status: "disponivel", email: "elena.bioguia@hotmail.com", phone: "+55 61 98821-4321" },
-  { id: "g3", name: "Thiago Rocha", languages: ["Português", "Francês"], specialty: ["Trilhas de Sobrevivência na Selva", "Canoagem"], status: "disponivel", email: "thiago.amazonguide@yahoo.com", phone: "+55 92 98115-9988" },
-  { id: "g4", name: "Sofia Almeida", languages: ["Português", "Inglês", "Alemão"], specialty: ["Fotografia de Natureza", "Botânica Aplicada"], status: "disponivel", email: "sofia.photo.guide@gmail.com", phone: "+55 63 99201-1122" }
-];
+// Guides, bookings, reviews, notifications and the whole extra "turismo"
+// layer below (turistas/roteiros/reservas/pagamentos/guiasTuristicos) all
+// start empty for the same reason — no hardcoded demo people/reservations
+// tied to pousadas that don't really exist.
+let guides: Guide[] = [];
 
-let bookings: Booking[] = [
-  {
-    id: "b1",
-    pousadaId: "1",
-    pousadaName: "Araras Eco Lodge",
-    customerName: "Mariana Souza",
-    customerEmail: "mariana.souza@gmail.com",
-    customerPhone: "+55 11 98765-4321",
-    nationality: "Brasileira",
-    adults: 2,
-    children: 1,
-    childAges: "8 anos",
-    dietaryRestrictions: "Vegetariana",
-    specialNeeds: "Nenhuma",
-    checkIn: "2026-07-20",
-    checkOut: "2026-07-25",
-    experienceType: "Safári Onça-Pintada",
-    totalPrice: 9450, // 5 noites * 1800 + 450 exp
-    status: "confirmado_total",
-    guideId: "g1",
-    guideName: "Carlos Silva",
-    dateCreated: "2026-07-10T14:30:00.000Z",
-    googleCalendarEventId: "gc_event_b1"
-  },
-  {
-    id: "b2",
-    pousadaId: "3",
-    pousadaName: "Anavilhanas Jungle Lodge",
-    customerName: "John Doe",
-    customerEmail: "john.doe@gmail.com",
-    customerPhone: "+1 202-555-0143",
-    nationality: "Norte-Americano",
-    adults: 2,
-    children: 0,
-    dietaryRestrictions: "Nenhuma",
-    specialNeeds: "Nenhuma",
-    checkIn: "2026-08-01",
-    checkOut: "2026-08-04",
-    experienceType: "Interação com Botos",
-    totalPrice: 9900, // 3 noites * 3200 + 300 exp
-    status: "pago",
-    dateCreated: "2026-07-14T09:15:00.000Z"
-  }
-];
+let bookings: Booking[] = [];
 
-let reviews: Review[] = [
-  { id: "r1", pousadaId: "1", userName: "Fernanda Lima", rating: 5, comment: "Uma experiência extraordinária! Vimos a onça-pintada no primeiro dia de safári com o guia Carlos. A comida é deliciosa e as passarelas suspensas são incríveis.", date: "2026-06-15" },
-  { id: "r2", pousadaId: "1", userName: "Marcus Schmidt", rating: 4.8, comment: "Excelente infraestrutura sustentável. É fascinante acordar cercado por araras-azuis e tuiuiús.", date: "2026-06-20" },
-  { id: "r3", pousadaId: "3", userName: "Ana Paula Silva", rating: 5, comment: "O melhor hotel de selva que já visitei. Os bangalôs têm uma vista incrível e o atendimento é impecável. Nadar próximo aos botos foi inesquecível.", date: "2026-07-01" }
-];
+let reviews: Review[] = [];
 
 let sightings: Sighting[] = [
   { id: "s1", pousadaId: "p_1784944422389", pousadaName: "Pesqueiro Vagalume", userName: "Bruno Rezende", animalName: "Onça-Pintada (Panthera onca)", imageUrl: "/species/onca-pintada.png", location: "Lago do Pesqueiro Vagalume, Mato Grosso", timestamp: "2026-07-15T10:00:00.000Z", likes: 24 },
@@ -555,42 +366,22 @@ let sightings: Sighting[] = [
   { id: "s3", pousadaId: "p_1784944422389", pousadaName: "Pesqueiro Vagalume", userName: "Alice Dupont", animalName: "Capivara (Hydrochoerus hydrochaeris)", imageUrl: "/species/capivara.png", location: "Lago do Pesqueiro Vagalume, Mato Grosso", timestamp: "2026-07-13T14:20:00.000Z", likes: 32 }
 ];
 
-let notifications: Notification[] = [
-  { id: "n1", target: "admin", message: "Nova reserva criada para Mariana Souza na Araras Eco Lodge.", type: "booking_new", timestamp: "2026-07-10T14:30:00.000Z", read: true, bookingId: "b1" },
-  { id: "n2", target: "admin", message: "Pagamento confirmado para a reserva de John Doe na Anavilhanas Jungle Lodge.", type: "payment_received", timestamp: "2026-07-14T09:15:00.000Z", read: false, bookingId: "b2" }
-];
+let notifications: Notification[] = [];
 
 // ----------------------------------------------------
 // Camada adicional de turismo: Turistas, Roteiros, Reservas,
 // Pagamentos e Guias (conforme especificação do banco de dados).
 // ----------------------------------------------------
 
-let turistas: Turista[] = [
-  { id: "t1", name: "Mariana Souza", email: "mariana.souza@gmail.com", whatsapp: "+55 11 98765-4321", country: "Brasil", age: 34, preferences: "Observação de aves, fotografia de natureza" },
-  { id: "t2", name: "John Doe", email: "john.doe@gmail.com", whatsapp: "+1 202-555-0143", country: "Estados Unidos", age: 41, preferences: "Safári fotográfico, trilhas" }
-];
+let turistas: Turista[] = [];
 
-let roteiros: Roteiro[] = [
-  { id: "rt1", name: "Safári Fotográfico da Onça-Pintada", duration: "5 dias / 4 noites", price: 4500, difficulty: "moderado", capacity: 8, description: "Expedição diária de jipe e barco em busca da onça-pintada no Pantanal Norte, com guias especializados em rastreamento." },
-  { id: "rt2", name: "Trilha do Lobo-Guará no Cerrado", duration: "3 dias / 2 noites", price: 2200, difficulty: "facil", capacity: 12, description: "Caminhadas guiadas pelas veredas do Cerrado em busca do lobo-guará e outras espécies endêmicas." },
-  { id: "rt3", name: "Imersão na Selva Amazônica", duration: "6 dias / 5 noites", price: 5800, difficulty: "dificil", capacity: 6, description: "Canoagem, trilhas de selva e observação de botos cor-de-rosa nas margens do Rio Negro." }
-];
+let roteiros: Roteiro[] = [];
 
-let reservas: Reserva[] = [
-  { id: "rv1", turistaId: "t1", roteiroId: "rt1", date: "2026-07-20", status: "confirmada", totalPrice: 4500 },
-  { id: "rv2", turistaId: "t2", roteiroId: "rt3", date: "2026-08-01", status: "pendente", totalPrice: 5800 }
-];
+let reservas: Reserva[] = [];
 
-let pagamentos: Pagamento[] = [
-  { id: "pg1", reservaId: "rv1", amount: 4500, date: "2026-07-10", method: "pix", status: "aprovado" },
-  { id: "pg2", reservaId: "rv2", amount: 2900, date: "2026-07-14", method: "cartao", status: "pendente" }
-];
+let pagamentos: Pagamento[] = [];
 
-let guiasTuristicos: GuiaTuristico[] = [
-  { id: "gt1", name: "Carlos Silva", specialty: "Rastreamento de Onça-Pintada", phone: "+55 65 99912-3456", availability: true, rating: 4.9 },
-  { id: "gt2", name: "Elena Torres", specialty: "Observação de Aves", phone: "+55 61 98821-4321", availability: true, rating: 4.8 },
-  { id: "gt3", name: "Thiago Rocha", specialty: "Trilhas na Selva Amazônica", phone: "+55 92 98115-9988", availability: false, rating: 4.7 }
-];
+let guiasTuristicos: GuiaTuristico[] = [];
 
 // Cadastro público de novos parceiros (guias e pousadas). Começa vazio —
 // preenchido pelas submissões reais do formulário em /seja-parceiro.

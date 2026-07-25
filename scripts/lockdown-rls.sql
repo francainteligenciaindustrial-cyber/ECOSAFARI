@@ -27,7 +27,10 @@ ALTER TABLE reservas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pagamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE candidaturas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE referral_sources ENABLE ROW LEVEL SECURITY;
+-- referral_sources: NÃO incluída aqui — essa tabela nunca foi criada no
+-- banco (a pesquisa "como você nos encontrou" que a usava foi removida do
+-- site). Se ela existir no seu banco, rode scripts/add-referral-sources-table.sql
+-- primeiro e então adicione as linhas de volta aqui.
 
 DROP POLICY IF EXISTS "Permitir leitura pública de pousadas" ON pousadas;
 DROP POLICY IF EXISTS "Permitir inserção pública de pousadas" ON pousadas;
@@ -93,11 +96,6 @@ DROP POLICY IF EXISTS "Permitir inserção pública de candidaturas" ON candidat
 DROP POLICY IF EXISTS "Permitir leitura pública de candidaturas" ON candidaturas;
 DROP POLICY IF EXISTS "Permitir atualização pública de candidaturas" ON candidaturas;
 DROP POLICY IF EXISTS "Permitir exclusão pública de candidaturas" ON candidaturas;
-
-DROP POLICY IF EXISTS "Permitir leitura pública de referral_sources" ON referral_sources;
-DROP POLICY IF EXISTS "Permitir inserção pública de referral_sources" ON referral_sources;
-DROP POLICY IF EXISTS "Permitir atualização pública de referral_sources" ON referral_sources;
-DROP POLICY IF EXISTS "Permitir exclusão pública de referral_sources" ON referral_sources;
 
 -- Todas as tabelas ficam com RLS ATIVADA e sem nenhuma policy. Sem policy,
 -- o role "anon" (chave pública) fica sem acesso nenhum a essas tabelas — só
