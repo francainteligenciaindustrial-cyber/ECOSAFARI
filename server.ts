@@ -595,40 +595,9 @@ async function syncFromSupabase() {
         };
       });
       console.log(`Carregadas ${pousadas.length} pousadas do Supabase com mappers de segurança.`);
-
-      // Check for missing default/new pousadas and insert them dynamically
-      const loadedIds = new Set(pousadas.map(p => String(p.id)));
-      const missingPousadas = DEFAULT_POUSADAS.filter(p => !loadedIds.has(String(p.id)));
-      if (missingPousadas.length > 0) {
-        console.log(`Identificadas ${missingPousadas.length} novas pousadas estáticas para semear no Supabase.`);
-        const seedNewData = missingPousadas.map(p => ({
-          ...p,
-          images: JSON.stringify(p.images),
-          features: JSON.stringify(p.features),
-          activities: JSON.stringify(p.activities),
-          experiences: JSON.stringify(p.experiences)
-        }));
-        const { error: seedNewErr } = await supabase.from("pousadas").insert(seedNewData);
-        if (seedNewErr) {
-          console.warn("Erro ao semear novas pousadas no Supabase:", seedNewErr.message);
-        } else {
-          console.log(`${missingPousadas.length} novas pousadas semeadas com sucesso.`);
-          // Append the missing ones to our runtime array
-          pousadas.push(...missingPousadas);
-        }
-      }
     } else {
-      console.log("Nenhuma pousada encontrada no Supabase. Semeando dados iniciais...");
-      const seedData = DEFAULT_POUSADAS.map(p => ({
-        ...p,
-        images: JSON.stringify(p.images),
-        features: JSON.stringify(p.features),
-        activities: JSON.stringify(p.activities),
-        experiences: JSON.stringify(p.experiences)
-      }));
-      const { error: seedErr } = await supabase.from("pousadas").insert(seedData);
-      if (seedErr) console.warn("Erro ao semear pousadas no Supabase:", seedErr.message);
-      pousadas = [...DEFAULT_POUSADAS];
+      console.log("Nenhuma pousada encontrada no Supabase (banco vazio de propósito, não semeando).");
+      pousadas = [];
     }
   } catch (err: any) {
     console.warn("Supabase pousadas sync fallback:", err.message);
@@ -647,14 +616,7 @@ async function syncFromSupabase() {
       }));
       console.log(`Carregados ${guides.length} guias do Supabase.`);
     } else {
-      console.log("Nenhum guia encontrado no Supabase. Semeando dados iniciais...");
-      const seedData = guides.map(g => ({
-        ...g,
-        languages: JSON.stringify(g.languages),
-        specialty: JSON.stringify(g.specialty)
-      }));
-      const { error: seedErr } = await supabase.from("guides").insert(seedData);
-      if (seedErr) console.warn("Erro ao semear guias no Supabase:", seedErr.message);
+      guides = [];
     }
   } catch (err: any) {
     console.warn("Supabase guides sync fallback:", err.message);
@@ -674,9 +636,7 @@ async function syncFromSupabase() {
       }));
       console.log(`Carregadas ${bookings.length} reservas do Supabase.`);
     } else {
-      console.log("Nenhuma reserva encontrada no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("bookings").insert(bookings);
-      if (seedErr) console.warn("Erro ao semear reservas no Supabase:", seedErr.message);
+      bookings = [];
     }
   } catch (err: any) {
     console.warn("Supabase bookings sync fallback:", err.message);
@@ -694,9 +654,7 @@ async function syncFromSupabase() {
       }));
       console.log(`Carregadas ${reviews.length} avaliações do Supabase.`);
     } else {
-      console.log("Nenhuma avaliação encontrada no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("reviews").insert(reviews);
-      if (seedErr) console.warn("Erro ao semear avaliações no Supabase:", seedErr.message);
+      reviews = [];
     }
   } catch (err: any) {
     console.warn("Supabase reviews sync fallback:", err.message);
@@ -715,9 +673,7 @@ async function syncFromSupabase() {
       }));
       console.log(`Carregados ${sightings.length} avistamentos do Supabase.`);
     } else {
-      console.log("Nenhum avistamento encontrado no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("sightings").insert(sightings);
-      if (seedErr) console.warn("Erro ao semear avistamentos no Supabase:", seedErr.message);
+      sightings = [];
     }
   } catch (err: any) {
     console.warn("Supabase sightings sync fallback:", err.message);
@@ -734,9 +690,7 @@ async function syncFromSupabase() {
       }));
       console.log(`Carregadas ${notifications.length} notificações do Supabase.`);
     } else {
-      console.log("Nenhuma notificação encontrada no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("notifications").insert(notifications);
-      if (seedErr) console.warn("Erro ao semear notificações no Supabase:", seedErr.message);
+      notifications = [];
     }
   } catch (err: any) {
     console.warn("Supabase notifications sync fallback:", err.message);
@@ -759,9 +713,7 @@ async function syncFromSupabase() {
       }));
       console.log(`Carregadas ${species.length} espécies do Supabase.`);
     } else {
-      console.log("Nenhuma espécie encontrada no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("species").insert(DEFAULT_SPECIES);
-      if (seedErr) console.warn("Erro ao semear espécies no Supabase:", seedErr.message);
+      species = [];
     }
   } catch (err: any) {
     console.warn("Supabase species sync fallback:", err.message);
@@ -775,9 +727,7 @@ async function syncFromSupabase() {
       turistas = data.map((t: any) => ({ ...t, name: resolveTranslation(t.name) }));
       console.log(`Carregados ${turistas.length} turistas do Supabase.`);
     } else {
-      console.log("Nenhum turista encontrado no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("turistas").insert(turistas);
-      if (seedErr) console.warn("Erro ao semear turistas no Supabase:", seedErr.message);
+      turistas = [];
     }
   } catch (err: any) {
     console.warn("Supabase turistas sync fallback:", err.message);
@@ -791,9 +741,7 @@ async function syncFromSupabase() {
       roteiros = data.map((r: any) => ({ ...r, name: resolveTranslation(r.name), description: resolveTranslation(r.description) }));
       console.log(`Carregados ${roteiros.length} roteiros do Supabase.`);
     } else {
-      console.log("Nenhum roteiro encontrado no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("roteiros").insert(roteiros);
-      if (seedErr) console.warn("Erro ao semear roteiros no Supabase:", seedErr.message);
+      roteiros = [];
     }
   } catch (err: any) {
     console.warn("Supabase roteiros sync fallback:", err.message);
@@ -807,9 +755,7 @@ async function syncFromSupabase() {
       reservas = data;
       console.log(`Carregadas ${reservas.length} reservas de roteiro do Supabase.`);
     } else {
-      console.log("Nenhuma reserva de roteiro encontrada no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("reservas").insert(reservas);
-      if (seedErr) console.warn("Erro ao semear reservas de roteiro no Supabase:", seedErr.message);
+      reservas = [];
     }
   } catch (err: any) {
     console.warn("Supabase reservas sync fallback:", err.message);
@@ -823,9 +769,7 @@ async function syncFromSupabase() {
       pagamentos = data;
       console.log(`Carregados ${pagamentos.length} pagamentos do Supabase.`);
     } else {
-      console.log("Nenhum pagamento encontrado no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("pagamentos").insert(pagamentos);
-      if (seedErr) console.warn("Erro ao semear pagamentos no Supabase:", seedErr.message);
+      pagamentos = [];
     }
   } catch (err: any) {
     console.warn("Supabase pagamentos sync fallback:", err.message);
@@ -839,9 +783,7 @@ async function syncFromSupabase() {
       guiasTuristicos = data.map((g: any) => ({ ...g, name: resolveTranslation(g.name), specialty: resolveTranslation(g.specialty) }));
       console.log(`Carregados ${guiasTuristicos.length} guias turísticos do Supabase.`);
     } else {
-      console.log("Nenhum guia turístico encontrado no Supabase. Semeando dados iniciais...");
-      const { error: seedErr } = await supabase.from("guias").insert(guiasTuristicos);
-      if (seedErr) console.warn("Erro ao semear guias turísticos no Supabase:", seedErr.message);
+      guiasTuristicos = [];
     }
   } catch (err: any) {
     console.warn("Supabase guias sync fallback:", err.message);
