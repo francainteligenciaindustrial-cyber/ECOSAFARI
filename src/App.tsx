@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Compass, ShieldAlert, Monitor, CheckCircle, Smartphone, HelpCircle, Mail, MessageSquare, Instagram, Lock, LogOut } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import PousadaCatalog from "./components/PousadaCatalog";
@@ -6,8 +6,6 @@ import PousadaDetailsView from "./components/PousadaDetailsView";
 import VideoPlayerView from "./components/VideoPlayerView";
 import WhatsAppChatbot from "./components/WhatsAppChatbot";
 import WhatsAppGateView from "./components/WhatsAppGateView";
-import AdminDashboard from "./components/AdminDashboard";
-import MobileSimulator from "./components/MobileSimulator";
 import AdminLoginModal from "./components/AdminLoginModal";
 import PartnerSignupPage from "./components/PartnerSignupPage";
 import AboutPage from "./components/AboutPage";
@@ -22,6 +20,22 @@ import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { useRoute, navigate } from "./lib/router";
 import { Pousada, Guide, Sighting, Review, Species, PublicBookingSummary } from "./types";
+
+// Code-split: AdminDashboard (~2000 lines) is dead weight in the bundle for
+// the ~99% of visitors who never touch /admin, and MobileSimulator is a
+// sizeable embedded widget too. React.lazy() puts each in its own chunk,
+// fetched only when actually rendered, instead of shipping in the single
+// main bundle every visitor downloads today.
+const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
+const MobileSimulator = lazy(() => import("./components/MobileSimulator"));
+
+function LazyFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <div className="w-8 h-8 border-2 border-editorial-primary border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+}
 
 // Standalone public routes that render their own full page (no shared header/footer chrome).
 const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
@@ -213,16 +227,18 @@ export default function App() {
     }
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans select-none">
-        <MobileSimulator
-          sightings={sightings}
-          pousadas={pousadas}
-          bookings={confirmedBookings}
-          onAddSighting={(newS) => {
-            setSightings(prev => [newS, ...prev]);
-          }}
-          onRefreshData={fetchData}
-          standalone={true}
-        />
+        <Suspense fallback={<LazyFallback />}>
+          <MobileSimulator
+            sightings={sightings}
+            pousadas={pousadas}
+            bookings={confirmedBookings}
+            onAddSighting={(newS) => {
+              setSightings(prev => [newS, ...prev]);
+            }}
+            onRefreshData={fetchData}
+            standalone={true}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -379,12 +395,14 @@ export default function App() {
 
             {/* 2. ADMIN PANEL (restricted to authenticated admins) */}
             {currentModule === "admin" && isAdmin && (
-              <AdminDashboard
-                pousadas={pousadas}
-                guides={guides}
-                species={species}
-                onRefreshData={fetchData}
-              />
+              <Suspense fallback={<LazyFallback />}>
+                <AdminDashboard
+                  pousadas={pousadas}
+                  guides={guides}
+                  species={species}
+                  onRefreshData={fetchData}
+                />
+              </Suspense>
             )}
           </>
         )}

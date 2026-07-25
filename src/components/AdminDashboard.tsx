@@ -26,6 +26,7 @@ import TurismoPanel from "./TurismoPanel";
 import CandidaturasPanel from "./CandidaturasPanel";
 import ReferralStatsWidget from "./ReferralStatsWidget";
 import { adminFetch } from "../lib/adminFetch";
+import ImageUploadButton from "./ImageUploadButton";
 
 interface AdminDashboardProps {
   pousadas: Pousada[];
@@ -570,13 +571,19 @@ export default function AdminDashboard({
                   <label className="text-zinc-700 font-semibold flex items-center gap-1.5">
                     <ImageIcon className="h-3.5 w-3.5" /> Imagens
                   </label>
-                  <button
-                    type="button"
-                    onClick={addImageLine}
-                    className="flex items-center gap-1 text-emerald-700 font-semibold hover:text-emerald-800 transition cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Adicionar imagem
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <ImageUploadButton
+                      label="Enviar nova imagem"
+                      onUploaded={url => setEditPousadaForm(prev => ({ ...prev, images: prev.images ? prev.images + "\n" + url : url }))}
+                    />
+                    <button
+                      type="button"
+                      onClick={addImageLine}
+                      className="flex items-center gap-1 text-emerald-700 font-semibold hover:text-emerald-800 transition cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Adicionar link
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {imageLines.length === 0 && (
@@ -604,6 +611,7 @@ export default function AdminDashboard({
                         placeholder="https://... ou /pousadas/foto.png"
                         className="flex-1 bg-white border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono"
                       />
+                      <ImageUploadButton label="Enviar" onUploaded={url => updateImageLine(idx, url)} />
                       <button
                         type="button"
                         onClick={() => removeImageLine(idx)}
@@ -1068,12 +1076,15 @@ export default function AdminDashboard({
                   </div>
                   <div>
                     <label className="block text-zinc-700 font-semibold mb-1">Link da Imagem Principal</label>
-                    <input
-                      type="text"
-                      value={pousadaForm.images}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, images: e.target.value }))}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={pousadaForm.images}
+                        onChange={e => setPousadaForm(prev => ({ ...prev, images: e.target.value }))}
+                        className="flex-1 bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                      />
+                      <ImageUploadButton onUploaded={url => setPousadaForm(prev => ({ ...prev, images: url }))} />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-zinc-700 font-semibold mb-1">Link do Vídeo (opcional)</label>
@@ -1837,13 +1848,16 @@ CREATE POLICY "Permitir deleção de espécies" ON species FOR DELETE USING (tru
 
                 <div className="text-xs">
                   <label className="block text-zinc-700 font-semibold mb-1">Link da Imagem Ilustrativa</label>
-                  <input
-                    type="text"
-                    value={speciesForm.image}
-                    onChange={e => setSpeciesForm(prev => ({ ...prev, image: e.target.value }))}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={speciesForm.image}
+                      onChange={e => setSpeciesForm(prev => ({ ...prev, image: e.target.value }))}
+                      placeholder="https://images.unsplash.com/..."
+                      className="flex-1 bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                    />
+                    <ImageUploadButton onUploaded={url => setSpeciesForm(prev => ({ ...prev, image: url }))} />
+                  </div>
                 </div>
 
                 <div className="text-xs">

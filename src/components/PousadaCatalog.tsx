@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck } from "lucide-react";
 import { Pousada, Review, Species, Sighting, PublicBookingSummary } from "../types";
-import MobileSimulator from "./MobileSimulator";
 import PictureImg from "./PictureImg";
+
+// Code-split — see App.tsx for why (same component, lazy-loaded separately
+// here since this page embeds it directly too).
+const MobileSimulator = lazy(() => import("./MobileSimulator"));
 
 const WILD_SPECIES = [
   {
@@ -592,14 +595,16 @@ export default function PousadaCatalog({
               </div>
 
               {/* Smartphone Inner Live Content */}
-              <MobileSimulator
-                sightings={sightings}
-                pousadas={pousadas}
-                bookings={bookings}
-                onAddSighting={onAddSighting}
-                onRefreshData={onRefreshData}
-                standalone={true}
-              />
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+                <MobileSimulator
+                  sightings={sightings}
+                  pousadas={pousadas}
+                  bookings={bookings}
+                  onAddSighting={onAddSighting}
+                  onRefreshData={onRefreshData}
+                  standalone={true}
+                />
+              </Suspense>
             </div>
 
             {/* Float badge */}

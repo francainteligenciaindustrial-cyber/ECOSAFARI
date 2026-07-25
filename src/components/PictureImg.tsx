@@ -9,9 +9,14 @@ import React, { useState } from "react";
 // render as a broken image instead of falling back.
 type Props = React.ImgHTMLAttributes<HTMLImageElement> & { src: string };
 
-export default function PictureImg({ src, ...imgProps }: Props) {
+// Exported standalone so it's unit-testable without rendering the component.
+export function toWebpCandidate(src: string): string | null {
   const isLocalRaster = /^\/(pousadas|species)\/.+\.(png|jpe?g)$/i.test(src);
-  const webpSrc = isLocalRaster ? src.replace(/\.(png|jpe?g)$/i, ".webp") : null;
+  return isLocalRaster ? src.replace(/\.(png|jpe?g)$/i, ".webp") : null;
+}
+
+export default function PictureImg({ src, ...imgProps }: Props) {
+  const webpSrc = toWebpCandidate(src);
   const [failed, setFailed] = useState(false);
 
   return (

@@ -1,7 +1,9 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
+import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { randomUUID } from "crypto";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -394,7 +396,7 @@ let referralSources: ReferralSource[] = [];
 // Helper to push a notification
 function addNotification(target: 'admin' | 'guide' | 'pousada', message: string, type: 'booking_new' | 'payment_received' | 'status_update' | 'sighting_new', bookingId?: string) {
   const newNotif: Notification = {
-    id: `n_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    id: `n_${randomUUID()}`,
     target,
     message,
     type,
@@ -737,25 +739,59 @@ app.post("/api/pousadas/:id/view", async (req, res) => {
   res.json({ viewCount: pousadas[idx].viewCount });
 });
 
+// Image uploads go to the "site-media" Supabase Storage bucket (public,
+// created via scripts/create-storage-bucket.mjs) instead of the git repo —
+// before this, replacing a photo meant a developer editing files and
+// pushing a deploy, which doesn't scale past one person maintaining the
+// site. memoryStorage() keeps the file in RAM only long enough to forward
+// it to Supabase; nothing touches disk.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(png|jpeg|webp|gif)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Formato de imagem não suportado (use PNG, JPEG, WebP ou GIF)"));
+  },
+});
+
+app.post("/api/upload-image", requireAdmin, (req, res) => {
+  upload.single("file")(req, res, async (err: any) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
+
+    const ext = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
+    const objectPath = `uploads/${randomUUID()}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from("site-media")
+      .upload(objectPath, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+
+    if (error) {
+      console.error("Erro ao subir imagem para o Supabase Storage:", error.message);
+      return res.status(500).json({ error: "Falha ao enviar imagem" });
+    }
+
+    const { data } = supabase.storage.from("site-media").getPublicUrl(objectPath);
+    res.status(201).json({ url: data.publicUrl });
+  });
+});
+
 app.post("/api/pousadas", requireAdmin, async (req, res) => {
   const newPousada: Pousada = {
-    id: `p_${Date.now()}`,
+    id: `p_${randomUUID()}`,
     verified: false,
     viewCount: 0,
     ...req.body
   };
   pousadas.push(newPousada);
   
-  // Save to Supabase in background
+  // Save to Supabase in background. images/features/activities/experiences
+  // are jsonb columns — pass the native arrays straight through, supabase-js
+  // serializes them correctly as nested JSON. Stringifying them here (like
+  // this used to) would double-encode them into a jsonb string scalar
+  // instead of a jsonb array.
   try {
-    const dbPayload = {
-      ...newPousada,
-      images: JSON.stringify(newPousada.images),
-      features: JSON.stringify(newPousada.features),
-      activities: JSON.stringify(newPousada.activities),
-      experiences: JSON.stringify(newPousada.experiences)
-    };
-    const { error } = await supabase.from("pousadas").insert(dbPayload);
+    const { error } = await supabase.from("pousadas").insert(newPousada);
     if (error) console.warn("Erro ao salvar pousada no Supabase:", error.message);
   } catch (err: any) {
     console.warn("Erro ao salvar pousada no Supabase:", err.message);
@@ -770,16 +806,9 @@ app.put("/api/pousadas/:id", requireAdmin, async (req, res) => {
   if (idx !== -1) {
     pousadas[idx] = { ...pousadas[idx], ...req.body };
     
-    // Save to Supabase in background
+    // Save to Supabase in background (see insert route above re: jsonb columns)
     try {
-      const dbPayload = {
-        ...pousadas[idx],
-        images: JSON.stringify(pousadas[idx].images),
-        features: JSON.stringify(pousadas[idx].features),
-        activities: JSON.stringify(pousadas[idx].activities),
-        experiences: JSON.stringify(pousadas[idx].experiences)
-      };
-      const { error } = await supabase.from("pousadas").update(dbPayload).eq("id", id);
+      const { error } = await supabase.from("pousadas").update(pousadas[idx]).eq("id", id);
       if (error) console.warn("Erro ao atualizar pousada no Supabase:", error.message);
     } catch (err: any) {
       console.warn("Erro ao atualizar pousada no Supabase:", err.message);
@@ -813,19 +842,15 @@ app.get("/api/guides", (req, res) => {
 
 app.post("/api/guides", requireAdmin, async (req, res) => {
   const newGuide: Guide = {
-    id: `g_${Date.now()}`,
+    id: `g_${randomUUID()}`,
     ...req.body
   };
   guides.push(newGuide);
   
-  // Save to Supabase in background
+  // Save to Supabase in background (languages/specialty are jsonb — see the
+  // pousadas insert route above for why these aren't JSON.stringify'd)
   try {
-    const dbPayload = {
-      ...newGuide,
-      languages: JSON.stringify(newGuide.languages),
-      specialty: JSON.stringify(newGuide.specialty)
-    };
-    await supabase.from("guides").insert(dbPayload);
+    await supabase.from("guides").insert(newGuide);
   } catch (err: any) {
     console.warn("Erro ao salvar guia no Supabase:", err.message);
   }
@@ -839,14 +864,9 @@ app.put("/api/guides/:id", requireAdmin, async (req, res) => {
   if (idx !== -1) {
     guides[idx] = { ...guides[idx], ...req.body };
     
-    // Save to Supabase in background
+    // Save to Supabase in background (see insert route above re: jsonb columns)
     try {
-      const dbPayload = {
-        ...guides[idx],
-        languages: JSON.stringify(guides[idx].languages),
-        specialty: JSON.stringify(guides[idx].specialty)
-      };
-      await supabase.from("guides").update(dbPayload).eq("id", id);
+      await supabase.from("guides").update(guides[idx]).eq("id", id);
     } catch (err: any) {
       console.warn("Erro ao atualizar guia no Supabase:", err.message);
     }
@@ -930,7 +950,7 @@ app.post("/api/bookings", requireAdmin, (req, res) => {
   const totalPrice = (targetPousada.pricePerNight * days) + experiencePrice;
 
   const newBooking: Booking = {
-    id: `b_${Date.now()}`,
+    id: `b_${randomUUID()}`,
     pousadaId,
     pousadaName: targetPousada.name,
     customerName: req.body.customerName || "Cliente WhatsApp",
@@ -1470,7 +1490,7 @@ app.post("/api/sightings", publicFormLimiter, (req, res) => {
   const { pousadaId, userName, animalName, imageUrl, location } = req.body;
   const targetPousada = pousadas.find(p => p.id === pousadaId) || pousadas[0];
   const newSighting: Sighting = {
-    id: `s_${Date.now()}`,
+    id: `s_${randomUUID()}`,
     pousadaId: targetPousada ? targetPousada.id : (pousadaId || ""),
     pousadaName: targetPousada ? targetPousada.name : "",
     userName: userName || "Turista Anônimo",
@@ -1518,7 +1538,7 @@ app.get("/api/reviews", (req, res) => {
 
 app.post("/api/reviews", publicFormLimiter, (req, res) => {
   const newReview: Review = {
-    id: `r_${Date.now()}`,
+    id: `r_${randomUUID()}`,
     pousadaId: req.body.pousadaId,
     userName: req.body.userName || "Turista Satisfeito",
     rating: req.body.rating || 5,
@@ -1579,7 +1599,7 @@ app.get("/api/species", (req, res) => {
 
 app.post("/api/species", requireAdmin, async (req, res) => {
   const newSpecie: Species = {
-    id: req.body.id || `s_${Date.now()}`,
+    id: req.body.id || `s_${randomUUID()}`,
     ...req.body
   };
   species.push(newSpecie);
@@ -1642,7 +1662,7 @@ app.get("/api/turistas", requireAdmin, (req, res) => {
 });
 
 app.post("/api/turistas", requireAdmin, async (req, res) => {
-  const newTurista: Turista = { id: `t_${Date.now()}`, ...req.body };
+  const newTurista: Turista = { id: `t_${randomUUID()}`, ...req.body };
   turistas.push(newTurista);
   try {
     const { error } = await supabase.from("turistas").insert(newTurista);
@@ -1688,7 +1708,7 @@ app.get("/api/roteiros", requireAdmin, (req, res) => {
 });
 
 app.post("/api/roteiros", requireAdmin, async (req, res) => {
-  const newRoteiro: Roteiro = { id: `rt_${Date.now()}`, ...req.body };
+  const newRoteiro: Roteiro = { id: `rt_${randomUUID()}`, ...req.body };
   roteiros.push(newRoteiro);
   try {
     const { error } = await supabase.from("roteiros").insert(newRoteiro);
@@ -1734,7 +1754,7 @@ app.get("/api/reservas", requireAdmin, (req, res) => {
 });
 
 app.post("/api/reservas", requireAdmin, async (req, res) => {
-  const newReserva: Reserva = { id: `rv_${Date.now()}`, ...req.body };
+  const newReserva: Reserva = { id: `rv_${randomUUID()}`, ...req.body };
   reservas.push(newReserva);
   try {
     const { error } = await supabase.from("reservas").insert(newReserva);
@@ -1780,7 +1800,7 @@ app.get("/api/pagamentos", requireAdmin, (req, res) => {
 });
 
 app.post("/api/pagamentos", requireAdmin, async (req, res) => {
-  const newPagamento: Pagamento = { id: `pg_${Date.now()}`, ...req.body };
+  const newPagamento: Pagamento = { id: `pg_${randomUUID()}`, ...req.body };
   pagamentos.push(newPagamento);
   try {
     const { error } = await supabase.from("pagamentos").insert(newPagamento);
@@ -1826,7 +1846,7 @@ app.get("/api/guias", requireAdmin, (req, res) => {
 });
 
 app.post("/api/guias", requireAdmin, async (req, res) => {
-  const newGuia: GuiaTuristico = { id: `gt_${Date.now()}`, ...req.body };
+  const newGuia: GuiaTuristico = { id: `gt_${randomUUID()}`, ...req.body };
   guiasTuristicos.push(newGuia);
   try {
     const { error } = await supabase.from("guias").insert(newGuia);
@@ -1890,7 +1910,7 @@ app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
   }
 
   const newCandidatura: Candidatura = {
-    id: `cand_${Date.now()}`,
+    id: `cand_${randomUUID()}`,
     status: "pendente",
     dateCreated: new Date().toISOString(),
     ...body
@@ -1945,7 +1965,7 @@ app.delete("/api/candidaturas/:id", requireAdmin, async (req, res) => {
 // POST é público (qualquer visitante responde); GET é admin-only (estatísticas).
 app.post("/api/referral-sources", publicFormLimiter, async (req, res) => {
   const newSource: ReferralSource = {
-    id: `ref_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+    id: `ref_${randomUUID()}`,
     timestamp: new Date().toISOString(),
     ...req.body
   };

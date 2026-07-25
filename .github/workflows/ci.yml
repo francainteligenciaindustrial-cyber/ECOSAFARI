@@ -1,0 +1,38 @@
+name: CI
+
+# Catches typecheck/build breakage before it reaches Vercel — before this
+# workflow existed, the only way to find out a deploy was broken was to
+# check the live site after it was already published.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Dummy values so the build step doesn't fail on missing secrets —
+          # this job only verifies the code compiles and bundles, it never
+          # runs the server or talks to real services.
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
