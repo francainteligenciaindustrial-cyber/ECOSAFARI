@@ -126,24 +126,46 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             )}
           </div>
 
-          {images.length > 1 && (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {images.slice(1).map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setLightboxIndex(idx + 1)}
-                  className="aspect-square overflow-hidden border border-editorial-border relative cursor-pointer group"
-                >
-                  <PictureImg
-                    src={img}
-                    alt={`${pousada.name} ${idx + 2}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
+          {images.length > 1 && (() => {
+            // Caps the thumbnail grid at 12 tiles — past that, the grid gets
+            // long and repetitive for pousadas with a big gallery. The 12th
+            // tile gets a "+N" overlay for however many photos didn't get a
+            // tile of their own; those aren't gone, just not duplicated in
+            // the grid — clicking the 12th tile opens the lightbox at that
+            // position, and Próxima/Anterior already cycles through the
+            // full "images" array regardless of what the grid shows.
+            const MAX_VISIBLE_THUMBS = 12;
+            const thumbnails = images.slice(1);
+            const visibleThumbnails = thumbnails.slice(0, MAX_VISIBLE_THUMBS);
+            const hiddenCount = Math.max(0, thumbnails.length - MAX_VISIBLE_THUMBS);
+
+            return (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {visibleThumbnails.map((img, idx) => {
+                  const isLastVisible = hiddenCount > 0 && idx === MAX_VISIBLE_THUMBS - 1;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setLightboxIndex(idx + 1)}
+                      className="aspect-square overflow-hidden border border-editorial-border relative cursor-pointer group"
+                    >
+                      <PictureImg
+                        src={img}
+                        alt={`${pousada.name} ${idx + 2}`}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                      {isLastVisible && (
+                        <div className="absolute inset-0 bg-black/65 flex items-center justify-center">
+                          <span className="text-white font-serif font-bold text-2xl">+{hiddenCount}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Lightbox */}
