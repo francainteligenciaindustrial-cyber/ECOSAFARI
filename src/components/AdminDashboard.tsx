@@ -18,8 +18,7 @@ import {
   Briefcase,
   Bird,
   BadgeCheck,
-  Eye,
-  Image as ImageIcon
+  Eye
 } from "lucide-react";
 import { Pousada, Guide, Booking, Notification, Species } from "../types";
 import TurismoPanel from "./TurismoPanel";
@@ -30,6 +29,7 @@ import { adminFetch } from "../lib/adminFetch";
 import ImageUploadButton from "./ImageUploadButton";
 import TagInput from "./TagInput";
 import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
+import ImageListEditor from "./ImageListEditor";
 import Pagination from "./Pagination";
 import { usePagination } from "../lib/usePagination";
 
@@ -207,7 +207,8 @@ export default function AdminDashboard({
     features: [] as string[],
     activities: [] as string[],
     experiences: [] as ExperienceDraft[],
-    images: "",
+    images: [] as string[],
+    officialSiteImages: [] as string[],
     videoUrl: "",
     officialSiteUrl: ""
   });
@@ -224,7 +225,8 @@ export default function AdminDashboard({
       features: [...(p.features || [])],
       activities: [...(p.activities || [])],
       experiences: (p.experiences || []).map(e => ({ title: e.title, price: e.price })),
-      images: (p.images || []).join("\n"),
+      images: [...(p.images || [])],
+      officialSiteImages: [...(p.officialSiteImages || [])],
       videoUrl: p.videoUrl || "",
       officialSiteUrl: p.officialSiteUrl || ""
     });
@@ -246,7 +248,8 @@ export default function AdminDashboard({
         experiences: editPousadaForm.experiences
           .filter(exp => exp.title.trim())
           .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
-        images: editPousadaForm.images.split("\n").map(i => i.trim()).filter(Boolean),
+        images: editPousadaForm.images.map(i => i.trim()).filter(Boolean),
+        officialSiteImages: editPousadaForm.officialSiteImages.map(i => i.trim()).filter(Boolean),
         videoUrl: editPousadaForm.videoUrl.trim() || undefined,
         officialSiteUrl: editPousadaForm.officialSiteUrl.trim() || undefined
       };
@@ -524,20 +527,6 @@ export default function AdminDashboard({
 
       {/* Edit Pousada modal */}
       {editingPousadaId && (() => {
-        const imageLines = editPousadaForm.images.split("\n");
-        const updateImageLine = (idx: number, value: string) => {
-          const lines = [...imageLines];
-          lines[idx] = value;
-          setEditPousadaForm(prev => ({ ...prev, images: lines.join("\n") }));
-        };
-        const removeImageLine = (idx: number) => {
-          const lines = imageLines.filter((_, i) => i !== idx);
-          setEditPousadaForm(prev => ({ ...prev, images: lines.join("\n") }));
-        };
-        const addImageLine = () => {
-          setEditPousadaForm(prev => ({ ...prev, images: prev.images ? prev.images + "\n" : "" }));
-        };
-
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <form
@@ -622,65 +611,22 @@ export default function AdminDashboard({
                 />
               </div>
 
-              {/* Images — one row per photo, with live thumbnail preview */}
-              <div className="text-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-zinc-700 font-semibold flex items-center gap-1.5">
-                    <ImageIcon className="h-3.5 w-3.5" /> Imagens
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <ImageUploadButton
-                      label="Enviar nova imagem"
-                      onUploaded={url => setEditPousadaForm(prev => ({ ...prev, images: prev.images ? prev.images + "\n" + url : url }))}
-                    />
-                    <button
-                      type="button"
-                      onClick={addImageLine}
-                      className="flex items-center gap-1 text-emerald-700 font-semibold hover:text-emerald-800 transition cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Adicionar link
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {imageLines.length === 0 && (
-                    <p className="text-zinc-400 italic py-2">Nenhuma imagem adicionada ainda.</p>
-                  )}
-                  {imageLines.map((line, idx) => (
-                    <div key={idx} className="flex items-center gap-3 bg-zinc-50 border border-zinc-200 rounded-lg p-2">
-                      <div className="w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-zinc-200 border border-zinc-300 flex items-center justify-center">
-                        {line.trim() ? (
-                          <img
-                            src={line.trim()}
-                            alt={`Imagem ${idx + 1}`}
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                          />
-                        ) : (
-                          <ImageIcon className="h-5 w-5 text-zinc-400" />
-                        )}
-                      </div>
-                      <input
-                        type="text"
-                        value={line}
-                        onChange={e => updateImageLine(idx, e.target.value)}
-                        placeholder="https://... ou /pousadas/foto.png"
-                        className="flex-1 bg-white border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono"
-                      />
-                      <ImageUploadButton label="Enviar" onUploaded={url => updateImageLine(idx, url)} />
-                      <button
-                        type="button"
-                        onClick={() => removeImageLine(idx)}
-                        className="text-zinc-400 hover:text-red-600 transition cursor-pointer flex-shrink-0"
-                        title="Remover imagem"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Images — shown in the catalog's detail view (visão detalhada) */}
+              <ImageListEditor
+                label="Imagens (visão detalhada do catálogo)"
+                value={editPousadaForm.images}
+                onChange={images => setEditPousadaForm(prev => ({ ...prev, images }))}
+              />
+
+              {/* Independent gallery for the /site/:slug official site page —
+                  falls back to the images above when left empty, so this is
+                  optional, not a second copy of the same list. */}
+              <ImageListEditor
+                label="Fotos do Site Oficial (opcional — se vazio, usa as imagens acima)"
+                value={editPousadaForm.officialSiteImages}
+                onChange={officialSiteImages => setEditPousadaForm(prev => ({ ...prev, officialSiteImages }))}
+                emptyHint="Nenhuma foto exclusiva — o Site Oficial vai usar as imagens da visão detalhada."
+              />
 
               <div className="text-xs">
                 <label className="block text-zinc-700 font-semibold mb-1.5">Estrutura & Comodidades</label>

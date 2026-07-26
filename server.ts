@@ -409,7 +409,7 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // "viewCount" are deliberately excluded from POUSADA_* — they're computed by
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
-const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText"] as const;
+const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages"] as const;
 const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
 const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status"] as const;
 const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
@@ -455,7 +455,8 @@ function mapPousadaRow(p: any): Pousada {
     officialSiteUrl: p.officialSiteUrl || "",
     teamPhotoUrl: p.teamPhotoUrl || "",
     teamSectionTitle: p.teamSectionTitle || "",
-    teamSectionText: p.teamSectionText || ""
+    teamSectionText: p.teamSectionText || "",
+    officialSiteImages: parseJSONSafe(p.officialSiteImages) || []
   };
 }
 
@@ -1821,7 +1822,8 @@ CREATE TABLE IF NOT EXISTS pousadas (
   "officialSiteUrl" TEXT,
   "teamPhotoUrl" TEXT,
   "teamSectionTitle" TEXT,
-  "teamSectionText" TEXT
+  "teamSectionText" TEXT,
+  "officialSiteImages" TEXT -- armazenado como string JSON, igual images
 );
 
 -- Caso a tabela já exista de uma execução anterior deste script, garante as novas colunas
@@ -1831,6 +1833,7 @@ ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "officialSiteUrl" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamPhotoUrl" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamSectionTitle" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamSectionText" TEXT;
+ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "officialSiteImages" TEXT;
 
 -- Ativar RLS em pousadas (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE pousadas ENABLE ROW LEVEL SECURITY;

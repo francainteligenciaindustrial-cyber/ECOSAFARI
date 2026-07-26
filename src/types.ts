@@ -22,6 +22,11 @@ export interface Pousada {
   teamPhotoUrl?: string; // foto da equipe/família que atende os hóspedes, exibida no /site/:slug
   teamSectionTitle?: string; // título da seção (padrão: "Quem vai te receber")
   teamSectionText?: string; // texto de apresentação da equipe/família
+  // Galeria exclusiva da página /site/:slug (Site Oficial) — independente de
+  // "images" (usada no catálogo/visão detalhada). Quando vazia, o Site
+  // Oficial usa "images" como fallback, então pousadas antigas continuam
+  // mostrando uma galeria mesmo sem configurar este campo.
+  officialSiteImages?: string[];
 }
 
 export interface Review {

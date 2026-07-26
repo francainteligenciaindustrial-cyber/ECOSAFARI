@@ -57,6 +57,14 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
   const whatsappMessage = `Olá! Encontrei o site da ${pousada.name} e gostaria de mais informações.`;
   const whatsappLink = `https://wa.me/${AGENCY_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
 
+  // Independent gallery for this page — falls back to the shared "images"
+  // (used by the catalog's detail view) when the admin hasn't configured
+  // official-site-specific photos yet, so no pousada goes from having a
+  // gallery to having none just because this field is new.
+  const galleryImages = pousada.officialSiteImages && pousada.officialSiteImages.length > 0
+    ? pousada.officialSiteImages
+    : pousada.images;
+
   return (
     <div className="bg-editorial-bg font-sans text-editorial-text">
 
@@ -118,6 +126,29 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
         </p>
       </section>
 
+      {/* Gallery */}
+      {galleryImages.length > 1 && (
+        <section className="max-w-6xl mx-auto px-6 md:px-10 pb-16">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {galleryImages.slice(0, 6).map((img, idx) => (
+              <div key={idx} className="aspect-square overflow-hidden border border-editorial-border">
+                <PictureImg src={img} alt={`${pousada.name} ${idx + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover hover:scale-105 transition duration-500" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Emotional bridge — the feeling of the place, not a feature list */}
+      <section className="bg-editorial-primary py-20 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <Quote className="h-7 w-7 text-white/40 mx-auto mb-6" />
+          <p className="text-white text-2xl md:text-3xl font-serif italic leading-snug">
+            Mais que um pesqueiro: um lugar pra pescar em paz, rir em família e voltar sempre que bater a saudade.
+          </p>
+        </div>
+      </section>
+
       {/* Meet the team/family behind the place */}
       {pousada.teamPhotoUrl && (
         <section className="bg-editorial-secondary border-y border-editorial-border py-16">
@@ -139,29 +170,6 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
                 {pousada.teamSectionText}
               </p>
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* Emotional bridge — the feeling of the place, not a feature list */}
-      <section className="bg-editorial-primary py-20 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <Quote className="h-7 w-7 text-white/40 mx-auto mb-6" />
-          <p className="text-white text-2xl md:text-3xl font-serif italic leading-snug">
-            Mais que um pesqueiro: um lugar pra pescar em paz, rir em família e voltar sempre que bater a saudade.
-          </p>
-        </div>
-      </section>
-
-      {/* Gallery */}
-      {pousada.images.length > 1 && (
-        <section className="max-w-6xl mx-auto px-6 md:px-10 pb-16">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {pousada.images.slice(0, 6).map((img, idx) => (
-              <div key={idx} className="aspect-square overflow-hidden border border-editorial-border">
-                <PictureImg src={img} alt={`${pousada.name} ${idx + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover hover:scale-105 transition duration-500" />
-              </div>
-            ))}
           </div>
         </section>
       )}
