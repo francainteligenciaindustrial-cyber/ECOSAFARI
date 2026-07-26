@@ -26,8 +26,10 @@ export default function TurismoPanel() {
   const [guias, setGuias] = useState<GuiaTuristico[]>([]);
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchAll = async () => {
+    setLoadError(false);
     try {
       const [tRes, rtRes, rvRes, pgRes, gRes] = await Promise.all([
         adminFetch("/api/turistas"),
@@ -36,13 +38,19 @@ export default function TurismoPanel() {
         adminFetch("/api/pagamentos"),
         adminFetch("/api/guias"),
       ]);
-      setTuristas(await tRes.json());
-      setRoteiros(await rtRes.json());
-      setReservas(await rvRes.json());
-      setPagamentos(await pgRes.json());
-      setGuias(await gRes.json());
+      // A non-ok response (e.g. a table that hasn't been created in Supabase
+      // yet) returns { error: "..." } instead of an array — setting state to
+      // that object instead of [] used to crash every section's .filter()/
+      // .map() the moment this tab rendered. Skipping the setter on failure
+      // keeps the previous (or empty) array state instead.
+      if (tRes.ok) setTuristas(await tRes.json()); else setLoadError(true);
+      if (rtRes.ok) setRoteiros(await rtRes.json()); else setLoadError(true);
+      if (rvRes.ok) setReservas(await rvRes.json()); else setLoadError(true);
+      if (pgRes.ok) setPagamentos(await pgRes.json()); else setLoadError(true);
+      if (gRes.ok) setGuias(await gRes.json()); else setLoadError(true);
     } catch (err) {
       console.error("Erro ao carregar dados de turismo:", err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -77,6 +85,12 @@ export default function TurismoPanel() {
 
   return (
     <div>
+      {loadError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3 rounded-lg mb-4">
+          Não foi possível carregar uma ou mais seções (turistas, roteiros, reservas, pagamentos ou guias). Tente sair e entrar de novo no painel — se persistir, as tabelas dessa camada podem não existir ainda no Supabase (copie o script de criação em <span className="font-mono">/api/supabase/sql</span>, acessível logado como admin, e rode no SQL Editor do seu projeto).
+        </div>
+      )}
+
       {/* Sub-navigation */}
       <div className="flex flex-wrap gap-2 mb-6">
         {SECTIONS.map(s => (

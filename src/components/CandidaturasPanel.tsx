@@ -22,14 +22,24 @@ const STATUS_COLORS: Record<Candidatura["status"], string> = {
 export default function CandidaturasPanel() {
   const [candidaturas, setCandidaturas] = useState<Candidatura[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<"todos" | "guia" | "pousada">("todos");
 
   const fetchData = async () => {
+    setLoadError(false);
     try {
       const res = await adminFetch("/api/candidaturas");
-      setCandidaturas(await res.json());
+      // A non-ok response returns { error: "..." } instead of an array —
+      // setting state to that object instead of [] used to crash this
+      // whole tab the moment .filter() ran against it below.
+      if (res.ok) {
+        setCandidaturas(await res.json());
+      } else {
+        setLoadError(true);
+      }
     } catch (err) {
       console.error("Erro ao carregar candidaturas:", err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -66,6 +76,12 @@ export default function CandidaturasPanel() {
 
   return (
     <div>
+      {loadError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3 rounded-lg mb-4">
+          Não foi possível carregar as candidaturas. Tente sair e entrar de novo no painel — se persistir, a tabela <span className="font-mono">candidaturas</span> pode não existir ainda no Supabase (copie o script de criação em <span className="font-mono">/api/supabase/sql</span>, acessível logado como admin, e rode no SQL Editor do seu projeto).
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <p className="text-editorial-muted text-xs">
           Cadastros enviados pelo formulário público <span className="font-mono">/seja-parceiro</span> — guias e pousadas interessados em virar parceiros.
