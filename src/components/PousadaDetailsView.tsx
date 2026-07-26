@@ -3,6 +3,7 @@ import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye,
 import { Pousada } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
+import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 
 interface PousadaDetailsViewProps {
   pousada: Pousada;
@@ -242,6 +243,13 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 </div>
               </div>
             </div>
+
+            {/* Featured experiences (photo + pitch, alternating sides) */}
+            {hasPousadaHighlights(pousada.id) && (
+              <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
+                <PousadaHighlights pousadaId={pousada.id} />
+              </div>
+            )}
 
             {/* Activities available */}
             <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">

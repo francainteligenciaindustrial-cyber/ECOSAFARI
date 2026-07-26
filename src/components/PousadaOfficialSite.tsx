@@ -5,6 +5,7 @@ import { slugify } from "../lib/slug";
 import { navigate } from "../lib/router";
 import LanguageSwitcher from "./LanguageSwitcher";
 import PictureImg from "./PictureImg";
+import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -148,6 +149,13 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
           </p>
         </div>
       </section>
+
+      {/* Featured experiences (photo + pitch, alternating sides) */}
+      {hasPousadaHighlights(pousada.id) && (
+        <section className="max-w-5xl mx-auto px-6 md:px-10 py-16">
+          <PousadaHighlights pousadaId={pousada.id} />
+        </section>
+      )}
 
       {/* Meet the team/family behind the place */}
       {pousada.teamPhotoUrl && (
