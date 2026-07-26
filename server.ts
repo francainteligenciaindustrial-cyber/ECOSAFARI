@@ -358,6 +358,36 @@ function parseJSONSafe(val: any) {
   return val;
 }
 
+// Coerces a value that's supposed to represent a list of strings (guides'
+// languages/specialty, stored as a TEXT column holding either a JSON array
+// string or, if a row was ever written a different way, a raw Postgres
+// array literal like "{Português,Inglês}") into an actual array — so the
+// frontend's .map()/.join() never crashes no matter which shape the value
+// is in. Never throws: worst case for an unparseable non-empty string is a
+// single-item array instead of a real list.
+function toStringArray(val: any): string[] {
+  if (Array.isArray(val)) return val;
+  if (val == null || val === "") return [];
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // not JSON — fall through to the Postgres array literal check below
+    }
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      return trimmed
+        .slice(1, -1)
+        .split(",")
+        .map(s => s.trim().replace(/^"|"$/g, ""))
+        .filter(Boolean);
+    }
+    return [trimmed];
+  }
+  return [];
+}
+
 // Whitelists which fields a client-supplied body may set on an insert/update.
 // Without this, `.update(req.body)` / `.insert({ ...req.body })` pass every
 // key the caller sent straight to Supabase, so a form field never meant to be
@@ -566,10 +596,19 @@ app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
 // the public site actually displays this list (it's only consumed by the
 // admin dashboard) — it was public by mistake before, meaning anyone could
 // read every guide's contact info straight from the network tab.
+// languages/specialty are stored as TEXT columns holding a JSON-serialized
+// array (see /api/supabase/sql below), not native jsonb — supabase-js
+// returns TEXT columns as plain strings regardless of content, so without
+// parsing them back here the frontend receives a raw string where it
+// expects an array and crashes calling .map()/.join() on it.
 app.get("/api/guides", requireAdmin, async (req, res) => {
   const { data, error } = await supabase.from("guides").select("*");
   if (error) return res.status(500).json({ error: "Erro ao buscar guias" });
-  res.json(data);
+  res.json((data || []).map((g: any) => ({
+    ...g,
+    languages: toStringArray(g.languages),
+    specialty: toStringArray(g.specialty),
+  })));
 });
 
 // languages/specialty are jsonb columns — passed straight through, no

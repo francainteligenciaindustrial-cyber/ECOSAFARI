@@ -1010,7 +1010,7 @@ export default function AdminDashboard({
                               >
                                 <option value="" disabled>Selecione...</option>
                                 {guides.filter(g => g.status === "disponivel").map(g => (
-                                  <option key={g.id} value={g.id}>{g.name} ({g.specialty[0]})</option>
+                                  <option key={g.id} value={g.id}>{g.name}{g.specialty?.[0] ? ` (${g.specialty[0]})` : ""}</option>
                                 ))}
                               </select>
                             </div>
@@ -1422,13 +1422,13 @@ export default function AdminDashboard({
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
-                          {g.languages.map((l, i) => (
+                          {(g.languages || []).map((l, i) => (
                             <span key={i} className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded text-[10px] border border-zinc-200">{l}</span>
                           ))}
                         </div>
                       </td>
                       <td className="p-4 font-medium text-zinc-700">
-                        {g.specialty.join(", ")}
+                        {(g.specialty || []).join(", ")}
                       </td>
                       <td className="p-4">
                         {g.status === "disponivel" ? (
