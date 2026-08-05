@@ -18,12 +18,15 @@ import {
   Briefcase,
   Bird,
   BadgeCheck,
-  Eye
+  Eye,
+  KeyRound
 } from "lucide-react";
 import { Pousada, Guide, Booking, Notification, Species } from "../types";
 import TurismoPanel from "./TurismoPanel";
 import CandidaturasPanel from "./CandidaturasPanel";
 import AdminUsersPanel from "./AdminUsersPanel";
+import AtracoesPanel from "./AtracoesPanel";
+import PartnerAccessManager from "./PartnerAccessManager";
 import ReferralStatsWidget from "./ReferralStatsWidget";
 import { adminFetch } from "../lib/adminFetch";
 import ImageUploadButton from "./ImageUploadButton";
@@ -94,7 +97,7 @@ export default function AdminDashboard({
     }, 15000);
     return () => clearInterval(interval);
   }, []);
-  const [activeTab, setActiveTab] = useState<"bookings" | "pousadas" | "guides" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins">("bookings");
+  const [activeTab, setActiveTab] = useState<"bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins">("bookings");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddPousada, setShowAddPousada] = useState(false);
   const [showAddGuide, setShowAddGuide] = useState(false);
@@ -275,8 +278,71 @@ export default function AdminDashboard({
     phone: "",
     languages: ["Português", "Inglês"] as string[],
     specialty: ["Fotografia", "Rastreamento"] as string[],
-    status: "disponivel" as "disponivel" | "indisponivel"
+    status: "disponivel" as "disponivel" | "indisponivel",
+    bio: "",
+    age: "",
+    birthplace: "",
+    interests: [] as string[]
   });
+
+  // Edit Guide modal state
+  const [editingGuideId, setEditingGuideId] = useState<string | null>(null);
+  const [managingGuideAccess, setManagingGuideAccess] = useState<Guide | null>(null);
+  const [managingPousadaAccess, setManagingPousadaAccess] = useState<Pousada | null>(null);
+  const [editGuideForm, setEditGuideForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    languages: [] as string[],
+    specialty: [] as string[],
+    status: "disponivel" as "disponivel" | "indisponivel",
+    bio: "",
+    age: "",
+    birthplace: "",
+    interests: [] as string[]
+  });
+
+  const openEditGuide = (g: Guide) => {
+    setEditingGuideId(g.id);
+    setEditGuideForm({
+      name: g.name,
+      email: g.email,
+      phone: g.phone,
+      languages: [...(g.languages || [])],
+      specialty: [...(g.specialty || [])],
+      status: g.status,
+      bio: g.bio || "",
+      age: g.age ? String(g.age) : "",
+      birthplace: g.birthplace || "",
+      interests: [...(g.interests || [])]
+    });
+  };
+
+  const handleEditGuideSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGuideId) return;
+    const payload = {
+      name: editGuideForm.name,
+      email: editGuideForm.email,
+      phone: editGuideForm.phone,
+      languages: editGuideForm.languages,
+      specialty: editGuideForm.specialty,
+      status: editGuideForm.status,
+      bio: editGuideForm.bio,
+      age: editGuideForm.age ? Number(editGuideForm.age) : undefined,
+      birthplace: editGuideForm.birthplace,
+      interests: editGuideForm.interests
+    };
+    const response = await adminFetch(`/api/guides/${editingGuideId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (response.ok) {
+      setEditingGuideId(null);
+      fetchGuides();
+    }
+  };
 
   const [showAddSpecies, setShowAddSpecies] = useState(false);
   const [speciesForm, setSpeciesForm] = useState({
@@ -393,7 +459,11 @@ export default function AdminDashboard({
         phone: guideForm.phone,
         languages: guideForm.languages,
         specialty: guideForm.specialty,
-        status: guideForm.status
+        status: guideForm.status,
+        bio: guideForm.bio,
+        age: guideForm.age ? Number(guideForm.age) : undefined,
+        birthplace: guideForm.birthplace,
+        interests: guideForm.interests
       };
 
       const response = await adminFetch("/api/guides", {
@@ -804,6 +874,14 @@ export default function AdminDashboard({
             🧭 Gestão de Guias
           </button>
           <button
+            onClick={() => setActiveTab("atracoes")}
+            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
+              activeTab === "atracoes" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
+            }`}
+          >
+            🎯 Atrações
+          </button>
+          <button
             onClick={() => setActiveTab("agenda")}
             className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
               activeTab === "agenda" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
@@ -866,6 +944,9 @@ export default function AdminDashboard({
 
         {/* TAB: CANDIDATURAS DE PARCEIROS (cadastro público /seja-parceiro) */}
         {activeTab === "candidaturas" && <CandidaturasPanel />}
+
+        {/* TAB: ATRAÇÕES (Paradas Legais / Restaurantes) */}
+        {activeTab === "atracoes" && <AtracoesPanel />}
 
         {/* TAB: GESTÃO DE ADMINISTRADORES (Supabase Auth) */}
         {activeTab === "admins" && <AdminUsersPanel />}
@@ -1224,6 +1305,13 @@ export default function AdminDashboard({
                           {p.verified ? "Remover selo" : "Verificar"}
                         </button>
                         <button
+                          onClick={() => setManagingPousadaAccess(p)}
+                          className="text-zinc-500 hover:text-editorial-primary hover:bg-zinc-100 p-1.5 rounded transition cursor-pointer"
+                          title="Gerenciar acesso de parceiro"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleDeletePousada(p.id)}
                           className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition"
                           title="Excluir Pousada"
@@ -1329,6 +1417,44 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block text-zinc-700 font-semibold mb-1">Idade</label>
+                    <input
+                      type="number" min="18" value={guideForm.age}
+                      onChange={e => setGuideForm(prev => ({ ...prev, age: e.target.value }))}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-700 font-semibold mb-1">Origem / Local de Nascimento</label>
+                    <input
+                      type="text" value={guideForm.birthplace}
+                      onChange={e => setGuideForm(prev => ({ ...prev, birthplace: e.target.value }))}
+                      placeholder="Ex: Poconé, MT"
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-xs">
+                  <label className="block text-zinc-700 font-semibold mb-1">Breve Histórico / Bio</label>
+                  <textarea
+                    rows={3} value={guideForm.bio}
+                    onChange={e => setGuideForm(prev => ({ ...prev, bio: e.target.value }))}
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 resize-none"
+                  />
+                </div>
+
+                <div className="text-xs">
+                  <label className="block text-zinc-700 font-semibold mb-1">Temas de Interesse (piloteiro, passarinheiro, botânica...)</label>
+                  <TagInput
+                    value={guideForm.interests}
+                    onChange={interests => setGuideForm(prev => ({ ...prev, interests }))}
+                    placeholder="Digite e pressione Enter"
+                  />
+                </div>
+
                 <div className="flex gap-2 justify-end pt-2 text-xs">
                   <button
                     type="button"
@@ -1345,6 +1471,86 @@ export default function AdminDashboard({
                   </button>
                 </div>
               </form>
+            )}
+
+            {/* Edit Guide modal */}
+            {editingGuideId && (
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <form
+                  onSubmit={handleEditGuideSubmit}
+                  className="bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-8 space-y-5"
+                >
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                    <h3 className="font-bold text-lg text-zinc-900">Editar Guia</h3>
+                    <button type="button" onClick={() => setEditingGuideId(null)} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Nome Completo</label>
+                      <input type="text" required value={editGuideForm.name} onChange={e => setEditGuideForm(prev => ({ ...prev, name: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">E-mail</label>
+                      <input type="email" required value={editGuideForm.email} onChange={e => setEditGuideForm(prev => ({ ...prev, email: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Telefone WhatsApp</label>
+                      <input type="text" required value={editGuideForm.phone} onChange={e => setEditGuideForm(prev => ({ ...prev, phone: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados</label>
+                      <TagInput value={editGuideForm.languages} onChange={languages => setEditGuideForm(prev => ({ ...prev, languages }))} placeholder="Ex: Português" />
+                    </div>
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
+                      <TagInput value={editGuideForm.specialty} onChange={specialty => setEditGuideForm(prev => ({ ...prev, specialty }))} placeholder="Ex: Rastreamento" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Status</label>
+                      <select value={editGuideForm.status} onChange={e => setEditGuideForm(prev => ({ ...prev, status: e.target.value as any }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500">
+                        <option value="disponivel">Disponível</option>
+                        <option value="indisponivel">Indisponível</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Idade</label>
+                      <input type="number" min="18" value={editGuideForm.age} onChange={e => setEditGuideForm(prev => ({ ...prev, age: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
+                    </div>
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Origem</label>
+                      <input type="text" value={editGuideForm.birthplace} onChange={e => setEditGuideForm(prev => ({ ...prev, birthplace: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
+                    </div>
+                  </div>
+
+                  <div className="text-xs">
+                    <label className="block text-zinc-700 font-semibold mb-1">Breve Histórico / Bio</label>
+                    <textarea rows={3} value={editGuideForm.bio} onChange={e => setEditGuideForm(prev => ({ ...prev, bio: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 resize-none" />
+                  </div>
+
+                  <div className="text-xs">
+                    <label className="block text-zinc-700 font-semibold mb-1">Temas de Interesse</label>
+                    <TagInput value={editGuideForm.interests} onChange={interests => setEditGuideForm(prev => ({ ...prev, interests }))} placeholder="Digite e pressione Enter" />
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-2 text-xs border-t border-zinc-100">
+                    <button type="button" onClick={() => setEditingGuideId(null)} className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-lg font-semibold hover:bg-zinc-200 transition cursor-pointer">
+                      Cancelar
+                    </button>
+                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold transition shadow-sm cursor-pointer">
+                      Salvar Alterações
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
 
             {/* Guides List */}
@@ -1383,10 +1589,24 @@ export default function AdminDashboard({
                           <span className="bg-zinc-100 text-zinc-600 border border-zinc-200 px-2 py-1 rounded-full font-bold">Indisponível</span>
                         )}
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setManagingGuideAccess(g)}
+                          className="text-zinc-500 hover:text-editorial-primary p-2 rounded hover:bg-zinc-50 transition cursor-pointer"
+                          title="Gerenciar acesso de parceiro"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => openEditGuide(g)}
+                          className="text-zinc-500 hover:text-editorial-primary p-2 rounded hover:bg-zinc-50 transition cursor-pointer"
+                          title="Editar Guia"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleDeleteGuide(g.id)}
-                          className="text-red-500 hover:text-red-700 p-2 rounded hover:bg-red-50 transition"
+                          className="text-red-500 hover:text-red-700 p-2 rounded hover:bg-red-50 transition cursor-pointer"
                           title="Excluir Guia"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -2024,6 +2244,23 @@ CREATE POLICY "Permitir deleção de espécies" ON species FOR DELETE USING (tru
         )}
 
       </div>
+
+      {managingGuideAccess && (
+        <PartnerAccessManager
+          partnerType="guia"
+          partnerId={managingGuideAccess.id}
+          partnerLabel={managingGuideAccess.name}
+          onClose={() => setManagingGuideAccess(null)}
+        />
+      )}
+      {managingPousadaAccess && (
+        <PartnerAccessManager
+          partnerType="pousada"
+          partnerId={managingPousadaAccess.id}
+          partnerLabel={managingPousadaAccess.name}
+          onClose={() => setManagingPousadaAccess(null)}
+        />
+      )}
     </div>
   );
 }

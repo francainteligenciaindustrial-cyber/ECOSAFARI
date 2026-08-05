@@ -27,6 +27,8 @@ ALTER TABLE reservas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pagamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE candidaturas ENABLE ROW LEVEL SECURITY;
+-- atracoes: idem — rode scripts/add-atracoes-and-partner-fields.sql primeiro
+-- (ela já é criada com RLS ativada e sem policies públicas).
 -- referral_sources: NÃO incluída aqui — essa tabela nunca foi criada no
 -- banco (a pesquisa "como você nos encontrou" que a usava foi removida do
 -- site). Se ela existir no seu banco, rode scripts/add-referral-sources-table.sql

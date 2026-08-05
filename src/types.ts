@@ -29,9 +29,14 @@ export interface Pousada {
   officialSiteImages?: string[];
 }
 
+// Avaliação (antes chamada de "comentário") — unificada para os três tipos
+// de parceiro (pousada, atração, guia). Exatamente um dos três IDs vem
+// preenchido, dependendo de quem está sendo avaliado.
 export interface Review {
   id: string;
-  pousadaId: string;
+  pousadaId?: string;
+  atracaoId?: string;
+  guideId?: string;
   userName: string;
   rating: number;
   comment: string;
@@ -47,6 +52,39 @@ export interface Guide {
   status: 'disponivel' | 'indisponivel';
   email: string;
   phone: string;
+  bio?: string; // breve histórico/apresentação do guia
+  age?: number;
+  birthplace?: string; // origem / local de nascimento
+  interests?: string[]; // temas de interesse do guia (piloteiro, passarinheiro, botânica, etc.) — usados para casar o guia certo com o turista certo
+  rating?: number; // média calculada a partir das avaliações recebidas
+}
+
+// Atração: parceiro que não é uma hospedagem — "Parada Legal" (passeio,
+// artesanato, lembrança) ou "Restaurante". Categoria separada de Pousada
+// porque nem todo parceiro tem quartos para reservar.
+export interface Atracao {
+  id: string;
+  type: 'parada_legal' | 'restaurante';
+  name: string;
+  description: string;
+  location: string;
+  images: string[];
+  menu?: { item: string; price: number }[]; // cardápio — só para type === 'restaurante'
+  rating: number;
+  verified?: boolean;
+  dateCreated: string;
+}
+
+// Papel de acesso de autoatendimento do parceiro (dono de pousada/atração/
+// guia editando o próprio perfil) — ver requirePartnerAccess em server.ts.
+export type PartnerType = 'pousada' | 'atracao' | 'guia';
+
+export interface PartnerProfileResponse {
+  partnerType: PartnerType;
+  partnerId: string;
+  pousada?: Pousada;
+  atracao?: Atracao;
+  guia?: Guide;
 }
 
 export interface Booking {

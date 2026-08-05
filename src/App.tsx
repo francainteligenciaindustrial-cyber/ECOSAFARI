@@ -32,6 +32,7 @@ const TermsPage = lazy(() => import("./components/TermsPage"));
 const FaqPage = lazy(() => import("./components/FaqPage"));
 const CandidateStatusPage = lazy(() => import("./components/CandidateStatusPage"));
 const PaymentConfirmationPage = lazy(() => import("./components/PaymentConfirmationPage"));
+const PartnerPortalPage = lazy(() => import("./components/PartnerPortalPage"));
 
 function LazyFallback() {
   return (
@@ -58,6 +59,7 @@ const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   "/faq": FaqPage,
   "/status-candidatura": CandidateStatusPage,
   "/pagamento-confirmado": PaymentConfirmationPage,
+  "/parceiro": PartnerPortalPage,
 };
 
 export default function App() {
@@ -492,6 +494,7 @@ export default function App() {
           <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Política de Privacidade</a>
           <a href="/termos" onClick={(e) => { e.preventDefault(); navigate("/termos"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Termos de Uso e Cancelamento</a>
           <a href="/status-candidatura" onClick={(e) => { e.preventDefault(); navigate("/status-candidatura"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Status da Candidatura</a>
+          <a href="/parceiro" onClick={(e) => { e.preventDefault(); navigate("/parceiro"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Portal do Parceiro</a>
         </div>
 
         {/* Institutional identity — required for a public booking/payment

@@ -11,7 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { Resend } from "resend";
 import PDFDocument from "pdfkit";
-import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource } from "./src/types.js";
+import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource, Atracao, PartnerType } from "./src/types.js";
 import { slugify } from "./src/lib/slug.js";
 
 dotenv.config();
@@ -223,6 +223,50 @@ const requireAdmin: express.RequestHandler[] = [
   },
 ];
 
+// Allows either an admin OR the partner who owns this specific record (a
+// pousada/atração/guia self-editing their own profile) to proceed — anyone
+// else, including a partner authenticated for a *different* record, is
+// rejected. This is the actual access-control boundary for partner
+// self-service: app_metadata (role/partnerType/partnerId) is set only by
+// the service_role-backed admin invite flow below, never by the client, so
+// a caller can't grant themselves ownership of an arbitrary record just by
+// crafting a request. res.locals.isAdmin lets the route handler allow a few
+// extra admin-only fields (e.g. "verified") without a second whitelist.
+function requirePartnerAccess(partnerType: PartnerType): express.RequestHandler[] {
+  return [
+    authLimiter,
+    async (req, res, next) => {
+      const authHeader = req.headers.authorization || "";
+      const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+      if (!token) {
+        return res.status(401).json({ error: "Autenticação necessária." });
+      }
+      try {
+        const { data, error } = await supabase.auth.getUser(token);
+        if (error || !data.user) {
+          return res.status(401).json({ error: "Token inválido." });
+        }
+        const role = data.user.app_metadata?.role;
+        if (role === "admin") {
+          res.locals.isAdmin = true;
+          return next();
+        }
+        if (
+          role === "partner" &&
+          data.user.app_metadata?.partnerType === partnerType &&
+          data.user.app_metadata?.partnerId === req.params.id
+        ) {
+          res.locals.isAdmin = false;
+          return next();
+        }
+        return res.status(403).json({ error: "Acesso restrito ao administrador ou ao próprio parceiro." });
+      } catch (err) {
+        res.status(401).json({ error: "Token inválido." });
+      }
+    },
+  ];
+}
+
 // Optional Sentry error reporting — lazy-imported only when SENTRY_DSN is
 // set, so an unconfigured deployment doesn't pay for the dependency at
 // startup. Same graceful-degradation pattern as Stripe/Resend/Gemini above.
@@ -411,7 +455,7 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // client payload.
 const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages"] as const;
 const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
-const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status"] as const;
+const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests"] as const;
 const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "age", "preferences"] as const;
 const ROTEIRO_FIELDS = ["name", "duration", "price", "difficulty", "capacity", "description"] as const;
@@ -573,9 +617,13 @@ app.post("/api/pousadas", requireAdmin, async (req, res) => {
   res.status(201).json(newPousada);
 });
 
-app.put("/api/pousadas/:id", requireAdmin, async (req, res) => {
+// Admin OR the pousada's own linked partner account can edit it — "verified"
+// stays admin-only (POUSADA_CREATE_FIELDS excludes it; only the admin branch
+// upgrades to POUSADA_UPDATE_FIELDS), since that's a trust badge the partner
+// shouldn't be able to self-certify.
+app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) => {
   const { id } = req.params;
-  const updates = pickFields<Pousada>(req.body, POUSADA_UPDATE_FIELDS);
+  const updates = pickFields<Pousada>(req.body, res.locals.isAdmin ? POUSADA_UPDATE_FIELDS : POUSADA_CREATE_FIELDS);
   const { data, error } = await supabase.from("pousadas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Pousada não encontrada" });
   res.json(mapPousadaRow(data));
@@ -609,6 +657,8 @@ app.get("/api/guides", requireAdmin, async (req, res) => {
     ...g,
     languages: toStringArray(g.languages),
     specialty: toStringArray(g.specialty),
+    interests: toStringArray(g.interests),
+    rating: typeof g.rating === "number" ? g.rating : (g.rating ? parseFloat(g.rating) : 5),
   })));
 });
 
@@ -627,12 +677,12 @@ app.post("/api/guides", requireAdmin, async (req, res) => {
   res.status(201).json(newGuide);
 });
 
-app.put("/api/guides/:id", requireAdmin, async (req, res) => {
+app.put("/api/guides/:id", requirePartnerAccess("guia"), async (req, res) => {
   const { id } = req.params;
   const updates = pickFields<Guide>(req.body, GUIDE_FIELDS);
   const { data, error } = await supabase.from("guides").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
-  res.json(data);
+  res.json({ ...data, languages: toStringArray(data.languages), specialty: toStringArray(data.specialty), interests: toStringArray(data.interests) });
 });
 
 app.delete("/api/guides/:id", requireAdmin, async (req, res) => {
@@ -640,6 +690,72 @@ app.delete("/api/guides/:id", requireAdmin, async (req, res) => {
   const { error } = await supabase.from("guides").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir guia" });
   res.json({ success: true, message: "Guia excluído com sucesso" });
+});
+
+// ATRAÇÕES CRUD — parceiro que não é uma hospedagem: "Parada Legal" (passeio,
+// artesanato, lembrança) ou "Restaurante". Separado de pousadas porque nem
+// todo parceiro tem quartos pra reservar (ver Pousada vs. Atração no /seja-parceiro).
+function mapAtracaoRow(a: any): Atracao {
+  return {
+    id: a.id,
+    type: a.type,
+    name: resolveTranslation(a.name),
+    description: resolveTranslation(a.description),
+    location: resolveTranslation(a.location),
+    images: parseJSONSafe(a.images) || [],
+    menu: parseJSONSafe(a.menu) || undefined,
+    rating: typeof a.rating === "number" ? a.rating : (a.rating ? parseFloat(a.rating) : 5),
+    verified: typeof a.verified === "boolean" ? a.verified : false,
+    dateCreated: a.dateCreated || ""
+  };
+}
+
+const ATRACAO_FIELDS = ["type", "name", "description", "location", "images", "menu"] as const;
+
+app.get("/api/atracoes", async (req, res) => {
+  const { data, error } = await supabase.from("atracoes").select("*");
+  if (error) return res.status(500).json({ error: "Erro ao buscar atrações" });
+  res.json((data || []).map(mapAtracaoRow));
+});
+
+app.get("/api/atracoes/:id", async (req, res) => {
+  const { data, error } = await supabase.from("atracoes").select("*").eq("id", req.params.id).maybeSingle();
+  if (error || !data) return res.status(404).json({ error: "Atração não encontrada" });
+  res.json(mapAtracaoRow(data));
+});
+
+app.post("/api/atracoes", requireAdmin, async (req, res) => {
+  const newAtracao: Atracao = {
+    ...pickFields<Atracao>(req.body, ATRACAO_FIELDS),
+    id: `at_${randomUUID()}`,
+    rating: 5,
+    verified: false,
+    dateCreated: new Date().toISOString(),
+  } as Atracao;
+  const { error } = await supabase.from("atracoes").insert(newAtracao);
+  if (error) {
+    console.error("Erro ao salvar atração no Supabase:", error.message);
+    return res.status(500).json({ error: "Erro ao salvar atração" });
+  }
+  res.status(201).json(newAtracao);
+});
+
+// Admin OR the atração's own linked partner account — "verified" is
+// admin-only, same reasoning as pousadas above.
+app.put("/api/atracoes/:id", requirePartnerAccess("atracao"), async (req, res) => {
+  const { id } = req.params;
+  const fields = res.locals.isAdmin ? [...ATRACAO_FIELDS, "verified"] as const : ATRACAO_FIELDS;
+  const updates = pickFields<Atracao>(req.body, fields);
+  const { data, error } = await supabase.from("atracoes").update(updates).eq("id", id).select().single();
+  if (error || !data) return res.status(404).json({ error: "Atração não encontrada" });
+  res.json(mapAtracaoRow(data));
+});
+
+app.delete("/api/atracoes/:id", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { error } = await supabase.from("atracoes").delete().eq("id", id);
+  if (error) return res.status(500).json({ error: "Erro ao excluir atração" });
+  res.json({ success: true, message: "Atração excluída com sucesso" });
 });
 
 // BOOKINGS CRUD & FLOWS
@@ -1298,10 +1414,22 @@ app.get("/api/reviews", async (req, res) => {
   res.json(data);
 });
 
+// A review targets exactly one of pousada/atração/guia — this table backs
+// "avaliações" for all three partner kinds instead of a separate reviews
+// table per kind. Whichever *Id is present in the body decides both which
+// column gets set and which partner's average "rating" gets recalculated.
 app.post("/api/reviews", publicFormLimiter, async (req, res) => {
+  const { pousadaId, atracaoId, guideId } = req.body;
+  const targetCount = [pousadaId, atracaoId, guideId].filter(Boolean).length;
+  if (targetCount !== 1) {
+    return res.status(400).json({ error: "Informe exatamente um de pousadaId, atracaoId ou guideId." });
+  }
+
   const newReview: Review = {
     id: `r_${randomUUID()}`,
-    pousadaId: req.body.pousadaId,
+    pousadaId: pousadaId || undefined,
+    atracaoId: atracaoId || undefined,
+    guideId: guideId || undefined,
     userName: req.body.userName || "Turista Satisfeito",
     rating: req.body.rating || 5,
     comment: req.body.comment,
@@ -1315,13 +1443,14 @@ app.post("/api/reviews", publicFormLimiter, async (req, res) => {
     return res.status(500).json({ error: "Erro ao salvar avaliação" });
   }
 
-  // Recalculate the pousada's average rating from every review it has now
-  const targetId = req.body.pousadaId;
-  const { data: pReviews } = await supabase.from("reviews").select("rating").eq("pousadaId", targetId);
-  if (pReviews && pReviews.length > 0) {
-    const avg = Number((pReviews.reduce((sum, r) => sum + r.rating, 0) / pReviews.length).toFixed(1));
-    const { error: ratingErr } = await supabase.from("pousadas").update({ rating: avg }).eq("id", targetId);
-    if (ratingErr) console.warn("Erro ao atualizar nota da pousada no Supabase:", ratingErr.message);
+  // Recalculate the target's average rating from every review it has now
+  const [column, table] = pousadaId ? ["pousadaId", "pousadas"] : atracaoId ? ["atracaoId", "atracoes"] : ["guideId", "guides"];
+  const targetId = pousadaId || atracaoId || guideId;
+  const { data: targetReviews } = await supabase.from("reviews").select("rating").eq(column, targetId);
+  if (targetReviews && targetReviews.length > 0) {
+    const avg = Number((targetReviews.reduce((sum, r) => sum + r.rating, 0) / targetReviews.length).toFixed(1));
+    const { error: ratingErr } = await supabase.from(table).update({ rating: avg }).eq("id", targetId);
+    if (ratingErr) console.warn(`Erro ao atualizar nota (${table}) no Supabase:`, ratingErr.message);
   }
 
   res.status(201).json(newReview);
@@ -1727,6 +1856,117 @@ app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+// ----------------------------------------------------
+// PARTNER SELF-SERVICE ACCESS (Supabase Auth)
+// Lets a pousada/atração/guia log in and edit only their own profile — see
+// requirePartnerAccess above for the ownership check every partner-editable
+// route enforces. Invite/list/revoke here are admin-only (same
+// service_role-backed pattern as ADMIN USER MANAGEMENT above); the partner
+// never sets their own app_metadata, so they can't grant themselves access
+// to a different record.
+// ----------------------------------------------------
+
+const PARTNER_TABLE_BY_TYPE: Record<PartnerType, string> = {
+  pousada: "pousadas",
+  atracao: "atracoes",
+  guia: "guides",
+};
+
+app.get("/api/partners/:type/:id/access", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de acesso de parceiros indisponível." });
+  const partnerType = req.params.type as PartnerType;
+  if (!PARTNER_TABLE_BY_TYPE[partnerType]) return res.status(400).json({ error: "Tipo de parceiro inválido." });
+  const { id } = req.params;
+
+  const { data, error } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 200 });
+  if (error || !data?.users) return res.status(500).json({ error: "Erro ao listar acessos." });
+  const linked = data.users
+    .filter((u: any) => u.app_metadata?.role === "partner" && u.app_metadata?.partnerType === partnerType && u.app_metadata?.partnerId === id)
+    .map((u: any) => ({ id: u.id, email: u.email, createdAt: u.created_at, lastSignInAt: u.last_sign_in_at || null }));
+  res.json(linked);
+});
+
+app.post("/api/partners/invite", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — convite de parceiro indisponível." });
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const partnerType = req.body.partnerType as PartnerType;
+  const partnerId = String(req.body.partnerId || "");
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Informe um email válido." });
+  }
+  const table = PARTNER_TABLE_BY_TYPE[partnerType];
+  if (!table || !partnerId) {
+    return res.status(400).json({ error: "Informe o tipo e o id do parceiro." });
+  }
+
+  // Confirm the target record actually exists before linking an account to
+  // it — otherwise a typo'd id would silently create dead-end access.
+  const { data: target } = await supabase.from(table).select("id").eq("id", partnerId).maybeSingle();
+  if (!target) return res.status(404).json({ error: "Parceiro não encontrado." });
+
+  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+    email,
+    password: randomUUID(),
+    email_confirm: true,
+    app_metadata: { role: "partner", partnerType, partnerId },
+  });
+  if (createErr || !created.user) {
+    return res.status(400).json({ error: createErr?.message || "Erro ao criar acesso de parceiro (o email já pode estar em uso)." });
+  }
+
+  // Recovery link the partner uses to set their own password — same
+  // "copy and share manually" pattern as the admin invite flow, since
+  // relying on Supabase's transactional email isn't guaranteed to work.
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
+  if (linkErr) console.warn("Parceiro criado, mas falha ao gerar link de acesso:", linkErr.message);
+
+  res.status(201).json({
+    user: { id: created.user.id, email: created.user.email },
+    actionLink: linkData?.properties?.action_link || null,
+  });
+});
+
+app.delete("/api/partners/access/:userId", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de acesso de parceiros indisponível." });
+  const { error } = await supabaseAdminAuth.auth.admin.updateUserById(req.params.userId, { app_metadata: { role: null } });
+  if (error) return res.status(500).json({ error: "Erro ao revogar acesso." });
+  res.json({ success: true });
+});
+
+// Lets a logged-in partner fetch their own record without needing to know
+// their own id up front — the dashboard just calls this and renders
+// whichever of pousada/atracao/guia comes back.
+app.get("/api/my-partner-profile", authLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "Autenticação necessária." });
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return res.status(401).json({ error: "Token inválido." });
+
+  const partnerType = data.user.app_metadata?.partnerType as PartnerType | undefined;
+  const partnerId = data.user.app_metadata?.partnerId as string | undefined;
+  if (data.user.app_metadata?.role !== "partner" || !partnerType || !partnerId) {
+    return res.status(403).json({ error: "Esta conta não tem um perfil de parceiro vinculado." });
+  }
+
+  const table = PARTNER_TABLE_BY_TYPE[partnerType];
+  const { data: row, error: rowErr } = await supabase.from(table).select("*").eq("id", partnerId).maybeSingle();
+  if (rowErr || !row) return res.status(404).json({ error: "Perfil de parceiro não encontrado." });
+
+  const mapped =
+    partnerType === "pousada" ? mapPousadaRow(row) :
+    partnerType === "atracao" ? mapAtracaoRow(row) :
+    { ...row, languages: toStringArray(row.languages), specialty: toStringArray(row.specialty), interests: toStringArray(row.interests) };
+
+  res.json({
+    partnerType,
+    partnerId,
+    [partnerType === "pousada" ? "pousada" : partnerType === "atracao" ? "atracao" : "guia"]: mapped,
+  });
+});
+
 // SUPABASE SYSTEM STATUS & AUTO-CONFIGURATION ENDPOINTS
 // Exposes only the public Supabase URL and anon key (safe by design, protected by RLS)
 // so the frontend can initialize its own Supabase Auth client.
@@ -1852,8 +2092,20 @@ CREATE TABLE IF NOT EXISTS guides (
   specialty TEXT, -- armazenado como string JSON
   status TEXT DEFAULT 'disponivel',
   email TEXT,
-  phone TEXT
+  phone TEXT,
+  bio TEXT,
+  age INTEGER,
+  birthplace TEXT,
+  interests TEXT, -- armazenado como string JSON
+  rating FLOAT DEFAULT 5.0
 );
+
+-- Caso a tabela já exista de uma execução anterior deste script
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS age INTEGER;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS birthplace TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS interests TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 5.0;
 
 -- Ativar RLS em guias (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE guides ENABLE ROW LEVEL SECURITY;
@@ -1861,6 +2113,27 @@ DROP POLICY IF EXISTS "Permitir leitura pública de guias" ON guides;
 DROP POLICY IF EXISTS "Permitir inserção pública de guias" ON guides;
 DROP POLICY IF EXISTS "Permitir atualização pública de guias" ON guides;
 DROP POLICY IF EXISTS "Permitir exclusão pública de guias" ON guides;
+
+
+
+-- 2b. TABELA DE ATRAÇÕES (parceiro que não é hospedagem: Parada Legal ou Restaurante)
+CREATE TABLE IF NOT EXISTS atracoes (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL CHECK (type IN ('parada_legal', 'restaurante')),
+  name TEXT NOT NULL,
+  description TEXT,
+  location TEXT,
+  images TEXT, -- armazenado como string JSON
+  menu TEXT, -- cardápio (string JSON) — só para type = 'restaurante'
+  rating FLOAT DEFAULT 5.0,
+  verified BOOLEAN DEFAULT false,
+  "dateCreated" TEXT
+);
+
+-- Ativar RLS em atrações (sem policies públicas — só o backend com service_role acessa)
+ALTER TABLE atracoes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir leitura pública de atracoes" ON atracoes;
+DROP POLICY IF EXISTS "Permitir escrita pública de atracoes" ON atracoes;
 
 
 
@@ -1898,10 +2171,12 @@ DROP POLICY IF EXISTS "Permitir exclusão pública de reservas" ON bookings;
 
 
 
--- 4. TABELA DE AVALIAÇÕES (REVIEWS)
+-- 4. TABELA DE AVALIAÇÕES (REVIEWS) — de pousada, atração OU guia (exatamente um dos três IDs preenchido)
 CREATE TABLE IF NOT EXISTS reviews (
   id TEXT PRIMARY KEY,
   "pousadaId" TEXT,
+  "atracaoId" TEXT,
+  "guideId" TEXT,
   "userName" TEXT,
   rating FLOAT,
   comment TEXT,
@@ -1909,6 +2184,8 @@ CREATE TABLE IF NOT EXISTS reviews (
   "photoUrl" TEXT
 );
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "atracaoId" TEXT;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "guideId" TEXT;
 
 -- Ativar RLS em avaliações (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;

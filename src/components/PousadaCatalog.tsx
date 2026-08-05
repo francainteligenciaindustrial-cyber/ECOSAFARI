@@ -806,7 +806,7 @@ export default function PousadaCatalog({
               </div>
 
               <div>
-                <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Seu Comentário</label>
+                <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Sua Avaliação</label>
                 <textarea
                   value={commentInput}
                   onChange={e => setCommentInput(e.target.value)}

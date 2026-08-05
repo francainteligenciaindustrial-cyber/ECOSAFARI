@@ -20,3 +20,8 @@ fotoss/
 
 .vercel
 .claude/
+
+# Internal meeting transcripts/notes accidentally dropped in the repo root —
+# not site content, and this one specifically has a spoken-aloud email
+# password in it. Never belongs in git history.
+*Transcript*.pdf
