@@ -1926,6 +1926,51 @@ app.get("/api/partners/:type/:id/access", requireAdmin, async (req, res) => {
   res.json(linked);
 });
 
+// Creates (or re-links, if the email already has an account) a Supabase
+// Auth user and gets them access as fast as possible: tries
+// inviteUserByEmail first, which is the only admin API call that both
+// creates the user AND actually emails them via whatever mail sending is
+// configured on this Supabase project — createUser+generateLink (the
+// previous approach here) only ever mints a link, it never sends anything.
+// app_metadata (the actual role/partnerId authorization) has to be set in a
+// second call either way since inviteUserByEmail doesn't accept it directly.
+// A recovery link is always generated too so the caller has something to
+// copy/share manually if the automatic email doesn't land (e.g. no custom
+// SMTP configured — Supabase's default mail sending is rate-limited on the
+// free tier).
+async function provisionPartnerLogin(
+  email: string,
+  appMetadata: Record<string, unknown>
+): Promise<{ userId: string | null; actionLink: string | null; emailSent: boolean; error?: string }> {
+  if (!supabaseAdminAuth) return { userId: null, actionLink: null, emailSent: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
+
+  let userId: string | null = null;
+  let emailSent = false;
+
+  const { data: invited, error: inviteErr } = await supabaseAdminAuth.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${SITE_URL}/parceiro`,
+  });
+  if (invited?.user) {
+    userId = invited.user.id;
+    emailSent = true;
+  } else {
+    // inviteUserByEmail refuses to touch an email that already has an
+    // account (e.g. re-inviting after a revoke, or applying twice) — look
+    // them up instead of treating that as a hard failure.
+    const { data: existing, error: listErr } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+    const match = existing?.users?.find((u: any) => u.email?.toLowerCase() === email);
+    if (!match) return { userId: null, actionLink: null, emailSent: false, error: inviteErr?.message || listErr?.message || "Erro ao criar acesso." };
+    userId = match.id;
+  }
+
+  const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: appMetadata });
+  if (updateErr) return { userId, actionLink: null, emailSent: false, error: updateErr.message };
+
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
+  if (linkErr) console.warn("Acesso criado, mas falha ao gerar link de apoio:", linkErr.message);
+  return { userId, actionLink: linkData?.properties?.action_link || null, emailSent };
+}
+
 app.post("/api/partners/invite", requireAdmin, async (req, res) => {
   if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — convite de parceiro indisponível." });
   const email = String(req.body.email || "").trim().toLowerCase();
@@ -1945,25 +1990,13 @@ app.post("/api/partners/invite", requireAdmin, async (req, res) => {
   const { data: target } = await supabase.from(table).select("id").eq("id", partnerId).maybeSingle();
   if (!target) return res.status(404).json({ error: "Parceiro não encontrado." });
 
-  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
-    email,
-    password: randomUUID(),
-    email_confirm: true,
-    app_metadata: { role: "partner", partnerType, partnerId },
-  });
-  if (createErr || !created.user) {
-    return res.status(400).json({ error: createErr?.message || "Erro ao criar acesso de parceiro (o email já pode estar em uso)." });
-  }
-
-  // Recovery link the partner uses to set their own password — same
-  // "copy and share manually" pattern as the admin invite flow, since
-  // relying on Supabase's transactional email isn't guaranteed to work.
-  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
-  if (linkErr) console.warn("Parceiro criado, mas falha ao gerar link de acesso:", linkErr.message);
+  const result = await provisionPartnerLogin(email, { role: "partner", partnerType, partnerId });
+  if (result.error) return res.status(400).json({ error: result.error });
 
   res.status(201).json({
-    user: { id: created.user.id, email: created.user.email },
-    actionLink: linkData?.properties?.action_link || null,
+    user: { id: result.userId, email },
+    actionLink: result.actionLink,
+    emailSent: result.emailSent,
   });
 });
 
@@ -2042,23 +2075,12 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Erro ao criar o registro do parceiro." });
   }
 
-  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
-    email,
-    password: randomUUID(),
-    email_confirm: true,
-    app_metadata: { role: "partner", partnerType, partnerId: newRecord.id },
-  });
-  let actionLink: string | null = null;
-  if (createErr || !created.user) {
-    // The partner record was already created successfully above — a login
-    // failure here (e.g. email already registered) shouldn't be reported as
-    // a hard failure, since an admin can still invite access manually from
-    // the new record's own "Acesso de parceiro" panel.
-    console.warn("Registro do parceiro criado, mas falha ao criar login:", createErr?.message);
-  } else {
-    const { data: linkData } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
-    actionLink = linkData?.properties?.action_link || null;
-  }
+  // The partner record was already created successfully above — a login
+  // failure here (e.g. Supabase Auth hiccup) shouldn't be reported as a hard
+  // failure, since an admin can still invite access manually from the new
+  // record's own "Acesso de parceiro" panel.
+  const loginResult = await provisionPartnerLogin(email, { role: "partner", partnerType, partnerId: newRecord.id });
+  if (loginResult.error) console.warn("Registro do parceiro criado, mas falha ao criar login:", loginResult.error);
 
   const { data: updatedCandidatura, error: updateErr } = await supabase
     .from("candidaturas")
@@ -2072,8 +2094,9 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
     candidatura: updatedCandidatura || { ...candidatura, status: "aprovado", partnerId: newRecord.id },
     partnerType,
     partnerId: newRecord.id,
-    actionLink,
-    loginCreated: !createErr,
+    actionLink: loginResult.actionLink,
+    loginCreated: !loginResult.error,
+    emailSent: loginResult.emailSent,
   });
 });
 

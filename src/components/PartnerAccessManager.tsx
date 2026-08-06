@@ -29,6 +29,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState("");
   const [newAccessLink, setNewAccessLink] = useState<string | null>(null);
+  const [newAccessEmailSent, setNewAccessEmailSent] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
   const fetchUsers = async () => {
@@ -62,6 +63,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
         return;
       }
       setNewAccessLink(data.actionLink || null);
+      setNewAccessEmailSent(!!data.emailSent);
       setEmail("");
       fetchUsers();
     } catch (err) {
@@ -118,7 +120,11 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
 
             {newAccessLink && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs space-y-2">
-                <p className="text-emerald-900 font-semibold">Envie este link pro parceiro definir a própria senha:</p>
+                <p className="text-emerald-900 font-semibold">
+                  {newAccessEmailSent
+                    ? "Convite enviado por email automaticamente! Se não chegar, use este link como reserva:"
+                    : "Não foi possível confirmar o envio automático — envie este link pro parceiro definir a própria senha:"}
+                </p>
                 <div className="flex items-center gap-2">
                   <input readOnly value={newAccessLink} onFocus={e => e.target.select()} className="flex-1 min-w-0 bg-white border border-emerald-200 px-2 py-1.5 rounded font-mono text-[10px] truncate" />
                   <button

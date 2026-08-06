@@ -26,12 +26,34 @@ export default function PartnerPortalPage() {
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
 
+  // Self-service "esqueci minha senha" — previously a partner who lost
+  // access had no way to recover it without an admin manually generating a
+  // fresh invite link. This uses Supabase's own password-recovery email
+  // (resetPasswordForEmail), independent of the admin-triggered invite flow
+  // in server.ts.
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+
   const [profile, setProfile] = useState<PartnerProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<any>(null);
+
+  // Whether the current session came from clicking an invite/recovery link
+  // rather than a normal email+senha login — Supabase fires a dedicated
+  // PASSWORD_RECOVERY event for this. Without gating on it, someone clicking
+  // an invite link would land with a valid session but no way to ever set an
+  // actual known password (the account was created with a random one), so
+  // they'd be locked out again the moment that session expires.
+  const [needsNewPassword, setNeedsNewPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [setPasswordError, setSetPasswordError] = useState("");
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
@@ -41,13 +63,41 @@ export default function PartnerPortalPage() {
         setIsPartner(data.session?.user?.app_metadata?.role === "partner");
         setCheckingSession(false);
       });
-      const { data } = client.auth.onAuthStateChange((_event, session) => {
+      const { data } = client.auth.onAuthStateChange((event, session) => {
         setIsPartner(session?.user?.app_metadata?.role === "partner");
+        if (event === "PASSWORD_RECOVERY") setNeedsNewPassword(true);
       });
       subscription = data.subscription;
     });
     return () => subscription?.unsubscribe();
   }, []);
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || settingPassword) return;
+    setSetPasswordError("");
+    if (newPassword.length < 8) {
+      setSetPasswordError("A senha precisa ter pelo menos 8 caracteres.");
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setSetPasswordError("As senhas não coincidem.");
+      return;
+    }
+    setSettingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        setSetPasswordError(error.message || "Erro ao definir senha.");
+        return;
+      }
+      setNeedsNewPassword(false);
+      setNewPassword("");
+      setNewPasswordConfirm("");
+    } finally {
+      setSettingPassword(false);
+    }
+  };
 
   useEffect(() => {
     if (!isPartner) return;
@@ -127,6 +177,24 @@ export default function PartnerPortalPage() {
     }
     setIsPartner(true);
     setLoggingIn(false);
+  };
+
+  // Always reports success regardless of whether the email actually has an
+  // account — revealing that would let someone probe which emails are
+  // registered as partners, the same reasoning applied to the candidatura
+  // status lookup elsewhere in this app.
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || forgotSubmitting) return;
+    setForgotSubmitting(true);
+    try {
+      await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+        redirectTo: `${window.location.origin}/parceiro`,
+      });
+    } finally {
+      setForgotSubmitting(false);
+      setForgotSent(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -221,6 +289,40 @@ export default function PartnerPortalPage() {
     </header>
   );
 
+  if (needsNewPassword) {
+    return (
+      <div className="min-h-screen bg-editorial-bg font-sans">
+        {header}
+        <div className="flex items-center justify-center px-6 py-16">
+          <div className="max-w-sm w-full bg-white border border-editorial-border rounded-lg p-8 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <Lock className="h-4 w-4 text-editorial-primary" />
+              <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary">Defina sua Senha</h1>
+            </div>
+            <p className="text-editorial-muted text-xs mb-6">Escolha uma senha pra usar daqui pra frente no seu acesso de parceiro.</p>
+            <form onSubmit={handleSetNewPassword} className="flex flex-col gap-3">
+              <input
+                type="password" required minLength={8} placeholder="Nova senha (mínimo 8 caracteres)" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
+              <input
+                type="password" required minLength={8} placeholder="Confirme a nova senha" value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
+              {setPasswordError && <p className="text-red-600 text-xs font-medium">{setPasswordError}</p>}
+              <button
+                type="submit" disabled={settingPassword}
+                className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
+              >
+                {settingPassword ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Salvar Senha e Continuar"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isPartner) {
     return (
       <div className="min-h-screen bg-editorial-bg font-sans">
@@ -231,24 +333,71 @@ export default function PartnerPortalPage() {
               <Lock className="h-4 w-4 text-editorial-primary" />
               <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary">Portal do Parceiro</h1>
             </div>
-            <p className="text-editorial-muted text-xs mb-6">Entre com o acesso que a equipe EcoSafari criou pra você editar seu próprio perfil.</p>
-            <form onSubmit={handleLogin} className="flex flex-col gap-3">
-              <input
-                type="email" required placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
-                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-              />
-              <input
-                type="password" required placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)}
-                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-              />
-              {loginError && <p className="text-red-600 text-xs font-medium">{loginError}</p>}
-              <button
-                type="submit" disabled={loggingIn}
-                className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
-              >
-                {loggingIn ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Entrar"}
-              </button>
-            </form>
+
+            {!forgotMode ? (
+              <>
+                <p className="text-editorial-muted text-xs mb-6">Entre com o acesso que a equipe EcoSafari criou pra você editar seu próprio perfil.</p>
+                <form onSubmit={handleLogin} className="flex flex-col gap-3">
+                  <input
+                    type="email" required placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
+                    className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                  />
+                  <input
+                    type="password" required placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)}
+                    className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                  />
+                  {loginError && <p className="text-red-600 text-xs font-medium">{loginError}</p>}
+                  <button
+                    type="submit" disabled={loggingIn}
+                    className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {loggingIn ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Entrar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setForgotMode(true); setForgotSent(false); setForgotEmail(email); }}
+                    className="text-editorial-muted hover:text-editorial-primary text-[11px] text-center transition cursor-pointer mt-1"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </form>
+              </>
+            ) : forgotSent ? (
+              <div className="text-center py-2">
+                <p className="text-editorial-text text-sm font-medium mb-1">Se esse email tiver um acesso de parceiro, enviamos um link de redefinição pra ele agora.</p>
+                <p className="text-editorial-muted text-xs mb-6">Confira também a caixa de spam. O link expira em algumas horas.</p>
+                <button
+                  type="button"
+                  onClick={() => setForgotMode(false)}
+                  className="text-editorial-primary text-[11px] uppercase tracking-widest font-bold hover:opacity-80 transition cursor-pointer"
+                >
+                  Voltar ao login
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-editorial-muted text-xs mb-6">Informe o email do seu acesso de parceiro — enviaremos um link pra você definir uma nova senha.</p>
+                <form onSubmit={handleForgotPassword} className="flex flex-col gap-3">
+                  <input
+                    type="email" required placeholder="Email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                    className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                  />
+                  <button
+                    type="submit" disabled={forgotSubmitting}
+                    className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {forgotSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Enviar link de redefinição"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForgotMode(false)}
+                    className="text-editorial-muted hover:text-editorial-primary text-[11px] text-center transition cursor-pointer mt-1"
+                  >
+                    Voltar ao login
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </div>

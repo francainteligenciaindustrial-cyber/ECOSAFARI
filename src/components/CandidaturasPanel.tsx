@@ -29,6 +29,7 @@ interface ApproveResult {
   candidaturaId: string;
   actionLink: string | null;
   loginCreated: boolean;
+  emailSent: boolean;
 }
 
 // Approving used to be just a status dropdown — changing it to "aprovado"
@@ -91,7 +92,7 @@ export default function CandidaturasPanel() {
         setApproveError({ id: c.id, message: data.error || "Erro ao aprovar candidatura." });
         return;
       }
-      setApproveResult({ candidaturaId: c.id, actionLink: data.actionLink || null, loginCreated: !!data.loginCreated });
+      setApproveResult({ candidaturaId: c.id, actionLink: data.actionLink || null, loginCreated: !!data.loginCreated, emailSent: !!data.emailSent });
       fetchData();
     } catch {
       setApproveError({ id: c.id, message: "Não foi possível aprovar agora. Tente novamente." });
@@ -212,7 +213,11 @@ export default function CandidaturasPanel() {
                     <p className="text-emerald-900 font-semibold flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Perfil de parceiro criado!</p>
                     {approveResult.actionLink ? (
                       <>
-                        <p className="text-emerald-800">Envie este link pro parceiro definir a própria senha e acessar o painel dele em <span className="font-mono">/parceiro</span>:</p>
+                        <p className="text-emerald-800">
+                          {approveResult.emailSent
+                            ? <>Convite enviado por email automaticamente! Se não chegar, use este link como reserva pra ele acessar o painel em <span className="font-mono">/parceiro</span>:</>
+                            : <>Não foi possível confirmar o envio automático — envie este link pro parceiro definir a própria senha e acessar o painel dele em <span className="font-mono">/parceiro</span>:</>}
+                        </p>
                         <div className="flex items-center gap-2">
                           <input readOnly value={approveResult.actionLink} onFocus={e => e.target.select()} className="flex-1 min-w-0 bg-white border border-emerald-200 px-2 py-1.5 rounded font-mono text-[10px] truncate" />
                           <button
