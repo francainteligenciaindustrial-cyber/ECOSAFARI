@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Users, Building2, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet } from "lucide-react";
+import { Compass, Users, Building2, MapPin, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet } from "lucide-react";
 import { trackMetaEvent } from "../lib/metaPixel";
 
 const WHATSAPP_NUMBER = "5565999868334";
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
-type PartnerType = "guia" | "pousada";
+type PartnerType = "guia" | "pousada" | "atracao";
 
 // Loads the reCAPTCHA v3 script once and resolves a fresh token per submit.
 // No-op (resolves undefined) when VITE_RECAPTCHA_SITE_KEY isn't configured —
@@ -44,6 +44,9 @@ export default function PartnerSignupPage() {
   const [pousadaForm, setPousadaForm] = useState({
     pousadaName: "", name: "", email: "", phone: "", location: "", capacity: "", message: ""
   });
+  const [atracaoForm, setAtracaoForm] = useState({
+    atracaoName: "", atracaoType: "parada_legal" as "parada_legal" | "restaurante", name: "", email: "", phone: "", location: "", message: ""
+  });
   const getRecaptchaToken = useRecaptcha();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,7 +70,8 @@ export default function PartnerSignupPage() {
           specialty: guiaForm.specialty,
           message: guiaForm.message,
         }
-      : {
+      : type === "pousada"
+      ? {
           type,
           recaptchaToken,
           name: pousadaForm.name,
@@ -77,6 +81,17 @@ export default function PartnerSignupPage() {
           location: pousadaForm.location,
           capacity: pousadaForm.capacity ? parseInt(pousadaForm.capacity) : undefined,
           message: pousadaForm.message,
+        }
+      : {
+          type,
+          recaptchaToken,
+          name: atracaoForm.name,
+          email: atracaoForm.email,
+          phone: atracaoForm.phone,
+          atracaoName: atracaoForm.atracaoName,
+          atracaoType: atracaoForm.atracaoType,
+          location: atracaoForm.location,
+          message: atracaoForm.message,
         };
 
     try {
@@ -88,13 +103,13 @@ export default function PartnerSignupPage() {
       if (!res.ok) throw new Error("Falha ao enviar cadastro");
       const created = await res.json();
       if (created.statusToken) {
-        const email = type === "guia" ? guiaForm.email : pousadaForm.email;
+        const email = type === "guia" ? guiaForm.email : type === "pousada" ? pousadaForm.email : atracaoForm.email;
         setStatusLink(`${window.location.origin}/status-candidatura?email=${encodeURIComponent(email)}&token=${created.statusToken}`);
       }
       // Conversion event for Meta Ads — this is the actual "did the ad work"
       // signal; without it, campaigns pointed at this page have no way to
       // measure or optimize toward real signups.
-      trackMetaEvent("Lead", { content_name: type === "guia" ? "cadastro_guia" : "cadastro_pousada" });
+      trackMetaEvent("Lead", { content_name: type === "guia" ? "cadastro_guia" : type === "pousada" ? "cadastro_pousada" : "cadastro_atracao" });
       setSubmitted(true);
     } catch (err) {
       setError("Não foi possível enviar seu cadastro agora. Tente novamente em instantes.");
@@ -104,9 +119,10 @@ export default function PartnerSignupPage() {
   };
 
   if (submitted) {
-    const applicantName = type === "pousada" ? (pousadaForm.pousadaName || pousadaForm.name) : guiaForm.name;
+    const applicantName = type === "pousada" ? (pousadaForm.pousadaName || pousadaForm.name) : type === "atracao" ? (atracaoForm.atracaoName || atracaoForm.name) : guiaForm.name;
+    const typeLabel = type === "guia" ? "guia turístico" : type === "pousada" ? "pousada" : "atração";
     const waMessage = encodeURIComponent(
-      `Olá! Acabei de me cadastrar como ${type === "guia" ? "guia turístico" : "pousada"} parceira no site da EcoSafari Brasil (${applicantName}). Gostaria de conversar sobre os próximos passos.`
+      `Olá! Acabei de me cadastrar como ${typeLabel} parceira no site da EcoSafari Brasil (${applicantName}). Gostaria de conversar sobre os próximos passos.`
     );
 
     return (
@@ -190,7 +206,7 @@ export default function PartnerSignupPage() {
             Cadastre-se para prestar serviços conosco
           </h2>
           <p className="text-white/80 text-sm mb-8 leading-relaxed">
-            Você é guia turístico ou representa uma pousada e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
+            Você é guia turístico, representa uma pousada ou uma atração (restaurante, parada legal) e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
           </p>
 
         {/* Why partner with us — cold traffic from an ad needs the "what's
@@ -232,6 +248,15 @@ export default function PartnerSignupPage() {
             }`}
           >
             <Building2 className="h-4 w-4" /> Represento uma Pousada
+          </button>
+          <button
+            type="button"
+            onClick={() => setType("atracao")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
+              type === "atracao" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+            }`}
+          >
+            <MapPin className="h-4 w-4" /> Represento uma Atração
           </button>
         </div>
 
@@ -296,6 +321,42 @@ export default function PartnerSignupPage() {
               </div>
               <Field label="Conte um pouco sobre a pousada">
                 <Textarea value={pousadaForm.message} onChange={e => setPousadaForm({ ...pousadaForm, message: e.target.value })} />
+              </Field>
+            </>
+          )}
+
+          {type === "atracao" && (
+            <>
+              <Field label="Nome da atração" required>
+                <Input required value={atracaoForm.atracaoName} onChange={e => setAtracaoForm({ ...atracaoForm, atracaoName: e.target.value })} />
+              </Field>
+              <Field label="Tipo" required>
+                <select
+                  required
+                  value={atracaoForm.atracaoType}
+                  onChange={e => setAtracaoForm({ ...atracaoForm, atracaoType: e.target.value as "parada_legal" | "restaurante" })}
+                  className="w-full border border-editorial-border px-3 py-2.5 text-sm rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                >
+                  <option value="parada_legal">Parada Legal (passeio, artesanato, lembrança)</option>
+                  <option value="restaurante">Restaurante</option>
+                </select>
+              </Field>
+              <Field label="Nome do responsável" required>
+                <Input required value={atracaoForm.name} onChange={e => setAtracaoForm({ ...atracaoForm, name: e.target.value })} />
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Email" required>
+                  <Input required type="email" value={atracaoForm.email} onChange={e => setAtracaoForm({ ...atracaoForm, email: e.target.value })} />
+                </Field>
+                <Field label="Telefone / WhatsApp" required>
+                  <Input required value={atracaoForm.phone} onChange={e => setAtracaoForm({ ...atracaoForm, phone: e.target.value })} />
+                </Field>
+              </div>
+              <Field label="Localidade" required>
+                <Input required placeholder="Ex: Pantanal Norte, Mato Grosso" value={atracaoForm.location} onChange={e => setAtracaoForm({ ...atracaoForm, location: e.target.value })} />
+              </Field>
+              <Field label="Conte um pouco sobre a atração">
+                <Textarea value={atracaoForm.message} onChange={e => setAtracaoForm({ ...atracaoForm, message: e.target.value })} />
               </Field>
             </>
           )}

@@ -19,7 +19,18 @@ import {
   Bird,
   BadgeCheck,
   Eye,
-  KeyRound
+  KeyRound,
+  ClipboardList,
+  CalendarClock,
+  History as HistoryIcon,
+  Compass,
+  MapPin,
+  Handshake,
+  PawPrint,
+  Map as MapIcon,
+  Database,
+  Lock,
+  type LucideIcon
 } from "lucide-react";
 import { Pousada, Guide, Booking, Notification, Species } from "../types";
 import TurismoPanel from "./TurismoPanel";
@@ -45,21 +56,24 @@ interface AdminDashboardProps {
 type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
-// hand-written <button> per tab (each previously repeating the same active/
-// inactive className logic eleven times).
-const ADMIN_TABS: { id: AdminTab; icon: string; label: string }[] = [
-  { id: "bookings", icon: "📋", label: "Reservas & Confirmações" },
-  { id: "pousadas", icon: "🏨", label: "Gestão de Pousadas" },
-  { id: "guides", icon: "🧭", label: "Gestão de Guias" },
-  { id: "atracoes", icon: "🎯", label: "Atrações" },
-  { id: "agenda", icon: "📅", label: "Agenda Integrada" },
-  { id: "history", icon: "👤", label: "Histórico de Clientes" },
-  { id: "supabase", icon: "⚡", label: "Banco de Dados (Supabase)" },
-  { id: "species", icon: "🐾", label: "Gestão de Espécies" },
-  { id: "turismo", icon: "🗺️", label: "Turistas & Roteiros" },
-  { id: "candidaturas", icon: "🤝", label: "Candidaturas de Parceiros" },
-  { id: "admins", icon: "🔐", label: "Administradores" },
+// hand-written <button> per tab. Grouped into sections (rather than one flat
+// list of 11) so the nav keeps reading cleanly as more partner types get
+// added to the ecosystem over time — the same pattern big platforms
+// (Stripe, Linear, Vercel) use once a sidebar outgrows ~6-7 flat items.
+const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string }[] = [
+  { id: "bookings", icon: ClipboardList, label: "Reservas & Confirmações", group: "Operação" },
+  { id: "agenda", icon: CalendarClock, label: "Agenda Integrada", group: "Operação" },
+  { id: "history", icon: HistoryIcon, label: "Histórico de Clientes", group: "Operação" },
+  { id: "pousadas", icon: Building2, label: "Pousadas", group: "Parceiros" },
+  { id: "guides", icon: Compass, label: "Guias", group: "Parceiros" },
+  { id: "atracoes", icon: MapPin, label: "Atrações", group: "Parceiros" },
+  { id: "candidaturas", icon: Handshake, label: "Candidaturas", group: "Parceiros" },
+  { id: "species", icon: PawPrint, label: "Espécies", group: "Conteúdo" },
+  { id: "turismo", icon: MapIcon, label: "Turistas & Roteiros", group: "Conteúdo" },
+  { id: "supabase", icon: Database, label: "Banco de Dados", group: "Sistema" },
+  { id: "admins", icon: Lock, label: "Administradores", group: "Sistema" },
 ];
+const ADMIN_TAB_GROUPS = ["Operação", "Parceiros", "Conteúdo", "Sistema"] as const;
 
 export default function AdminDashboard({
   pousadas,
@@ -794,12 +808,12 @@ export default function AdminDashboard({
       <div className="max-w-7xl mx-auto px-6">
 
         {/* Header Title */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b border-editorial-border pb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-200 pb-5">
           <div>
-            <h1 className="text-3xl font-serif font-bold text-editorial-primary tracking-tight flex items-center gap-2">
-              <Building2 className="h-7 w-7 text-editorial-primary" /> Painel de Controle EcoSafari
+            <h1 className="text-xl font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-editorial-primary" /> Painel de Controle EcoSafari
             </h1>
-            <p className="text-editorial-muted text-xs mt-1 font-light">Gestão de pousadas parceiras, guias turísticos, alocação de equipe e agenda de reservas.</p>
+            <p className="text-zinc-500 text-xs mt-1">Gestão de pousadas parceiras, guias turísticos, alocação de equipe e agenda de reservas.</p>
           </div>
 
           {/* Quick Notification alert — jumps to the notification log below */}
@@ -811,56 +825,54 @@ export default function AdminDashboard({
                   document.getElementById("notifications-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }, 50);
               }}
-              className="relative bg-white border border-editorial-border p-2 rounded-none flex items-center gap-2.5 shadow-sm text-[11px] hover:bg-editorial-secondary transition cursor-pointer"
+              className="relative bg-white border border-zinc-200 px-3 py-2 rounded-lg flex items-center gap-2 text-[11px] hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"
             >
-              <Bell className="h-4 w-4 text-editorial-primary animate-swing" />
-              <div>
-                <span className="font-bold text-editorial-primary">{unreadNotifications.length} novas</span> notificações
-              </div>
+              <Bell className="h-3.5 w-3.5 text-zinc-500" />
+              <span><span className="font-semibold text-zinc-900">{unreadNotifications.length} novas</span> <span className="text-zinc-500">notificações</span></span>
             </button>
           </div>
         </div>
 
         {/* METRICS ROW */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          
-          <div className="bg-white border border-editorial-border p-5 rounded-none shadow-sm flex items-center justify-between">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+          <div className="bg-white border border-zinc-200 p-4 rounded-xl flex items-center justify-between">
             <div>
-              <span className="text-editorial-muted text-[9px] font-bold uppercase tracking-widest block">Faturamento Reservas</span>
-              <span className="text-2xl font-serif font-bold text-editorial-primary mt-1 block">R$ {totalRevenue.toLocaleString('pt-BR')}</span>
+              <span className="text-zinc-500 text-xs block">Faturamento Reservas</span>
+              <span className="text-xl font-semibold text-zinc-900 mt-1 block">R$ {totalRevenue.toLocaleString('pt-BR')}</span>
             </div>
-            <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border p-3">
-              <DollarSign className="h-5 w-5" />
+            <div className="bg-zinc-50 text-editorial-primary rounded-full p-2.5">
+              <DollarSign className="h-4 w-4" />
             </div>
           </div>
 
-          <div className="bg-white border border-editorial-border p-5 rounded-none shadow-sm flex items-center justify-between">
+          <div className="bg-white border border-zinc-200 p-4 rounded-xl flex items-center justify-between">
             <div>
-              <span className="text-editorial-muted text-[9px] font-bold uppercase tracking-widest block">Reservas Ativas</span>
-              <span className="text-2xl font-serif font-bold text-editorial-primary mt-1 block">{activeReservationsCount} registradas</span>
+              <span className="text-zinc-500 text-xs block">Reservas Ativas</span>
+              <span className="text-xl font-semibold text-zinc-900 mt-1 block">{activeReservationsCount} registradas</span>
             </div>
-            <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border p-3">
-              <TrendingUp className="h-5 w-5" />
+            <div className="bg-zinc-50 text-zinc-400 rounded-full p-2.5">
+              <TrendingUp className="h-4 w-4" />
             </div>
           </div>
 
-          <div className="bg-white border border-editorial-border p-5 rounded-none shadow-sm flex items-center justify-between">
+          <div className="bg-white border border-zinc-200 p-4 rounded-xl flex items-center justify-between">
             <div>
-              <span className="text-editorial-muted text-[9px] font-bold uppercase tracking-widest block">Pousadas Parceiras</span>
-              <span className="text-2xl font-serif font-bold text-editorial-primary mt-1 block">{pousadas.length} ativas</span>
+              <span className="text-zinc-500 text-xs block">Pousadas Parceiras</span>
+              <span className="text-xl font-semibold text-zinc-900 mt-1 block">{pousadas.length} ativas</span>
             </div>
-            <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border p-3">
-              <Building2 className="h-5 w-5" />
+            <div className="bg-zinc-50 text-zinc-400 rounded-full p-2.5">
+              <Building2 className="h-4 w-4" />
             </div>
           </div>
 
-          <div className="bg-white border border-editorial-border p-5 rounded-none shadow-sm flex items-center justify-between">
+          <div className="bg-white border border-zinc-200 p-4 rounded-xl flex items-center justify-between">
             <div>
-              <span className="text-editorial-muted text-[9px] font-bold uppercase tracking-widest block">Aguardando Aprovação</span>
-              <span className="text-2xl font-serif font-bold text-amber-800 mt-1 block">{pendingConfirmation} de reservas</span>
+              <span className="text-zinc-500 text-xs block">Aguardando Aprovação</span>
+              <span className="text-xl font-semibold text-amber-700 mt-1 block">{pendingConfirmation} de reservas</span>
             </div>
-            <div className="bg-amber-50 text-amber-900 border border-amber-200 p-3">
-              <Clock className="h-5 w-5 animate-pulse" />
+            <div className="bg-amber-50 text-amber-600 rounded-full p-2.5">
+              <Clock className="h-4 w-4" />
             </div>
           </div>
 
@@ -875,19 +887,35 @@ export default function AdminDashboard({
         <div className="flex flex-col md:flex-row gap-8 items-start">
 
         {/* NAVIGATION SIDEBAR */}
-        <aside className="w-full md:w-60 flex-shrink-0 md:sticky md:top-6">
-          <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1 bg-white border border-editorial-border rounded-none md:rounded-lg p-2">
-            {ADMIN_TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`text-left text-[11px] uppercase tracking-widest font-bold whitespace-nowrap px-3 py-2.5 rounded-md transition duration-200 flex items-center gap-2.5 cursor-pointer ${
-                  activeTab === tab.id ? "bg-editorial-primary text-white" : "text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-primary"
-                }`}
-              >
-                <span>{tab.icon}</span> {tab.label}
-              </button>
-            ))}
+        <aside className="w-full md:w-56 flex-shrink-0 md:sticky md:top-6">
+          <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1 md:gap-4 bg-white border border-zinc-200 md:border-0 md:bg-transparent rounded-lg md:rounded-none p-2 md:p-0">
+            {ADMIN_TAB_GROUPS.map(group => {
+              const tabs = ADMIN_TABS.filter(t => t.group === group);
+              if (tabs.length === 0) return null;
+              return (
+                <div key={group} className="md:flex md:flex-col md:gap-0.5">
+                  <span className="hidden md:block text-[10px] uppercase tracking-wider font-semibold text-zinc-400 px-3 mb-1.5">{group}</span>
+                  {tabs.map(tab => {
+                    const Icon = tab.icon;
+                    const active = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`relative text-left text-[13px] whitespace-nowrap px-3 py-2 rounded-md transition-colors duration-150 flex items-center gap-2.5 cursor-pointer border-l-2 ${
+                          active
+                            ? "bg-zinc-100 text-zinc-900 font-medium border-editorial-primary"
+                            : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 border-transparent"
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 flex-shrink-0 ${active ? "text-editorial-primary" : "text-zinc-400"}`} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </nav>
         </aside>
 

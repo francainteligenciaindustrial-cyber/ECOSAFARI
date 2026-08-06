@@ -432,6 +432,15 @@ function toStringArray(val: any): string[] {
   return [];
 }
 
+// Splits a free-text "Português, Inglês, Espanhol" field (as typed into the
+// public /seja-parceiro form) into a trimmed array — used only when
+// approving a candidatura into a real guides.languages/specialty value,
+// since the candidatura itself stores these as plain comma-separated text.
+function splitCommaList(val: string | undefined): string[] {
+  if (!val) return [];
+  return val.split(",").map(s => s.trim()).filter(Boolean);
+}
+
 // Whitelists which fields a client-supplied body may set on an insert/update.
 // Without this, `.update(req.body)` / `.insert({ ...req.body })` pass every
 // key the caller sent straight to Supabase, so a form field never meant to be
@@ -1730,7 +1739,7 @@ app.get("/api/candidaturas/status", async (req, res) => {
   res.json(data);
 });
 
-const CANDIDATURA_PUBLIC_FIELDS = ["type", "name", "email", "phone", "message", "languages", "availability", "age", "experienceYears", "specialty", "pousadaName", "location", "capacity"] as const;
+const CANDIDATURA_PUBLIC_FIELDS = ["type", "name", "email", "phone", "message", "languages", "availability", "age", "experienceYears", "specialty", "pousadaName", "location", "capacity", "atracaoName", "atracaoType"] as const;
 
 app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
   const { recaptchaToken, ...body } = req.body;
@@ -1765,6 +1774,8 @@ app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
 
   const label = newCandidatura.type === "pousada"
     ? `Nova candidatura de pousada: ${newCandidatura.pousadaName || newCandidatura.name}`
+    : newCandidatura.type === "atracao"
+    ? `Nova candidatura de atração: ${newCandidatura.atracaoName || newCandidatura.name}`
     : `Nova candidatura de guia: ${newCandidatura.name}`;
   addNotification("admin", label, "status_update");
 
@@ -1953,6 +1964,116 @@ app.post("/api/partners/invite", requireAdmin, async (req, res) => {
   res.status(201).json({
     user: { id: created.user.id, email: created.user.email },
     actionLink: linkData?.properties?.action_link || null,
+  });
+});
+
+// Turns a candidatura into an actual partner in one step: creates the
+// pousada/guides/atracoes row from what the applicant submitted, then
+// creates their partner login (same recovery-link pattern as
+// POST /api/partners/invite above) — collapsing what used to be 3 manual
+// admin actions (approve status → create record by hand → invite access by
+// hand) into one. The new record is intentionally unverified/indisponível
+// (not a public "trust badge" yet) since nothing here has been vetted
+// beyond what the candidate typed into a public form — the partner (or an
+// admin) fills in photos/pricing/etc. via the self-service portal before
+// it's flagged as verified.
+app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — aprovação com criação de acesso indisponível." });
+  const { id } = req.params;
+
+  const { data: candidatura, error: fetchErr } = await supabase.from("candidaturas").select("*").eq("id", id).maybeSingle();
+  if (fetchErr || !candidatura) return res.status(404).json({ error: "Candidatura não encontrada." });
+  if (candidatura.partnerId) return res.status(400).json({ error: "Esta candidatura já foi aprovada e virou um parceiro." });
+
+  const email = String(candidatura.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Candidatura sem um email válido — não é possível criar o acesso do parceiro." });
+  }
+
+  const partnerType = candidatura.type as PartnerType;
+  const table = PARTNER_TABLE_BY_TYPE[partnerType];
+  if (!table) return res.status(400).json({ error: "Tipo de candidatura desconhecido." });
+
+  let newRecord: Record<string, any>;
+  if (partnerType === "guia") {
+    newRecord = {
+      id: `g_${randomUUID()}`,
+      name: candidatura.name,
+      email,
+      phone: candidatura.phone || "",
+      languages: splitCommaList(candidatura.languages),
+      specialty: splitCommaList(candidatura.specialty),
+      status: "indisponivel",
+      bio: candidatura.message || undefined,
+      age: candidatura.age || undefined,
+    };
+  } else if (partnerType === "pousada") {
+    newRecord = {
+      id: `p_${randomUUID()}`,
+      name: candidatura.pousadaName || candidatura.name,
+      description: candidatura.message || "Nova pousada parceira EcoSafari — perfil em preparação.",
+      location: candidatura.location || "",
+      pricePerNight: 0,
+      images: [],
+      features: [],
+      activities: [],
+      experiences: [],
+      capacity: candidatura.capacity || 1,
+      verified: false,
+      viewCount: 0,
+    };
+  } else {
+    newRecord = {
+      id: `at_${randomUUID()}`,
+      type: candidatura.atracaoType === "restaurante" ? "restaurante" : "parada_legal",
+      name: candidatura.atracaoName || candidatura.name,
+      description: candidatura.message || "Nova atração parceira EcoSafari — perfil em preparação.",
+      location: candidatura.location || "",
+      images: [],
+      rating: 5,
+      verified: false,
+      dateCreated: new Date().toISOString(),
+    };
+  }
+
+  const { error: insertErr } = await supabase.from(table).insert(newRecord);
+  if (insertErr) {
+    console.error(`Erro ao criar parceiro (${table}) a partir da candidatura:`, insertErr.message);
+    return res.status(500).json({ error: "Erro ao criar o registro do parceiro." });
+  }
+
+  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+    email,
+    password: randomUUID(),
+    email_confirm: true,
+    app_metadata: { role: "partner", partnerType, partnerId: newRecord.id },
+  });
+  let actionLink: string | null = null;
+  if (createErr || !created.user) {
+    // The partner record was already created successfully above — a login
+    // failure here (e.g. email already registered) shouldn't be reported as
+    // a hard failure, since an admin can still invite access manually from
+    // the new record's own "Acesso de parceiro" panel.
+    console.warn("Registro do parceiro criado, mas falha ao criar login:", createErr?.message);
+  } else {
+    const { data: linkData } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
+    actionLink = linkData?.properties?.action_link || null;
+  }
+
+  const { data: updatedCandidatura, error: updateErr } = await supabase
+    .from("candidaturas")
+    .update({ status: "aprovado", partnerId: newRecord.id })
+    .eq("id", id)
+    .select()
+    .single();
+  if (updateErr) console.warn("Parceiro criado, mas falha ao marcar candidatura como aprovada:", updateErr.message);
+
+  res.status(201).json({
+    candidatura: updatedCandidatura || { ...candidatura, status: "aprovado", partnerId: newRecord.id },
+    partnerType,
+    partnerId: newRecord.id,
+    actionLink,
+    loginCreated: !createErr,
   });
 });
 
@@ -2395,10 +2516,13 @@ DROP POLICY IF EXISTS "Permitir exclusão pública de guias turísticos" ON guia
 
 
 
--- 13. TABELA DE CANDIDATURAS (cadastro público de parceiros: guias e pousadas)
+-- 13. TABELA DE CANDIDATURAS (cadastro público de parceiros: guias, pousadas e atrações)
 -- Recebe as submissões do formulário público em /seja-parceiro, mediadas pelo
 -- backend (POST /api/candidaturas é a única rota pública; leitura/edição
 -- exigem login de admin). Sem policies públicas — só o backend acessa.
+-- "partnerId" é preenchido só por POST /api/candidaturas/:id/approve, que
+-- cria o registro real do parceiro (pousadas/guides/atracoes) + o login dele
+-- a partir do que foi submetido aqui.
 CREATE TABLE IF NOT EXISTS candidaturas (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
@@ -2415,7 +2539,10 @@ CREATE TABLE IF NOT EXISTS candidaturas (
   specialty TEXT,
   "pousadaName" TEXT,
   location TEXT,
-  capacity INTEGER
+  capacity INTEGER,
+  "atracaoName" TEXT,
+  "atracaoType" TEXT,
+  "partnerId" TEXT
 );
 
 ALTER TABLE candidaturas ENABLE ROW LEVEL SECURITY;

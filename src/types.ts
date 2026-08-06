@@ -217,15 +217,19 @@ export interface GuiaTuristico {
 // admin para triagem e contato — não é publicado automaticamente.
 export interface Candidatura {
   id: string;
-  type: 'guia' | 'pousada';
+  type: 'guia' | 'pousada' | 'atracao';
   status: 'pendente' | 'contatado' | 'aprovado' | 'rejeitado';
   dateCreated: string;
   // Opaque token returned once at submission time — required (alongside the
   // email) to look up status publicly, so knowing/guessing someone's email
   // alone isn't enough to see their application.
   statusToken?: string;
+  // Preenchido só por POST /api/candidaturas/:id/approve — id do registro
+  // (pousada/guides/atracoes) criado a partir desta candidatura, para saber
+  // que ela já virou um parceiro de verdade e para onde linkar no painel.
+  partnerId?: string;
   // comuns
-  name: string; // nome do guia OU nome do responsável pela pousada
+  name: string; // nome do guia OU nome do responsável pela pousada/atração
   email: string;
   phone: string;
   message?: string;
@@ -237,8 +241,11 @@ export interface Candidatura {
   specialty?: string;
   // específicos de pousada
   pousadaName?: string;
-  location?: string;
+  location?: string; // também usado por atração
   capacity?: number;
+  // específicos de atração
+  atracaoName?: string;
+  atracaoType?: 'parada_legal' | 'restaurante';
 }
 
 // ReferralSource: resposta da pesquisa "como você chegou até nós?" exibida
