@@ -194,6 +194,18 @@ const chatLimiter = rateLimit({
   message: { error: "Muitas mensagens em pouco tempo. Aguarde um instante." },
 });
 
+// Generous compared to the others — a shared/NAT IP genuinely browsing the
+// catalog can rack up view pings quickly, this just needs to stop a script
+// hammering one pousada's counter, not throttle normal traffic.
+const viewLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new SupabaseRateLimitStore() as any,
+  message: { error: "Muitas requisições em pouco tempo." },
+});
+
 // Verifies the caller is an authenticated admin (Supabase Auth JWT with
 // app_metadata.role === "admin") before allowing access to admin-only routes.
 // The Gestão tab hides itself client-side for non-admins, but that's cosmetic —
@@ -216,6 +228,33 @@ const requireAdmin: express.RequestHandler[] = [
       // Stashed for routes that need to know which admin is calling — e.g.
       // preventing an admin from revoking their own access below.
       res.locals.adminUser = data.user;
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Token inválido." });
+    }
+  },
+];
+
+// Any authenticated admin OR partner (of any type/record) — used for routes
+// like image upload that don't belong to a specific resource yet, so there's
+// nothing to scope ownership against. The real authorization boundary is
+// still enforced downstream: an uploaded image is just a URL sitting in
+// storage until it's attached to a record via a PUT that goes through
+// requirePartnerAccess, which *does* check ownership.
+const requireAdminOrPartner: express.RequestHandler[] = [
+  authLimiter,
+  async (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: "Autenticação necessária." });
+    }
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      const role = data.user?.app_metadata?.role;
+      if (error || !data.user || (role !== "admin" && role !== "partner")) {
+        return res.status(403).json({ error: "Acesso restrito a administradores ou parceiros." });
+      }
       next();
     } catch (err) {
       res.status(401).json({ error: "Token inválido." });
@@ -530,7 +569,7 @@ app.get("/api/pousadas/:id", async (req, res) => {
   res.json(mapPousadaRow(data));
 });
 
-app.post("/api/pousadas/:id/view", async (req, res) => {
+app.post("/api/pousadas/:id/view", viewLimiter, async (req, res) => {
   const { id } = req.params;
   const { data: current, error: fetchErr } = await supabase.from("pousadas").select("viewCount").eq("id", id).maybeSingle();
   if (fetchErr || !current) return res.status(404).json({ error: "Pousada não encontrada" });
@@ -582,7 +621,7 @@ function detectImageType(buffer: Buffer): { ext: string; contentType: string } |
   return null;
 }
 
-app.post("/api/upload-image", requireAdmin, (req, res) => {
+app.post("/api/upload-image", requireAdminOrPartner, (req, res) => {
   upload.single("file")(req, res, async (err: any) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
@@ -931,6 +970,39 @@ async function deleteTokens(): Promise<void> {
   else console.log("Tokens do Google Calendar excluídos.");
 }
 
+// OAuth "state" anti-CSRF pattern: /api/auth/google/callback is a plain,
+// unauthenticated GET (Google redirects the browser there directly, so it
+// can never carry our Bearer token) — without validating state, anyone
+// could craft their own Google consent URL using our public client_id and
+// registered redirect_uri, approve it with an attacker-controlled Google
+// account, and have OUR server store THEIR tokens as the site's calendar
+// integration. Storing the pending value in app_secrets (not memory) since
+// this runs on serverless — a value minted by one invocation must still be
+// readable by whichever invocation later handles the callback.
+const GOOGLE_OAUTH_STATE_KEY = "google_oauth_pending_state";
+const GOOGLE_OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+
+async function createOAuthState(): Promise<string> {
+  const state = randomUUID();
+  await supabase.from("app_secrets").upsert({
+    key: GOOGLE_OAUTH_STATE_KEY,
+    value: { state, expiresAt: Date.now() + GOOGLE_OAUTH_STATE_TTL_MS },
+    updated_at: new Date().toISOString(),
+  });
+  return state;
+}
+
+async function consumeOAuthState(candidate: string | undefined): Promise<boolean> {
+  const { data } = await supabase.from("app_secrets").select("value").eq("key", GOOGLE_OAUTH_STATE_KEY).maybeSingle();
+  // One-time use — delete regardless of outcome so a leaked/replayed
+  // callback URL can't be reused.
+  await supabase.from("app_secrets").delete().eq("key", GOOGLE_OAUTH_STATE_KEY);
+  const pending = data?.value as { state: string; expiresAt: number } | undefined;
+  if (!pending || !candidate) return false;
+  if (Date.now() > pending.expiresAt) return false;
+  return pending.state === candidate;
+}
+
 function getOAuthClient(req: express.Request) {
   const protocol = req.headers["x-forwarded-proto"] || req.protocol;
   const host = req.get("host");
@@ -1015,7 +1087,10 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
 // ----------------------------------------------------
 
 // Status of Google connection
-app.get("/api/auth/google/status", async (req, res) => {
+// Admin-only — this reveals which Google account (email) the site's
+// calendar is connected to, which is only meaningful to the admin panel
+// and not something worth exposing to an unauthenticated caller.
+app.get("/api/auth/google/status", requireAdmin, async (req, res) => {
   const tokens = await loadStoredTokens();
   if (!tokens) {
     return res.json({ connected: false, email: null });
@@ -1033,10 +1108,17 @@ app.get("/api/auth/google/status", async (req, res) => {
   }
 });
 
-// Start OAuth authentication redirection
-app.get("/api/auth/google", (req, res) => {
+// Start OAuth authentication — admin-only (returns the URL as JSON rather
+// than redirecting directly, since the browser navigation that actually
+// hits Google has to be triggered client-side by the caller after an
+// authenticated fetch; a plain <a href> here couldn't carry the admin's
+// Bearer token). The one-time state token is what actually closes the
+// hole: without it, anyone who knows our public client_id/redirect_uri
+// could complete their own consent and have the callback below store
+// their tokens as this site's calendar integration.
+app.get("/api/auth/google", requireAdmin, async (req, res) => {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-    return res.status(400).send("Google OAuth Client ID ou Client Secret não estão configurados.");
+    return res.status(400).json({ error: "Google OAuth Client ID ou Client Secret não estão configurados." });
   }
 
   const oauth2Client = getOAuthClient(req);
@@ -1046,20 +1128,29 @@ app.get("/api/auth/google", (req, res) => {
     "https://www.googleapis.com/auth/userinfo.email"
   ];
 
+  const state = await createOAuthState();
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: scopes,
-    prompt: "consent"
+    prompt: "consent",
+    state,
   });
 
-  res.redirect(authUrl);
+  res.json({ authUrl });
 });
 
-// OAuth Redirect Callback Handler
+// OAuth Redirect Callback Handler — necessarily unauthenticated (Google
+// redirects the browser here directly), so the state check above is the
+// only thing standing between this and an account-hijack via a crafted
+// consent URL. See createOAuthState/consumeOAuthState above.
 app.get("/api/auth/google/callback", async (req, res) => {
   const code = req.query.code as string;
+  const state = req.query.state as string | undefined;
   if (!code) {
     return res.status(400).send("Código de autorização ausente.");
+  }
+  if (!(await consumeOAuthState(state))) {
+    return res.status(400).send("Sessão de autenticação inválida ou expirada. Inicie a conexão novamente pelo painel administrativo.");
   }
 
   try {
@@ -1074,10 +1165,12 @@ app.get("/api/auth/google/callback", async (req, res) => {
   }
 });
 
-// Disconnect Google account
-app.get("/api/auth/google/disconnect", async (req, res) => {
+// Disconnect Google account — admin-only, and POST rather than GET since
+// this has a real side effect (a plain link/prefetch hitting a GET here
+// would silently break the calendar sync for anyone who stumbled on the URL).
+app.post("/api/auth/google/disconnect", requireAdmin, async (req, res) => {
   await deleteTokens();
-  res.redirect("/?google_cal_success=false");
+  res.json({ success: true });
 });
 
 // Update Status flow (Gateway Pay, Pousada confirm, Guide confirm)
@@ -1803,12 +1896,14 @@ app.delete("/api/candidaturas/:id", requireAdmin, async (req, res) => {
 
 // REFERRAL SOURCES — pesquisa "como você chegou até nós?" no primeiro acesso.
 // POST é público (qualquer visitante responde); GET é admin-only (estatísticas).
+const REFERRAL_SOURCE_FIELDS = ["source", "otherText"] as const;
+
 app.post("/api/referral-sources", publicFormLimiter, async (req, res) => {
   const newSource: ReferralSource = {
-    ...req.body,
+    ...pickFields<ReferralSource>(req.body, REFERRAL_SOURCE_FIELDS),
     id: `ref_${randomUUID()}`,
     timestamp: new Date().toISOString(),
-  };
+  } as ReferralSource;
   // referral_sources may not exist (see scripts/add-referral-sources-table.sql)
   // — this endpoint's only caller in the frontend was already removed, so it
   // degrades gracefully instead of erroring if the table isn't there.
@@ -1960,6 +2055,22 @@ async function provisionPartnerLogin(
     const { data: existing, error: listErr } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
     const match = existing?.users?.find((u: any) => u.email?.toLowerCase() === email);
     if (!match) return { userId: null, actionLink: null, emailSent: false, error: inviteErr?.message || listErr?.message || "Erro ao criar acesso." };
+
+    // This account already has SOME role — only proceed if it's the exact
+    // same association we're about to (re)grant. Otherwise this would
+    // silently strip an existing admin's access, or move a partner account
+    // from whatever record they already manage onto a different one, just
+    // because someone reused their email on a second invite/candidatura.
+    const existingMeta = match.app_metadata || {};
+    const isSameGrant = Object.entries(appMetadata).every(([k, v]) => existingMeta[k] === v);
+    if (existingMeta.role && !isSameGrant) {
+      return {
+        userId: null,
+        actionLink: null,
+        emailSent: false,
+        error: `Este email já tem uma conta com outro acesso (${existingMeta.role === "admin" ? "administrador" : `parceiro de ${existingMeta.partnerType || "outro registro"}`}). Revogue o acesso atual antes de reatribuí-lo, ou use outro email.`,
+      };
+    }
     userId = match.id;
   }
 
@@ -2608,11 +2719,18 @@ async function getPousadasContext() {
 const AGENCY_WHATSAPP = "+55 65 99986-8334";
 
 app.post("/api/chat", chatLimiter, async (req, res) => {
-  const { messages } = req.body;
+  const { messages: rawMessages } = req.body;
 
-  if (!messages || !Array.isArray(messages)) {
+  if (!rawMessages || !Array.isArray(rawMessages)) {
     return res.status(400).json({ error: "Formato de mensagens inválido." });
   }
+
+  // Caps cost/abuse exposure per request regardless of the rate limiter
+  // above — a client sending an enormous history or giant message bodies
+  // shouldn't be able to multiply the cost of a single chat call.
+  const messages = rawMessages
+    .slice(-20)
+    .map((m: any) => ({ role: m?.role, content: typeof m?.content === "string" ? m.content.slice(0, 2000) : "" }));
 
   // Simple public-info support assistant: answers general questions about the
   // agency using only public catalog data, and always steers anything about

@@ -311,6 +311,13 @@ export default function App() {
           >
             Portal
           </button>
+          <button
+            onClick={() => navigate("/parceiro")}
+            className="transition duration-200 pb-1 border-b-2 border-transparent hover:text-editorial-text flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <span className="hidden sm:inline">Portal do Parceiro</span>
+            <span className="sm:hidden">Parceiro</span>
+          </button>
           {isAdmin && (
             <button
               onClick={() => setCurrentModule("admin")}
@@ -506,7 +513,6 @@ export default function App() {
           <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Política de Privacidade</a>
           <a href="/termos" onClick={(e) => { e.preventDefault(); navigate("/termos"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Termos de Uso e Cancelamento</a>
           <a href="/status-candidatura" onClick={(e) => { e.preventDefault(); navigate("/status-candidatura"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Status da Candidatura</a>
-          <a href="/parceiro" onClick={(e) => { e.preventDefault(); navigate("/parceiro"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Portal do Parceiro</a>
         </div>
 
         {/* Institutional identity — required for a public booking/payment

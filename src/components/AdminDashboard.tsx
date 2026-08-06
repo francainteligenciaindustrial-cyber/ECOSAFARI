@@ -28,7 +28,6 @@ import {
   Handshake,
   PawPrint,
   Map as MapIcon,
-  Database,
   Lock,
   type LucideIcon
 } from "lucide-react";
@@ -53,7 +52,7 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins";
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
 // hand-written <button> per tab. Grouped into sections (rather than one flat
@@ -70,10 +69,31 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "candidaturas", icon: Handshake, label: "Candidaturas", group: "Parceiros" },
   { id: "species", icon: PawPrint, label: "Espécies", group: "Conteúdo" },
   { id: "turismo", icon: MapIcon, label: "Turistas & Roteiros", group: "Conteúdo" },
-  { id: "supabase", icon: Database, label: "Banco de Dados", group: "Sistema" },
   { id: "admins", icon: Lock, label: "Administradores", group: "Sistema" },
 ];
 const ADMIN_TAB_GROUPS = ["Operação", "Parceiros", "Conteúdo", "Sistema"] as const;
+
+const NOTIFICATION_ICONS: Record<Notification["type"], LucideIcon> = {
+  booking_new: ClipboardList,
+  payment_received: DollarSign,
+  status_update: Bell,
+  sighting_new: Bird,
+};
+
+// "há 2h", "há 3 dias" — short relative timestamps read better in a dense
+// notification feed than a full date, and don't need a date-formatting
+// library for something this simple.
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "agora mesmo";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `há ${days} dia${days > 1 ? "s" : ""}`;
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
 
 export default function AdminDashboard({
   pousadas,
@@ -136,16 +156,6 @@ export default function AdminDashboard({
   const [showAddGuide, setShowAddGuide] = useState(false);
   const [googleCalendarStatus, setGoogleCalendarStatus] = useState<{ connected: boolean; email: string | null }>({ connected: false, email: null });
 
-  // Supabase Status States
-  const [supabaseStatus, setSupabaseStatus] = useState<{
-    connected: boolean;
-    url: string;
-    tables: Record<string, boolean>;
-    allOk: boolean;
-  } | null>(null);
-  const [loadingSupabase, setLoadingSupabase] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
-
   // Detects rows matching the old hardcoded demo dataset's ids — a reliable
   // sign that some other deployment is still writing straight into this
   // Supabase project (see the comment on KNOWN_FAKE_IDS in server.ts).
@@ -180,7 +190,7 @@ export default function AdminDashboard({
 
   const fetchGoogleCalendarStatus = async () => {
     try {
-      const response = await fetch("/api/auth/google/status");
+      const response = await adminFetch("/api/auth/google/status");
       if (response.ok) {
         const data = await response.json();
         setGoogleCalendarStatus(data);
@@ -190,28 +200,50 @@ export default function AdminDashboard({
     }
   };
 
-  const fetchSupabaseStatus = async () => {
-    setLoadingSupabase(true);
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
+
+  // Both now go through adminFetch (an authenticated call) instead of a
+  // plain <a href> — the backend route requires an admin session, since an
+  // unauthenticated GET here used to let anyone hijack or drop the site's
+  // Google Calendar connection.
+  const handleConnectGoogleCalendar = async () => {
+    setConnectingGoogle(true);
     try {
-      const response = await adminFetch("/api/supabase/status");
-      if (response.ok) {
-        const data = await response.json();
-        setSupabaseStatus(data);
+      const response = await adminFetch("/api/auth/google");
+      const data = await response.json();
+      if (response.ok && data.authUrl) {
+        window.location.href = data.authUrl;
+      } else {
+        alert(data.error || "Erro ao iniciar conexão com o Google Calendar.");
       }
     } catch (err) {
-      console.error("Erro ao carregar status do Supabase:", err);
+      console.error("Erro ao iniciar conexão com o Google Calendar:", err);
     } finally {
-      setLoadingSupabase(false);
+      setConnectingGoogle(false);
     }
   };
 
+  const handleDisconnectGoogleCalendar = async () => {
+    setDisconnectingGoogle(true);
+    try {
+      const response = await adminFetch("/api/auth/google/disconnect", { method: "POST" });
+      if (response.ok) await fetchGoogleCalendarStatus();
+    } catch (err) {
+      console.error("Erro ao desconectar Google Calendar:", err);
+    } finally {
+      setDisconnectingGoogle(false);
+    }
+  };
+
+  // Runs once on mount rather than gated behind a tab — a stale/rogue
+  // deployment writing fake data is worth surfacing proactively (see the
+  // banner near the top of the dashboard below), not something an admin
+  // should have to remember to go check manually.
   useEffect(() => {
     fetchGoogleCalendarStatus();
-    if (activeTab === "supabase") {
-      fetchSupabaseStatus();
-      fetchFakeDataCheck();
-    }
-  }, [activeTab]);
+    fetchFakeDataCheck();
+  }, []);
 
   // Notifications management
   const unreadNotifications = notifications.filter(n => !n.read);
@@ -807,6 +839,40 @@ export default function AdminDashboard({
 
       <div className="max-w-7xl mx-auto px-6">
 
+        {/* Fake-data integrity alert — only rendered when something's
+            actually wrong, so it stays invisible day-to-day. Flags rows
+            matching the old hardcoded demo dataset's ids (see KNOWN_FAKE_IDS
+            in server.ts), a reliable sign some other deployment is still
+            writing straight into this Supabase project. */}
+        {fakeDataCheck && !fakeDataCheck.clean && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-xs">
+            <p className="text-red-800 font-semibold mb-2">
+              Encontrados registros com os IDs do antigo dataset de demonstração — provavelmente um deploy antigo ainda gravando dado fake direto no banco:
+            </p>
+            <ul className="font-mono text-red-700 space-y-0.5 mb-3">
+              {Object.entries(fakeDataCheck.found).map(([table, ids]) => (
+                <li key={table}>{table}: {ids.join(", ")}</li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePurgeFakeData}
+                disabled={purgingFakeData}
+                className="bg-red-600 hover:bg-red-700 text-white text-[11px] uppercase tracking-widest font-bold px-3 py-2 rounded-md transition disabled:opacity-60 cursor-pointer"
+              >
+                {purgingFakeData ? "Removendo..." : "Remover esses registros"}
+              </button>
+              <button
+                onClick={fetchFakeDataCheck}
+                disabled={checkingFakeData}
+                className="text-red-700 hover:text-red-900 text-[11px] font-semibold underline transition disabled:opacity-60 cursor-pointer"
+              >
+                {checkingFakeData ? "Verificando..." : "Verificar novamente"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header Title */}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-200 pb-5">
           <div>
@@ -1063,26 +1129,46 @@ export default function AdminDashboard({
               />
             </div>
 
-            {/* In-app administrative log activities */}
-            <div id="notifications-panel" className="bg-zinc-900 text-white rounded-2xl p-6 border border-zinc-800 shadow-lg">
-              <h3 className="font-extrabold text-sm mb-4 flex items-center gap-2 text-emerald-400"><Clock className="h-4.5 w-4.5" /> Histórico de Alertas de Sistema (Webhooks)</h3>
-              <div className="space-y-3 max-h-52 overflow-y-auto pr-2 scrollbar-thin">
-                {notifications.map((notif) => (
-                  <div key={notif.id} className={`flex items-start justify-between p-3 rounded-lg text-xs border ${notif.read ? "bg-zinc-800/30 border-zinc-800 text-zinc-400" : "bg-emerald-950/20 border-emerald-900/30 text-zinc-100"}`}>
-                    <div className="flex gap-2">
-                      <span className="mt-0.5">🔔</span>
-                      <p className="leading-relaxed">{notif.message}</p>
-                    </div>
-                    {!notif.read && (
-                      <button
-                        onClick={() => handleMarkNotificationRead(notif.id)}
-                        className="text-[10px] font-bold text-emerald-400 hover:underline shrink-0"
+            {/* Notification feed */}
+            <div id="notifications-panel" className="bg-white border border-zinc-200 rounded-xl">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200">
+                <h3 className="font-semibold text-sm text-zinc-900 flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-zinc-400" /> Notificações
+                </h3>
+                {unreadNotifications.length > 0 && (
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-editorial-primary bg-editorial-secondary px-2 py-0.5 rounded-full">
+                    {unreadNotifications.length} não lida{unreadNotifications.length > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              <div className="max-h-72 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="text-zinc-400 text-xs px-5 py-6 text-center">Nenhuma notificação ainda.</p>
+                ) : (
+                  notifications.map((notif) => {
+                    const Icon = NOTIFICATION_ICONS[notif.type] || Bell;
+                    return (
+                      <div
+                        key={notif.id}
+                        className={`flex items-start gap-3 px-5 py-3 border-b border-zinc-100 last:border-none transition-colors ${notif.read ? "" : "bg-editorial-secondary/30"}`}
                       >
-                        Marcar como Lida
-                      </button>
-                    )}
-                  </div>
-                ))}
+                        <Icon className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${notif.read ? "text-zinc-300" : "text-editorial-primary"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs leading-relaxed ${notif.read ? "text-zinc-500" : "text-zinc-900 font-medium"}`}>{notif.message}</p>
+                          <span className="text-[10px] text-zinc-400 mt-0.5 block">{formatRelativeTime(notif.timestamp)}</span>
+                        </div>
+                        {!notif.read && (
+                          <button
+                            onClick={() => handleMarkNotificationRead(notif.id)}
+                            className="text-[10px] font-semibold text-zinc-400 hover:text-editorial-primary transition cursor-pointer flex-shrink-0"
+                          >
+                            Marcar como lida
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -1666,19 +1752,21 @@ export default function AdminDashboard({
               </div>
               <div className="flex-shrink-0">
                 {googleCalendarStatus.connected ? (
-                  <a
-                    href="/api/auth/google/disconnect"
-                    className="bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 px-4 py-2 text-xs font-bold uppercase tracking-widest transition cursor-pointer inline-block"
+                  <button
+                    onClick={handleDisconnectGoogleCalendar}
+                    disabled={disconnectingGoogle}
+                    className="bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 px-4 py-2 text-xs font-bold uppercase tracking-widest transition cursor-pointer disabled:opacity-60"
                   >
-                    Desconectar Conta
-                  </a>
+                    {disconnectingGoogle ? "Desconectando..." : "Desconectar Conta"}
+                  </button>
                 ) : (
-                  <a
-                    href="/api/auth/google"
-                    className="bg-editorial-primary text-white hover:bg-editorial-primary/95 px-4 py-2 text-xs font-bold uppercase tracking-widest transition cursor-pointer inline-block"
+                  <button
+                    onClick={handleConnectGoogleCalendar}
+                    disabled={connectingGoogle}
+                    className="bg-editorial-primary text-white hover:bg-editorial-primary/95 px-4 py-2 text-xs font-bold uppercase tracking-widest transition cursor-pointer disabled:opacity-60"
                   >
-                    Conectar Google Calendar
-                  </a>
+                    {connectingGoogle ? "Conectando..." : "Conectar Google Calendar"}
+                  </button>
                 )}
               </div>
             </div>
@@ -1771,279 +1859,6 @@ export default function AdminDashboard({
                   })}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 6: SUPABASE DATABASE */}
-        {activeTab === "supabase" && (
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 pb-4">
-              <div>
-                <h3 className="font-serif font-bold text-editorial-primary text-xl mb-1 flex items-center gap-1.5">⚡ Conexão Supabase Real-Time</h3>
-                <p className="text-zinc-500 text-xs">Monitore o status do seu banco de dados na nuvem e configure as tabelas com um único clique.</p>
-              </div>
-              <button
-                onClick={fetchSupabaseStatus}
-                disabled={loadingSupabase}
-                className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold px-4 py-2 rounded-lg transition"
-              >
-                {loadingSupabase ? "Verificando..." : "🔄 Atualizar Status"}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Status and Diagnostics */}
-              <div className="lg:col-span-1 space-y-4">
-                <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50">
-                  <h4 className="font-bold text-xs text-zinc-500 uppercase tracking-wider mb-3">Status de Conexão</h4>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="relative flex h-3.5 w-3.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
-                    </span>
-                    <span className="font-bold text-sm text-zinc-900">Supabase Conectado</span>
-                  </div>
-                  <div className="text-[11px] text-zinc-500 break-all bg-white p-2 border border-zinc-200 font-mono rounded mt-2">
-                    URL: {supabaseStatus?.url || "Carregando..."}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl border border-zinc-200 bg-white space-y-3">
-                  <h4 className="font-bold text-xs text-zinc-500 uppercase tracking-wider">Status das Tabelas</h4>
-                  {supabaseStatus && supabaseStatus.tables ? (
-                    <div className="space-y-2">
-                      {Object.entries(supabaseStatus.tables).map(([table, exists]) => (
-                        <div key={table} className="flex items-center justify-between text-xs py-1 border-b border-zinc-100 last:border-none">
-                          <span className="font-mono text-zinc-700 font-semibold">{table}</span>
-                          {exists ? (
-                            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5">
-                              ✓ Criada
-                            </span>
-                          ) : (
-                            <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold flex items-center gap-0.5">
-                              ⚠️ Não Encontrada
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-zinc-500 animate-pulse">Carregando status das tabelas...</div>
-                  )}
-                </div>
-
-                {/* Fake-data guard: flags rows matching the old hardcoded
-                    demo dataset's ids, which this app hasn't written since
-                    switching to UUIDs — a reliable sign that some other
-                    deployment is still seeding fake data into this database. */}
-                <div className={`p-4 rounded-xl border space-y-3 ${fakeDataCheck && !fakeDataCheck.clean ? "border-red-300 bg-red-50" : "border-zinc-200 bg-white"}`}>
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-xs text-zinc-500 uppercase tracking-wider">Verificação de Dados Fake</h4>
-                    <button
-                      onClick={fetchFakeDataCheck}
-                      disabled={checkingFakeData}
-                      className="text-[10px] font-bold text-zinc-500 hover:text-zinc-800 transition cursor-pointer"
-                    >
-                      {checkingFakeData ? "Verificando..." : "🔄 Verificar"}
-                    </button>
-                  </div>
-                  {!fakeDataCheck ? (
-                    <div className="text-xs text-zinc-500 animate-pulse">Verificando...</div>
-                  ) : fakeDataCheck.clean ? (
-                    <div className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">✓ Nenhum dado fake encontrado</div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-xs text-red-700 font-semibold">
-                        Encontrados registros com os IDs do antigo dataset de demonstração — sinal de que algo (provavelmente um deploy antigo ainda ativo) está gravando dado fake direto no banco:
-                      </p>
-                      <ul className="text-[11px] font-mono text-red-800 space-y-0.5">
-                        {Object.entries(fakeDataCheck.found).map(([table, ids]) => (
-                          <li key={table}>{table}: {ids.join(", ")}</li>
-                        ))}
-                      </ul>
-                      <button
-                        onClick={handlePurgeFakeData}
-                        disabled={purgingFakeData}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white text-[10px] uppercase tracking-widest font-bold py-2.5 rounded-lg transition disabled:opacity-60 cursor-pointer"
-                      >
-                        {purgingFakeData ? "Removendo..." : "🗑️ Remover esses registros"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Instructions and SQL */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="bg-zinc-950 text-zinc-100 p-6 rounded-2xl border border-zinc-800 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                    <div>
-                      <h4 className="text-sm font-extrabold text-emerald-400 font-serif">Como inicializar as tabelas no Supabase?</h4>
-                      <p className="text-zinc-400 text-[11px] mt-0.5">Siga os 3 passos simples abaixo para ativar a sincronização 100% perfeita.</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`
-CREATE TABLE IF NOT EXISTS pousadas (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  "longDescription" TEXT,
-  location TEXT,
-  rating FLOAT DEFAULT 5.0,
-  "pricePerNight" NUMERIC DEFAULT 0,
-  images TEXT, -- stored as JSON string
-  features TEXT, -- stored as JSON string
-  activities TEXT, -- stored as JSON string
-  experiences TEXT, -- stored as JSON string
-  capacity INTEGER DEFAULT 1,
-  "videoUrl" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS guides (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  languages TEXT, -- stored as JSON string
-  specialty TEXT, -- stored as JSON string
-  status TEXT DEFAULT 'disponivel',
-  email TEXT,
-  phone TEXT
-);
-
-CREATE TABLE IF NOT EXISTS bookings (
-  id TEXT PRIMARY KEY,
-  "pousadaId" TEXT,
-  "pousadaName" TEXT,
-  "customerName" TEXT,
-  "customerEmail" TEXT,
-  "customerPhone" TEXT,
-  nationality TEXT,
-  adults INTEGER DEFAULT 1,
-  children INTEGER DEFAULT 0,
-  "childAges" TEXT,
-  "dietaryRestrictions" TEXT,
-  "specialNeeds" TEXT,
-  "checkIn" TEXT,
-  "checkOut" TEXT,
-  "experienceType" TEXT,
-  "totalPrice" NUMERIC DEFAULT 0,
-  status TEXT,
-  "guideId" TEXT,
-  "guideName" TEXT,
-  "dateCreated" TEXT,
-  "googleCalendarEventId" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS reviews (
-  id TEXT PRIMARY KEY,
-  "pousadaId" TEXT,
-  "userName" TEXT,
-  rating FLOAT,
-  comment TEXT,
-  date TEXT
-);
-
-CREATE TABLE IF NOT EXISTS sightings (
-  id TEXT PRIMARY KEY,
-  "pousadaId" TEXT,
-  "pousadaName" TEXT,
-  "userName" TEXT,
-  "animalName" TEXT,
-  "imageUrl" TEXT,
-  location TEXT,
-  timestamp TEXT,
-  likes INTEGER DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS notifications (
-  id TEXT PRIMARY KEY,
-  target TEXT,
-  "targetId" TEXT,
-  message TEXT,
-  type TEXT,
-  timestamp TEXT,
-  read BOOLEAN DEFAULT false,
-  "bookingId" TEXT
-);
-
-CREATE TABLE IF NOT EXISTS species (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  "scientificName" TEXT,
-  category TEXT,
-  description TEXT,
-  details TEXT,
-  sightings TEXT,
-  image TEXT,
-  "bestPousadaId" TEXT,
-  "bestPousadaName" TEXT
-);
-
--- Ativar RLS e permitir acessos públicos para todas as tabelas criadas acima
-ALTER TABLE pousadas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE guides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sightings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE species ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Permitir leitura pública" ON pousadas;
-DROP POLICY IF EXISTS "Permitir leitura pública" ON guides;
-DROP POLICY IF EXISTS "Permitir leitura pública" ON bookings;
-DROP POLICY IF EXISTS "Permitir leitura pública" ON reviews;
-DROP POLICY IF EXISTS "Permitir leitura pública" ON sightings;
-DROP POLICY IF EXISTS "Permitir leitura pública" ON notifications;
-DROP POLICY IF EXISTS "Permitir leitura pública" ON species;
-
-CREATE POLICY "Permitir leitura pública" ON pousadas FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura pública" ON guides FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura pública" ON bookings FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura pública" ON reviews FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura pública" ON sightings FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura pública" ON notifications FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura pública" ON species FOR SELECT USING (true);
-
--- Permitir inserção, atualização e deleção para facilitar o fluxo local do painel e simulator
-CREATE POLICY "Permitir inserção pública" ON bookings FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir atualização pública" ON bookings FOR UPDATE USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir inserção de avaliações" ON reviews FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir inserção de avistamentos" ON sightings FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Permitir inserção de notificações" ON notifications FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir atualização de notificações" ON notifications FOR UPDATE USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir inserção de espécies" ON species FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir atualização de espécies" ON species FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir deleção de espécies" ON species FOR DELETE USING (true);
-                        `);
-                        setCopiedSql(true);
-                        setTimeout(() => setCopiedSql(false), 2000);
-                      }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded transition shadow-sm flex items-center gap-1 cursor-pointer"
-                    >
-                      {copiedSql ? "✓ Copiado!" : "📋 Copiar Código SQL"}
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 text-xs leading-relaxed text-zinc-300">
-                    <p>
-                      1️⃣ Acesse seu painel do <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-bold hover:underline">Supabase</a> e clique no seu projeto.
-                    </p>
-                    <p>
-                      2️⃣ No menu lateral esquerdo, clique em <strong>SQL Editor</strong> e depois em <strong>New query</strong>.
-                    </p>
-                    <p>
-                      3️⃣ Cole o código SQL que você copiou do botão acima e clique em <strong>Run</strong> (ou aperte Ctrl+Enter/Cmd+Enter).
-                    </p>
-                    <div className="bg-emerald-950/20 border border-emerald-900/30 p-3 text-[11px] text-emerald-400 rounded-lg">
-                      <strong>💡 Nota de Sincronização:</strong> Assim que as tabelas forem criadas com sucesso no editor do Supabase, este painel detectará automaticamente e importará/exportará todos os dados iniciais. Qualquer reserva feita pelos hóspedes no Aplicativo Móvel será salva no banco do Supabase!
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}
