@@ -42,6 +42,25 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins";
+
+// Drives the vertical sidebar nav — a single source of truth instead of one
+// hand-written <button> per tab (each previously repeating the same active/
+// inactive className logic eleven times).
+const ADMIN_TABS: { id: AdminTab; icon: string; label: string }[] = [
+  { id: "bookings", icon: "📋", label: "Reservas & Confirmações" },
+  { id: "pousadas", icon: "🏨", label: "Gestão de Pousadas" },
+  { id: "guides", icon: "🧭", label: "Gestão de Guias" },
+  { id: "atracoes", icon: "🎯", label: "Atrações" },
+  { id: "agenda", icon: "📅", label: "Agenda Integrada" },
+  { id: "history", icon: "👤", label: "Histórico de Clientes" },
+  { id: "supabase", icon: "⚡", label: "Banco de Dados (Supabase)" },
+  { id: "species", icon: "🐾", label: "Gestão de Espécies" },
+  { id: "turismo", icon: "🗺️", label: "Turistas & Roteiros" },
+  { id: "candidaturas", icon: "🤝", label: "Candidaturas de Parceiros" },
+  { id: "admins", icon: "🔐", label: "Administradores" },
+];
+
 export default function AdminDashboard({
   pousadas,
   species = [],
@@ -97,7 +116,7 @@ export default function AdminDashboard({
     }, 15000);
     return () => clearInterval(interval);
   }, []);
-  const [activeTab, setActiveTab] = useState<"bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "supabase" | "species" | "turismo" | "candidaturas" | "admins">("bookings");
+  const [activeTab, setActiveTab] = useState<AdminTab>("bookings");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddPousada, setShowAddPousada] = useState(false);
   const [showAddGuide, setShowAddGuide] = useState(false);
@@ -282,7 +301,8 @@ export default function AdminDashboard({
     bio: "",
     age: "",
     birthplace: "",
-    interests: [] as string[]
+    interests: [] as string[],
+    photoUrl: ""
   });
 
   // Edit Guide modal state
@@ -299,7 +319,8 @@ export default function AdminDashboard({
     bio: "",
     age: "",
     birthplace: "",
-    interests: [] as string[]
+    interests: [] as string[],
+    photoUrl: ""
   });
 
   const openEditGuide = (g: Guide) => {
@@ -314,7 +335,8 @@ export default function AdminDashboard({
       bio: g.bio || "",
       age: g.age ? String(g.age) : "",
       birthplace: g.birthplace || "",
-      interests: [...(g.interests || [])]
+      interests: [...(g.interests || [])],
+      photoUrl: g.photoUrl || ""
     });
   };
 
@@ -327,6 +349,7 @@ export default function AdminDashboard({
       phone: editGuideForm.phone,
       languages: editGuideForm.languages,
       specialty: editGuideForm.specialty,
+      photoUrl: editGuideForm.photoUrl,
       status: editGuideForm.status,
       bio: editGuideForm.bio,
       age: editGuideForm.age ? Number(editGuideForm.age) : undefined,
@@ -463,7 +486,8 @@ export default function AdminDashboard({
         bio: guideForm.bio,
         age: guideForm.age ? Number(guideForm.age) : undefined,
         birthplace: guideForm.birthplace,
-        interests: guideForm.interests
+        interests: guideForm.interests,
+        photoUrl: guideForm.photoUrl
       };
 
       const response = await adminFetch("/api/guides", {
@@ -847,97 +871,28 @@ export default function AdminDashboard({
           <ReferralStatsWidget />
         </div>
 
-        {/* NAVIGATION TABS */}
-        <div className="flex border-b border-editorial-border mb-6 overflow-x-auto gap-6">
-          <button
-            onClick={() => setActiveTab("bookings")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "bookings" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            📋 Reservas & Confirmações
-          </button>
-          <button
-            onClick={() => setActiveTab("pousadas")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "pousadas" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🏨 Gestão de Pousadas
-          </button>
-          <button
-            onClick={() => setActiveTab("guides")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "guides" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🧭 Gestão de Guias
-          </button>
-          <button
-            onClick={() => setActiveTab("atracoes")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "atracoes" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🎯 Atrações
-          </button>
-          <button
-            onClick={() => setActiveTab("agenda")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "agenda" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            📅 Agenda Integrada
-          </button>
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "history" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            👤 Histórico de Clientes
-          </button>
-          <button
-            onClick={() => setActiveTab("supabase")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "supabase" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            ⚡ Banco de Dados (Supabase)
-          </button>
-          <button
-            onClick={() => setActiveTab("species")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "species" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🐾 Gestão de Espécies
-          </button>
-          <button
-            onClick={() => setActiveTab("turismo")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "turismo" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🗺️ Turistas & Roteiros
-          </button>
-          <button
-            onClick={() => setActiveTab("candidaturas")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "candidaturas" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🤝 Candidaturas de Parceiros
-          </button>
-          <button
-            onClick={() => setActiveTab("admins")}
-            className={`pb-3 text-[11px] uppercase tracking-widest font-bold border-b-2 transition duration-200 whitespace-nowrap px-1 flex items-center gap-2 cursor-pointer ${
-              activeTab === "admins" ? "border-editorial-primary text-editorial-primary font-bold" : "border-transparent text-editorial-muted hover:text-editorial-primary"
-            }`}
-          >
-            🔐 Administradores
-          </button>
-        </div>
+        {/* Sidebar nav (left, vertical) + tab content (right) */}
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+
+        {/* NAVIGATION SIDEBAR */}
+        <aside className="w-full md:w-60 flex-shrink-0 md:sticky md:top-6">
+          <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1 bg-white border border-editorial-border rounded-none md:rounded-lg p-2">
+            {ADMIN_TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`text-left text-[11px] uppercase tracking-widest font-bold whitespace-nowrap px-3 py-2.5 rounded-md transition duration-200 flex items-center gap-2.5 cursor-pointer ${
+                  activeTab === tab.id ? "bg-editorial-primary text-white" : "text-editorial-muted hover:bg-editorial-secondary hover:text-editorial-primary"
+                }`}
+              >
+                <span>{tab.icon}</span> {tab.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* TAB CONTENT */}
+        <div className="flex-1 min-w-0 w-full space-y-6">
 
         {/* TAB: TURISTAS, ROTEIROS, RESERVAS, PAGAMENTOS, GUIAS (camada adicional) */}
         {activeTab === "turismo" && <TurismoPanel />}
@@ -1350,7 +1305,21 @@ export default function AdminDashboard({
             {showAddGuide && (
               <form onSubmit={handleAddGuideSubmit} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-md space-y-4">
                 <h3 className="font-bold text-base text-zinc-900 border-b border-zinc-100 pb-2">Cadastrar Novo Guia Turístico</h3>
-                
+
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="w-16 h-16 flex-shrink-0 rounded-full overflow-hidden bg-zinc-100 border border-zinc-200 flex items-center justify-center">
+                    {guideForm.photoUrl ? (
+                      <img src={guideForm.photoUrl} alt="Prévia" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                    ) : (
+                      <Users className="h-6 w-6 text-zinc-400" />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-zinc-700 font-semibold mb-1">Foto de Perfil</label>
+                    <ImageUploadButton label="Enviar foto" onUploaded={url => setGuideForm(prev => ({ ...prev, photoUrl: url }))} />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                   <div>
                     <label className="block text-zinc-700 font-semibold mb-1">Nome Completo</label>
@@ -1485,6 +1454,20 @@ export default function AdminDashboard({
                     <button type="button" onClick={() => setEditingGuideId(null)} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
                       <X className="h-5 w-5" />
                     </button>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="w-16 h-16 flex-shrink-0 rounded-full overflow-hidden bg-zinc-100 border border-zinc-200 flex items-center justify-center">
+                      {editGuideForm.photoUrl ? (
+                        <img src={editGuideForm.photoUrl} alt="Prévia" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                      ) : (
+                        <Users className="h-6 w-6 text-zinc-400" />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-zinc-700 font-semibold mb-1">Foto de Perfil</label>
+                      <ImageUploadButton label="Trocar foto" onUploaded={url => setEditGuideForm(prev => ({ ...prev, photoUrl: url }))} />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -2242,6 +2225,12 @@ CREATE POLICY "Permitir deleção de espécies" ON species FOR DELETE USING (tru
             </div>
           </div>
         )}
+
+        </div>
+        {/* end TAB CONTENT */}
+
+        </div>
+        {/* end sidebar + content flex wrapper */}
 
       </div>
 

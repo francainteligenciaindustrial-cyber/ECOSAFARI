@@ -5,8 +5,8 @@
 --  1. Nova tabela "atracoes" — parceiro que não é hospedagem ("Parada Legal"
 --     ou "Restaurante"), separado de "pousadas" porque nem todo parceiro tem
 --     quartos pra reservar.
---  2. Novos campos em "guides" (bio, idade, origem, interesses, nota) para um
---     perfil de guia mais completo.
+--  2. Novos campos em "guides" (bio, idade, origem, interesses, nota, foto de
+--     perfil) para um perfil de guia mais completo.
 --  3. "reviews" passa a aceitar avaliação de atração e de guia, não só de
 --     pousada (colunas "atracaoId"/"guideId" novas, ambas opcionais).
 --
@@ -49,6 +49,7 @@ ALTER TABLE guides ADD COLUMN IF NOT EXISTS age INTEGER;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS birthplace TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS interests TEXT; -- armazenado como string JSON, igual languages/specialty
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 5.0;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS "photoUrl" TEXT; -- foto de perfil pública, exibida em /guias/:id
 
 -- ============================================================
 -- 3. AVALIAÇÕES UNIFICADAS (pousada, atração OU guia)

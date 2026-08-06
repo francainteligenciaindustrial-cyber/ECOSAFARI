@@ -57,6 +57,7 @@ export interface Guide {
   birthplace?: string; // origem / local de nascimento
   interests?: string[]; // temas de interesse do guia (piloteiro, passarinheiro, botânica, etc.) — usados para casar o guia certo com o turista certo
   rating?: number; // média calculada a partir das avaliações recebidas
+  photoUrl?: string; // foto de perfil — exibida na página pública do guia, tipo um perfil de rede social
 }
 
 // Atração: parceiro que não é uma hospedagem — "Parada Legal" (passeio,

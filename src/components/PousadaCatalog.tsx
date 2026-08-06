@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
-import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck } from "lucide-react";
-import { Pousada, Review, Species, Sighting, PublicBookingSummary } from "../types";
+import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User } from "lucide-react";
+import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
+import { navigate } from "../lib/router";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -148,6 +149,17 @@ export default function PousadaCatalog({
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // Atrações (Paradas Legais / Restaurantes) and Guias — fetched locally
+  // instead of threading through App.tsx's central fetchData, since this is
+  // the only place on the public site that browses them (their own detail
+  // pages at /atracoes/:id and /guias/:id fetch independently too).
+  const [atracoes, setAtracoes] = useState<Atracao[]>([]);
+  const [guiasPublicos, setGuiasPublicos] = useState<Omit<Guide, "email" | "phone">[]>([]);
+  useEffect(() => {
+    fetch("/api/atracoes").then(res => res.json()).then(setAtracoes).catch(() => {});
+    fetch("/api/guides/public").then(res => res.json()).then(setGuiasPublicos).catch(() => {});
+  }, []);
 
   // Wildlife Showcase species details and carousel navigation
   const [selectedSpecies, setSelectedSpecies] = useState<any | null>(null);
@@ -401,6 +413,83 @@ export default function PousadaCatalog({
           </div>
         )}
       </section>
+
+      {/* Atrações Parceiras & Nossos Guias — public discovery for the other
+          two partner types in the ecossistema, each with its own profile
+          page at /atracoes/:id and /guias/:id (see AtracaoDetailsView and
+          GuiaDetailsView). Only rendered once there's something to show. */}
+      {(atracoes.length > 0 || guiasPublicos.length > 0) && (
+        <section className="max-w-7xl mx-auto px-6 py-16 border-t border-editorial-border space-y-16">
+          {atracoes.length > 0 && (
+            <div>
+              <div className="text-center mb-10">
+                <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold">Ecossistema EcoSafari</span>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">Atrações Parceiras</h2>
+                <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">Paradas legais e restaurantes selecionados para completar sua experiência no Pantanal.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {atracoes.map(atracao => (
+                  <div
+                    key={atracao.id}
+                    onClick={() => navigate(`/atracoes/${atracao.id}`)}
+                    className="group bg-white border border-editorial-border overflow-hidden cursor-pointer hover:shadow-lg transition"
+                  >
+                    <div className="h-44 bg-zinc-200 overflow-hidden relative">
+                      {atracao.images[0] ? (
+                        <img src={atracao.images[0]} alt={atracao.name} referrerPolicy="no-referrer" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-editorial-muted"><UtensilsCrossed className="h-8 w-8" /></div>
+                      )}
+                      <span className="absolute top-3 left-3 bg-white/95 text-editorial-primary text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full">
+                        {atracao.type === "restaurante" ? "Restaurante" : "Parada Legal"}
+                      </span>
+                      {atracao.verified && (
+                        <span className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-500/90 text-white text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"><BadgeCheck className="h-3 w-3" /></span>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-serif font-bold text-editorial-text group-hover:text-editorial-primary transition">{atracao.name}</h3>
+                      <div className="flex items-center gap-3 mt-1.5 text-editorial-muted text-xs">
+                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {atracao.location}</span>
+                        <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {atracao.rating}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {guiasPublicos.length > 0 && (
+            <div>
+              <div className="text-center mb-10">
+                <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold">Ecossistema EcoSafari</span>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">Nossos Guias</h2>
+                <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">Conheça os guias locais que conduzem as expedições — cada um com seu próprio perfil.</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+                {guiasPublicos.map(guia => (
+                  <div
+                    key={guia.id}
+                    onClick={() => navigate(`/guias/${guia.id}`)}
+                    className="group text-center cursor-pointer"
+                  >
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-editorial-border mx-auto mb-3 bg-editorial-secondary flex items-center justify-center group-hover:border-editorial-primary transition">
+                      {guia.photoUrl ? (
+                        <img src={guia.photoUrl} alt={guia.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="h-8 w-8 text-editorial-muted" />
+                      )}
+                    </div>
+                    <h3 className="font-serif font-bold text-editorial-text text-sm group-hover:text-editorial-primary transition">{guia.name}</h3>
+                    <p className="text-editorial-muted text-[11px] mt-0.5 flex items-center justify-center gap-1"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {guia.rating ?? 5}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Wildlife Species Showcase (O que avistar) Section */}
       <section className="bg-[#121613] text-[#FDFCF8] py-24 border-t border-editorial-border/10 relative overflow-hidden">

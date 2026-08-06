@@ -8,6 +8,8 @@ import WhatsAppChatbot from "./components/WhatsAppChatbot";
 import WhatsAppGateView from "./components/WhatsAppGateView";
 import AdminLoginModal from "./components/AdminLoginModal";
 import PousadaOfficialSite from "./components/PousadaOfficialSite";
+import AtracaoDetailsView from "./components/AtracaoDetailsView";
+import GuiaDetailsView from "./components/GuiaDetailsView";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getSupabaseClient } from "./lib/supabaseClient";
@@ -70,6 +72,8 @@ export default function App() {
   const StandalonePage = STANDALONE_ROUTES[path];
   const pousadaRouteMatch = path.match(/^\/pousadas\/(.+)$/);
   const officialSiteMatch = path.match(/^\/site\/(.+)$/);
+  const atracaoRouteMatch = path.match(/^\/atracoes\/(.+)$/);
+  const guiaRouteMatch = path.match(/^\/guias\/(.+)$/);
 
   // Supabase Auth: the "Gestão" tab is only shown to authenticated users whose
   // account has app_metadata.role === "admin" (set via the Supabase dashboard).
@@ -169,7 +173,7 @@ export default function App() {
 
   useEffect(() => {
     // Standalone info/partner pages are self-contained and don't need the portal's data.
-    if (StandalonePage || officialSiteMatch) return;
+    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch) return;
     fetchData();
     // Refreshes the public catalog periodically so new pousadas/reviews/
     // sightings show up without a manual reload. This runs in every visitor's
@@ -236,6 +240,14 @@ export default function App() {
 
   if (officialSiteMatch) {
     return <PousadaOfficialSite slug={officialSiteMatch[1]} />;
+  }
+
+  if (atracaoRouteMatch) {
+    return <AtracaoDetailsView id={atracaoRouteMatch[1]} />;
+  }
+
+  if (guiaRouteMatch) {
+    return <GuiaDetailsView id={guiaRouteMatch[1]} />;
   }
 
   if (isMobileNative) {

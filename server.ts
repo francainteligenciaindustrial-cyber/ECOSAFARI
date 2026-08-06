@@ -455,7 +455,7 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // client payload.
 const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages"] as const;
 const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
-const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests"] as const;
+const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl"] as const;
 const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "age", "preferences"] as const;
 const ROTEIRO_FIELDS = ["name", "duration", "price", "difficulty", "capacity", "description"] as const;
@@ -650,16 +650,45 @@ app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
 // returns TEXT columns as plain strings regardless of content, so without
 // parsing them back here the frontend receives a raw string where it
 // expects an array and crashes calling .map()/.join() on it.
-app.get("/api/guides", requireAdmin, async (req, res) => {
-  const { data, error } = await supabase.from("guides").select("*");
-  if (error) return res.status(500).json({ error: "Erro ao buscar guias" });
-  res.json((data || []).map((g: any) => ({
+function mapGuideRow(g: any): Guide {
+  return {
     ...g,
     languages: toStringArray(g.languages),
     specialty: toStringArray(g.specialty),
     interests: toStringArray(g.interests),
     rating: typeof g.rating === "number" ? g.rating : (g.rating ? parseFloat(g.rating) : 5),
-  })));
+  };
+}
+
+// Strips email/phone (PII) — used for anything a visitor can reach, since
+// guides now have a real public profile page as part of the "one ecosystem
+// of service providers" the site is meant to be. The full record (with
+// contact info) stays admin-only via the route below.
+function toPublicGuide(g: Guide): Omit<Guide, "email" | "phone"> {
+  const { email, phone, ...publicFields } = g;
+  return publicFields;
+}
+
+app.get("/api/guides", requireAdmin, async (req, res) => {
+  const { data, error } = await supabase.from("guides").select("*");
+  if (error) return res.status(500).json({ error: "Erro ao buscar guias" });
+  res.json((data || []).map(mapGuideRow));
+});
+
+// Public guide directory + individual profile — PII-free. Registered before
+// the admin-only routes above only for readability; Express doesn't need
+// the ordering since none of these paths overlap (GET /api/guides vs.
+// GET /api/guides/public[/:id]).
+app.get("/api/guides/public", async (req, res) => {
+  const { data, error } = await supabase.from("guides").select("*");
+  if (error) return res.status(500).json({ error: "Erro ao buscar guias" });
+  res.json((data || []).map(mapGuideRow).map(toPublicGuide));
+});
+
+app.get("/api/guides/public/:id", async (req, res) => {
+  const { data, error } = await supabase.from("guides").select("*").eq("id", req.params.id).maybeSingle();
+  if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
+  res.json(toPublicGuide(mapGuideRow(data)));
 });
 
 // languages/specialty are jsonb columns — passed straight through, no
@@ -682,7 +711,7 @@ app.put("/api/guides/:id", requirePartnerAccess("guia"), async (req, res) => {
   const updates = pickFields<Guide>(req.body, GUIDE_FIELDS);
   const { data, error } = await supabase.from("guides").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
-  res.json({ ...data, languages: toStringArray(data.languages), specialty: toStringArray(data.specialty), interests: toStringArray(data.interests) });
+  res.json(mapGuideRow(data));
 });
 
 app.delete("/api/guides/:id", requireAdmin, async (req, res) => {
@@ -1958,7 +1987,7 @@ app.get("/api/my-partner-profile", authLimiter, async (req, res) => {
   const mapped =
     partnerType === "pousada" ? mapPousadaRow(row) :
     partnerType === "atracao" ? mapAtracaoRow(row) :
-    { ...row, languages: toStringArray(row.languages), specialty: toStringArray(row.specialty), interests: toStringArray(row.interests) };
+    mapGuideRow(row);
 
   res.json({
     partnerType,
@@ -2106,6 +2135,7 @@ ALTER TABLE guides ADD COLUMN IF NOT EXISTS age INTEGER;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS birthplace TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS interests TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 5.0;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 
 -- Ativar RLS em guias (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE guides ENABLE ROW LEVEL SECURITY;
