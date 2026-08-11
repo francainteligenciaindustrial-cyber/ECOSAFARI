@@ -42,6 +42,7 @@ import { adminFetch } from "../lib/adminFetch";
 import ImageUploadButton from "./ImageUploadButton";
 import TagInput from "./TagInput";
 import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
+import RoomsEditor, { RoomDraft } from "./RoomsEditor";
 import ImageListEditor from "./ImageListEditor";
 import Pagination from "./Pagination";
 import { usePagination } from "../lib/usePagination";
@@ -260,7 +261,8 @@ export default function AdminDashboard({
     experiences: [{ title: "Safári Onça-Pintada", price: 300 }, { title: "Observação de Aves", price: 150 }] as ExperienceDraft[],
     capacity: 10,
     images: "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80",
-    videoUrl: ""
+    videoUrl: "",
+    rooms: [] as RoomDraft[]
   });
 
   // Edit Pousada modal state
@@ -278,7 +280,8 @@ export default function AdminDashboard({
     images: [] as string[],
     officialSiteImages: [] as string[],
     videoUrl: "",
-    officialSiteUrl: ""
+    officialSiteUrl: "",
+    rooms: [] as RoomDraft[]
   });
 
   const openEditPousada = (p: Pousada) => {
@@ -296,7 +299,8 @@ export default function AdminDashboard({
       images: [...(p.images || [])],
       officialSiteImages: [...(p.officialSiteImages || [])],
       videoUrl: p.videoUrl || "",
-      officialSiteUrl: p.officialSiteUrl || ""
+      officialSiteUrl: p.officialSiteUrl || "",
+      rooms: [...(p.rooms || [])]
     });
   };
 
@@ -319,7 +323,8 @@ export default function AdminDashboard({
         images: editPousadaForm.images.map(i => i.trim()).filter(Boolean),
         officialSiteImages: editPousadaForm.officialSiteImages.map(i => i.trim()).filter(Boolean),
         videoUrl: editPousadaForm.videoUrl.trim() || undefined,
-        officialSiteUrl: editPousadaForm.officialSiteUrl.trim() || undefined
+        officialSiteUrl: editPousadaForm.officialSiteUrl.trim() || undefined,
+        rooms: editPousadaForm.rooms.filter(r => r.type.trim())
       };
 
       const response = await adminFetch(`/api/pousadas/${editingPousadaId}`, {
@@ -348,7 +353,8 @@ export default function AdminDashboard({
     age: "",
     birthplace: "",
     interests: [] as string[],
-    photoUrl: ""
+    photoUrl: "",
+    images: [] as string[]
   });
 
   // Edit Guide modal state
@@ -366,7 +372,8 @@ export default function AdminDashboard({
     age: "",
     birthplace: "",
     interests: [] as string[],
-    photoUrl: ""
+    photoUrl: "",
+    images: [] as string[]
   });
 
   const openEditGuide = (g: Guide) => {
@@ -382,7 +389,8 @@ export default function AdminDashboard({
       age: g.age ? String(g.age) : "",
       birthplace: g.birthplace || "",
       interests: [...(g.interests || [])],
-      photoUrl: g.photoUrl || ""
+      photoUrl: g.photoUrl || "",
+      images: [...(g.images || [])]
     });
   };
 
@@ -400,7 +408,8 @@ export default function AdminDashboard({
       bio: editGuideForm.bio,
       age: editGuideForm.age ? Number(editGuideForm.age) : undefined,
       birthplace: editGuideForm.birthplace,
-      interests: editGuideForm.interests
+      interests: editGuideForm.interests,
+      images: editGuideForm.images
     };
     const response = await adminFetch(`/api/guides/${editingGuideId}`, {
       method: "PUT",
@@ -501,7 +510,8 @@ export default function AdminDashboard({
           .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
         capacity: Number(pousadaForm.capacity),
         images: [pousadaForm.images],
-        videoUrl: pousadaForm.videoUrl.trim() || undefined
+        videoUrl: pousadaForm.videoUrl.trim() || undefined,
+        rooms: pousadaForm.rooms.filter(r => r.type.trim())
       };
 
       const response = await adminFetch("/api/pousadas", {
@@ -533,7 +543,8 @@ export default function AdminDashboard({
         age: guideForm.age ? Number(guideForm.age) : undefined,
         birthplace: guideForm.birthplace,
         interests: guideForm.interests,
-        photoUrl: guideForm.photoUrl
+        photoUrl: guideForm.photoUrl,
+        images: guideForm.images
       };
 
       const response = await adminFetch("/api/guides", {
@@ -791,6 +802,14 @@ export default function AdminDashboard({
                 <ExperienceListEditor
                   value={editPousadaForm.experiences}
                   onChange={experiences => setEditPousadaForm(prev => ({ ...prev, experiences }))}
+                />
+              </div>
+
+              <div className="text-xs">
+                <label className="block text-zinc-700 font-semibold mb-1.5">Quartos</label>
+                <RoomsEditor
+                  value={editPousadaForm.rooms}
+                  onChange={rooms => setEditPousadaForm(prev => ({ ...prev, rooms }))}
                 />
               </div>
 
@@ -1301,6 +1320,14 @@ export default function AdminDashboard({
                   />
                 </div>
 
+                <div className="text-xs">
+                  <label className="block text-zinc-700 font-semibold mb-1">Quartos</label>
+                  <RoomsEditor
+                    value={pousadaForm.rooms}
+                    onChange={rooms => setPousadaForm(prev => ({ ...prev, rooms }))}
+                  />
+                </div>
+
                 <div className="flex gap-2 justify-end pt-2 text-xs">
                   <button
                     type="button"
@@ -1538,6 +1565,8 @@ export default function AdminDashboard({
                   />
                 </div>
 
+                <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={guideForm.images} onChange={images => setGuideForm(prev => ({ ...prev, images }))} />
+
                 <div className="flex gap-2 justify-end pt-2 text-xs">
                   <button
                     type="button"
@@ -1637,6 +1666,8 @@ export default function AdminDashboard({
                     <label className="block text-zinc-700 font-semibold mb-1">Temas de Interesse</label>
                     <TagInput value={editGuideForm.interests} onChange={interests => setEditGuideForm(prev => ({ ...prev, interests }))} placeholder="Digite e pressione Enter" />
                   </div>
+
+                  <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={editGuideForm.images} onChange={images => setEditGuideForm(prev => ({ ...prev, images }))} />
 
                   <div className="flex gap-2 justify-end pt-2 text-xs border-t border-zinc-100">
                     <button type="button" onClick={() => setEditingGuideId(null)} className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-lg font-semibold hover:bg-zinc-200 transition cursor-pointer">

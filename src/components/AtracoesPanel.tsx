@@ -32,6 +32,7 @@ export default function AtracoesPanel() {
     location: "",
     images: [] as string[],
     menu: [] as ExperienceDraft[],
+    availability: "",
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -63,6 +64,7 @@ export default function AtracoesPanel() {
       location: a.location,
       images: [...(a.images || [])],
       menu: (a.menu || []).map(m => ({ title: m.item, price: m.price })),
+      availability: a.availability || "",
     });
   };
 
@@ -81,6 +83,7 @@ export default function AtracoesPanel() {
     menu: form.type === "restaurante"
       ? form.menu.filter(m => m.title.trim()).map(m => ({ item: m.title.trim(), price: m.price || 0 }))
       : undefined,
+    availability: form.availability.trim() || undefined,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,6 +203,16 @@ export default function AtracoesPanel() {
 
           <ImageListEditor label="Imagens" value={form.images} onChange={images => setForm(prev => ({ ...prev, images }))} />
 
+          <div className="text-xs">
+            <label className="block text-zinc-700 font-semibold mb-1">Disponibilidade / Horário de Funcionamento</label>
+            <input
+              type="text" value={form.availability}
+              onChange={e => setForm(prev => ({ ...prev, availability: e.target.value }))}
+              placeholder="Ex: Terça a domingo, 11h às 22h"
+              className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
           {form.type === "restaurante" && (
             <div className="text-xs">
               <label className="block text-zinc-700 font-semibold mb-1.5">Cardápio</label>
@@ -247,6 +260,7 @@ export default function AtracoesPanel() {
                   )}
                 </div>
                 <span className="text-[11px] text-zinc-500 flex items-center gap-1 mt-1"><MapPin className="h-3 w-3" /> {a.location}</span>
+                {a.availability && <span className="text-[11px] text-zinc-400 block mt-0.5">{a.availability}</span>}
               </div>
               <div className="flex items-center justify-end gap-1 mt-2 flex-wrap">
                 <button onClick={() => setManagingAccessFor(a)} className="text-zinc-500 hover:text-editorial-primary p-1.5 rounded hover:bg-zinc-50 transition cursor-pointer" title="Gerenciar acesso de parceiro">

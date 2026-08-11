@@ -9,6 +9,7 @@ import ImageListEditor from "./ImageListEditor";
 import ImageUploadButton from "./ImageUploadButton";
 import TagInput from "./TagInput";
 import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
+import RoomsEditor, { RoomDraft } from "./RoomsEditor";
 
 // Self-service portal for a partner (pousada/atração/guia) to edit only
 // their own profile — no access to bookings, other partners, or anything
@@ -129,6 +130,7 @@ export default function PartnerPortalPage() {
             teamPhotoUrl: data.pousada.teamPhotoUrl || "",
             teamSectionTitle: data.pousada.teamSectionTitle || "",
             teamSectionText: data.pousada.teamSectionText || "",
+            rooms: [...(data.pousada.rooms || [])] as RoomDraft[],
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
           setForm({
@@ -137,6 +139,7 @@ export default function PartnerPortalPage() {
             description: data.atracao.description,
             images: [...(data.atracao.images || [])],
             menu: (data.atracao.menu || []).map(m => ({ title: m.item, price: m.price })) as ExperienceDraft[],
+            availability: data.atracao.availability || "",
           });
         } else if (data.partnerType === "guia" && data.guia) {
           setForm({
@@ -151,6 +154,7 @@ export default function PartnerPortalPage() {
             specialty: [...(data.guia.specialty || [])],
             interests: [...(data.guia.interests || [])],
             status: data.guia.status,
+            images: [...(data.guia.images || [])],
           });
         }
       })
@@ -229,6 +233,7 @@ export default function PartnerPortalPage() {
           teamPhotoUrl: form.teamPhotoUrl.trim() || undefined,
           teamSectionTitle: form.teamSectionTitle.trim() || undefined,
           teamSectionText: form.teamSectionText.trim() || undefined,
+          rooms: form.rooms.filter((r: RoomDraft) => r.type.trim()),
         };
       } else if (profile.partnerType === "atracao") {
         endpoint = `/api/atracoes/${profile.partnerId}`;
@@ -238,6 +243,7 @@ export default function PartnerPortalPage() {
           description: form.description,
           images: form.images.map((i: string) => i.trim()).filter(Boolean),
           menu: form.menu.filter((m: ExperienceDraft) => m.title.trim()).map((m: ExperienceDraft) => ({ item: m.title.trim(), price: m.price || 0 })),
+          availability: form.availability.trim() || undefined,
         };
       } else {
         endpoint = `/api/guides/${profile.partnerId}`;
@@ -253,6 +259,7 @@ export default function PartnerPortalPage() {
           specialty: form.specialty,
           interests: form.interests,
           status: form.status,
+          images: form.images.map((i: string) => i.trim()).filter(Boolean),
         };
       }
       const res = await adminFetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -459,6 +466,10 @@ export default function PartnerPortalPage() {
                   <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
                 </div>
                 <div className="text-xs">
+                  <label className="block text-editorial-text font-semibold mb-1.5">Quartos</label>
+                  <RoomsEditor value={form.rooms} onChange={rooms => setForm((p: any) => ({ ...p, rooms }))} />
+                </div>
+                <div className="text-xs">
                   <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
                   <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                 </div>
@@ -499,6 +510,10 @@ export default function PartnerPortalPage() {
                   <textarea rows={4} value={form.description} onChange={e => setForm((p: any) => ({ ...p, description: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
                 </div>
                 <ImageListEditor label="Imagens" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
+                <div className="text-xs">
+                  <label className="block text-editorial-text font-semibold mb-1.5">Disponibilidade / Horário de Funcionamento</label>
+                  <input type="text" value={form.availability} onChange={e => setForm((p: any) => ({ ...p, availability: e.target.value }))} placeholder="Ex: Terça a domingo, 11h às 22h" className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                </div>
                 {profile.atracao?.type === "restaurante" && (
                   <div className="text-xs">
                     <label className="block text-editorial-text font-semibold mb-1.5">Cardápio</label>
@@ -567,6 +582,7 @@ export default function PartnerPortalPage() {
                     <option value="indisponivel">Indisponível</option>
                   </select>
                 </div>
+                <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
               </>
             )}
 

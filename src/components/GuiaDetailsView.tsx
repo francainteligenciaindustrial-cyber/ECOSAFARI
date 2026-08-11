@@ -104,6 +104,19 @@ export default function GuiaDetailsView({ id }: { id: string }) {
           )}
         </div>
 
+        {guia.images && guia.images.length > 0 && (
+          <div>
+            <h2 className="text-xl font-serif font-bold text-editorial-primary mb-4">Galeria</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {guia.images.map((img, idx) => (
+                <div key={idx} className="aspect-square overflow-hidden border border-editorial-border">
+                  <img src={img} alt={`${guia.name} ${idx + 1}`} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <h2 className="text-xl font-serif font-bold text-editorial-primary mb-4">Avaliações</h2>
           <ReviewsSection targetType="guia" targetId={guia.id} />

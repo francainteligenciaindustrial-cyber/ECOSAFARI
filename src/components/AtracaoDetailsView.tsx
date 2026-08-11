@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, MapPin, Star, BadgeCheck, MessageSquare, LoaderCircle, ArrowLeft } from "lucide-react";
+import { Compass, MapPin, Star, BadgeCheck, MessageSquare, LoaderCircle, ArrowLeft, Clock } from "lucide-react";
 import { Atracao } from "../types";
 import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
@@ -68,9 +68,12 @@ export default function AtracaoDetailsView({ id }: { id: string }) {
             )}
           </div>
           <h1 className="text-3xl md:text-5xl font-serif font-bold text-white tracking-tight">{atracao.name}</h1>
-          <div className="flex items-center gap-4 mt-2 text-white/90 text-xs">
+          <div className="flex items-center gap-4 mt-2 text-white/90 text-xs flex-wrap">
             <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {atracao.location}</span>
             <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {atracao.rating} / 5.0</span>
+            {atracao.availability && (
+              <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {atracao.availability}</span>
+            )}
           </div>
         </div>
       </section>

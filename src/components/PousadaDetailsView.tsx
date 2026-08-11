@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users } from "lucide-react";
 import { Pousada } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
@@ -242,6 +242,24 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                   ))}
                 </div>
               </div>
+
+              {/* Rooms breakdown */}
+              {pousada.rooms && pousada.rooms.length > 0 && (
+                <div className="border-t border-editorial-border pt-6 mt-6">
+                  <h3 className="font-serif font-bold text-editorial-primary text-base mb-4 flex items-center gap-2"><Bed className="h-4.5 w-4.5 text-editorial-primary" /> Quartos</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {pousada.rooms.map((room, idx) => (
+                      <div key={idx} className="flex items-center justify-between border border-editorial-border p-3 text-xs">
+                        <span className="font-medium text-editorial-text">{room.type}</span>
+                        <span className="text-editorial-muted flex items-center gap-3">
+                          <span>{room.quantity}x</span>
+                          <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> até {room.capacity}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Featured experiences (photo + pitch, alternating sides) */}

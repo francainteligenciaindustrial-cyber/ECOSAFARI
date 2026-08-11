@@ -27,6 +27,11 @@ export interface Pousada {
   // Oficial usa "images" como fallback, então pousadas antigas continuam
   // mostrando uma galeria mesmo sem configurar este campo.
   officialSiteImages?: string[];
+  // Estrutura de quartos — complementa "capacity" (limite agregado usado na
+  // checagem de disponibilidade de reservas) com o detalhe real que um
+  // hóspede quer ver: quantos quartos existem e quantas pessoas cabem em
+  // cada um.
+  rooms?: { type: string; capacity: number; quantity: number }[];
 }
 
 // Avaliação (antes chamada de "comentário") — unificada para os três tipos
@@ -58,6 +63,7 @@ export interface Guide {
   interests?: string[]; // temas de interesse do guia (piloteiro, passarinheiro, botânica, etc.) — usados para casar o guia certo com o turista certo
   rating?: number; // média calculada a partir das avaliações recebidas
   photoUrl?: string; // foto de perfil — exibida na página pública do guia, tipo um perfil de rede social
+  images?: string[]; // galeria de fotos do guia em campo/expedições — separada da foto de perfil
 }
 
 // Atração: parceiro que não é uma hospedagem — "Parada Legal" (passeio,
@@ -71,6 +77,7 @@ export interface Atracao {
   location: string;
   images: string[];
   menu?: { item: string; price: number }[]; // cardápio — só para type === 'restaurante'
+  availability?: string; // dias/horário de funcionamento, ex: "Terça a domingo, 11h às 22h"
   rating: number;
   verified?: boolean;
   dateCreated: string;

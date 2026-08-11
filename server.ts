@@ -501,9 +501,9 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // "viewCount" are deliberately excluded from POUSADA_* — they're computed by
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
-const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages"] as const;
+const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms"] as const;
 const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
-const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl"] as const;
+const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images"] as const;
 const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "age", "preferences"] as const;
 const ROTEIRO_FIELDS = ["name", "duration", "price", "difficulty", "capacity", "description"] as const;
@@ -548,7 +548,8 @@ function mapPousadaRow(p: any): Pousada {
     teamPhotoUrl: p.teamPhotoUrl || "",
     teamSectionTitle: p.teamSectionTitle || "",
     teamSectionText: p.teamSectionText || "",
-    officialSiteImages: parseJSONSafe(p.officialSiteImages) || []
+    officialSiteImages: parseJSONSafe(p.officialSiteImages) || [],
+    rooms: parseJSONSafe(p.rooms) || []
   };
 }
 
@@ -704,6 +705,7 @@ function mapGuideRow(g: any): Guide {
     languages: toStringArray(g.languages),
     specialty: toStringArray(g.specialty),
     interests: toStringArray(g.interests),
+    images: toStringArray(g.images),
     rating: typeof g.rating === "number" ? g.rating : (g.rating ? parseFloat(g.rating) : 5),
   };
 }
@@ -781,13 +783,14 @@ function mapAtracaoRow(a: any): Atracao {
     location: resolveTranslation(a.location),
     images: parseJSONSafe(a.images) || [],
     menu: parseJSONSafe(a.menu) || undefined,
+    availability: a.availability || undefined,
     rating: typeof a.rating === "number" ? a.rating : (a.rating ? parseFloat(a.rating) : 5),
     verified: typeof a.verified === "boolean" ? a.verified : false,
     dateCreated: a.dateCreated || ""
   };
 }
 
-const ATRACAO_FIELDS = ["type", "name", "description", "location", "images", "menu"] as const;
+const ATRACAO_FIELDS = ["type", "name", "description", "location", "images", "menu", "availability"] as const;
 
 app.get("/api/atracoes", async (req, res) => {
   const { data, error } = await supabase.from("atracoes").select("*");
@@ -2347,7 +2350,8 @@ CREATE TABLE IF NOT EXISTS pousadas (
   "teamPhotoUrl" TEXT,
   "teamSectionTitle" TEXT,
   "teamSectionText" TEXT,
-  "officialSiteImages" TEXT -- armazenado como string JSON, igual images
+  "officialSiteImages" TEXT, -- armazenado como string JSON, igual images
+  rooms TEXT -- array de {type,capacity,quantity}, armazenado como string JSON
 );
 
 -- Caso a tabela já exista de uma execução anterior deste script, garante as novas colunas
@@ -2358,6 +2362,7 @@ ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamPhotoUrl" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamSectionTitle" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamSectionText" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "officialSiteImages" TEXT;
+ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS rooms TEXT;
 
 -- Ativar RLS em pousadas (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE pousadas ENABLE ROW LEVEL SECURITY;
@@ -2381,7 +2386,9 @@ CREATE TABLE IF NOT EXISTS guides (
   age INTEGER,
   birthplace TEXT,
   interests TEXT, -- armazenado como string JSON
-  rating FLOAT DEFAULT 5.0
+  rating FLOAT DEFAULT 5.0,
+  "photoUrl" TEXT,
+  images TEXT -- galeria de fotos, armazenado como string JSON
 );
 
 -- Caso a tabela já exista de uma execução anterior deste script
@@ -2391,6 +2398,7 @@ ALTER TABLE guides ADD COLUMN IF NOT EXISTS birthplace TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS interests TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 5.0;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS images TEXT;
 
 -- Ativar RLS em guias (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE guides ENABLE ROW LEVEL SECURITY;
@@ -2410,10 +2418,13 @@ CREATE TABLE IF NOT EXISTS atracoes (
   location TEXT,
   images TEXT, -- armazenado como string JSON
   menu TEXT, -- cardápio (string JSON) — só para type = 'restaurante'
+  availability TEXT, -- dias/horário de funcionamento, texto livre
   rating FLOAT DEFAULT 5.0,
   verified BOOLEAN DEFAULT false,
   "dateCreated" TEXT
 );
+
+ALTER TABLE atracoes ADD COLUMN IF NOT EXISTS availability TEXT;
 
 -- Ativar RLS em atrações (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE atracoes ENABLE ROW LEVEL SECURITY;
