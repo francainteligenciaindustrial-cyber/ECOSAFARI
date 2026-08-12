@@ -2229,6 +2229,10 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
     actionLink: loginResult.actionLink,
     loginCreated: !loginResult.error,
     emailSent: loginResult.emailSent,
+    // Surfaced in the admin UI instead of only console.warn — otherwise the
+    // only way to see *why* login provisioning failed is digging through
+    // Vercel function logs, which isn't realistic for day-to-day triage.
+    loginError: loginResult.error,
   });
 });
 

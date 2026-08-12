@@ -30,6 +30,7 @@ interface ApproveResult {
   actionLink: string | null;
   loginCreated: boolean;
   emailSent: boolean;
+  loginError?: string;
 }
 
 // Approving used to be just a status dropdown — changing it to "aprovado"
@@ -92,7 +93,7 @@ export default function CandidaturasPanel() {
         setApproveError({ id: c.id, message: data.error || "Erro ao aprovar candidatura." });
         return;
       }
-      setApproveResult({ candidaturaId: c.id, actionLink: data.actionLink || null, loginCreated: !!data.loginCreated, emailSent: !!data.emailSent });
+      setApproveResult({ candidaturaId: c.id, actionLink: data.actionLink || null, loginCreated: !!data.loginCreated, emailSent: !!data.emailSent, loginError: data.loginError || undefined });
       fetchData();
     } catch {
       setApproveError({ id: c.id, message: "Não foi possível aprovar agora. Tente novamente." });
@@ -230,7 +231,12 @@ export default function CandidaturasPanel() {
                         </div>
                       </>
                     ) : (
-                      <p className="text-emerald-800">O perfil foi criado, mas não foi possível gerar o login agora — abra o perfil dele na aba correspondente e use "Acesso de parceiro" para convidar manualmente.</p>
+                      <div className="space-y-1">
+                        <p className="text-emerald-800">O perfil foi criado, mas não foi possível gerar o login agora — abra o perfil dele na aba correspondente e use "Acesso de parceiro" para convidar manualmente.</p>
+                        {approveResult.loginError && (
+                          <p className="text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 font-mono text-[10px]">{approveResult.loginError}</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
