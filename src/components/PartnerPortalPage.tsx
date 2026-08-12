@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft } from "lucide-react";
+import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2 } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
@@ -164,6 +164,40 @@ export default function PartnerPortalPage() {
       .catch(err => setProfileError(err.message || "Erro ao carregar seu perfil."))
       .finally(() => setLoadingProfile(false));
   }, [isPartner]);
+
+  // "Entrar com EcoSafari" — apps de terceiros (o aplicativo mobile
+  // planejado, por exemplo) que o parceiro autorizou via a tela de
+  // consentimento em /parceiro/oauth/consent. Só relevante se o Servidor
+  // OAuth do Supabase estiver habilitado no projeto.
+  const [grants, setGrants] = useState<{ client: { id: string; name: string; logo_uri: string }; scopes: string[]; granted_at: string }[]>([]);
+  const [loadingGrants, setLoadingGrants] = useState(false);
+  const [revokingClientId, setRevokingClientId] = useState<string | null>(null);
+
+  const fetchGrants = () => {
+    if (!supabase) return;
+    setLoadingGrants(true);
+    supabase.auth.oauth.listGrants()
+      .then(({ data }) => setGrants(data || []))
+      .catch(() => {})
+      .finally(() => setLoadingGrants(false));
+  };
+
+  useEffect(() => {
+    if (!isPartner || !supabase) return;
+    fetchGrants();
+  }, [isPartner, supabase]);
+
+  const handleRevokeGrant = async (clientId: string, clientName: string) => {
+    if (!supabase) return;
+    if (!confirm(`Remover o acesso de "${clientName}" à sua conta?`)) return;
+    setRevokingClientId(clientId);
+    try {
+      await supabase.auth.oauth.revokeGrant({ clientId });
+      fetchGrants();
+    } finally {
+      setRevokingClientId(null);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -607,6 +641,40 @@ export default function PartnerPortalPage() {
             </div>
           </form>
         ) : null}
+
+        {!loadingGrants && grants.length > 0 && (
+          <div className="mt-8 bg-white border border-editorial-border rounded-lg p-6">
+            <h2 className="text-sm font-bold text-editorial-text mb-1">Apps Conectados</h2>
+            <p className="text-editorial-muted text-xs mb-4">Aplicativos externos autorizados a entrar com sua conta EcoSafari.</p>
+            <div className="space-y-2">
+              {grants.map(g => (
+                <div key={g.client.id} className="flex items-center justify-between gap-3 bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {g.client.logo_uri ? (
+                      <img src={g.client.logo_uri} alt={g.client.name} referrerPolicy="no-referrer" className="w-8 h-8 rounded object-cover border border-editorial-border flex-shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded bg-white border border-editorial-border flex items-center justify-center flex-shrink-0">
+                        <ShieldCheck className="h-4 w-4 text-editorial-primary" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-editorial-text truncate">{g.client.name}</p>
+                      <p className="text-[10px] text-editorial-muted">Conectado em {new Date(g.granted_at).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRevokeGrant(g.client.id, g.client.name)}
+                    disabled={revokingClientId === g.client.id}
+                    className="text-red-600 hover:text-red-800 transition cursor-pointer flex-shrink-0 disabled:opacity-60"
+                    title="Remover acesso"
+                  >
+                    {revokingClientId === g.client.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
