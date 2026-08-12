@@ -2148,17 +2148,21 @@ app.get("/api/partners/:type/:id/access", requireAdmin, async (req, res) => {
 });
 
 // Creates (or re-links, if the email already has an account) a Supabase
-// Auth user and gets them access as fast as possible: tries
-// inviteUserByEmail first, which is the only admin API call that both
-// creates the user AND actually emails them via whatever mail sending is
-// configured on this Supabase project — createUser+generateLink (the
-// previous approach here) only ever mints a link, it never sends anything.
+// Auth user and gets them access as fast as possible.
+//
+// This used to call inviteUserByEmail first — the one admin API call that
+// both creates the user AND emails them via Supabase's own mail sending —
+// but that makes account creation and email delivery a single atomic step:
+// when Supabase's mail sending hits its (tight, shared-tier) rate limit, the
+// WHOLE call fails and no account gets created at all, leaving the partner
+// record with no login and no link an admin could even hand out manually
+// (see the "Erro ao criar acesso" dead end this used to produce). Splitting
+// "create the account" from "get a link for it" — createUser, which never
+// triggers Supabase's own email, followed by generateLink — means a mail
+// hiccup can only ever affect whether the email arrives automatically, never
+// whether the account and its recovery link exist at all.
 // app_metadata (the actual role/partnerId authorization) has to be set in a
-// second call either way since inviteUserByEmail doesn't accept it directly.
-// A recovery link is always generated too so the caller has something to
-// copy/share manually if the automatic email doesn't land (e.g. no custom
-// SMTP configured — Supabase's default mail sending is rate-limited on the
-// free tier).
+// second call either way since createUser doesn't accept it directly.
 // Supabase's admin SDK sometimes surfaces a failure with no usable
 // `.message` (just an empty error body, which JSON.stringify turns into the
 // literal text "{}") — most often when an internal Supabase-side rate limit
@@ -2177,18 +2181,18 @@ async function provisionPartnerLogin(
   if (!supabaseAdminAuth) return { userId: null, actionLink: null, emailSent: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
 
   let userId: string | null = null;
-  let emailSent = false;
 
-  const { data: invited, error: inviteErr } = await supabaseAdminAuth.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${SITE_URL}/parceiro`,
+  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+    email,
+    password: randomUUID(),
+    email_confirm: true,
   });
-  if (invited?.user) {
-    userId = invited.user.id;
-    emailSent = true;
+  if (created?.user) {
+    userId = created.user.id;
   } else {
-    // inviteUserByEmail refuses to touch an email that already has an
-    // account (e.g. re-inviting after a revoke, or applying twice) — look
-    // them up instead of treating that as a hard failure.
+    // createUser refuses to touch an email that already has an account
+    // (e.g. re-inviting after a revoke, or applying twice) — look them up
+    // instead of treating that as a hard failure.
     const { data: existing, error: listErr } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
     const match = existing?.users?.find((u: any) => u.email?.toLowerCase() === email);
     if (!match) {
@@ -2196,7 +2200,7 @@ async function provisionPartnerLogin(
         userId: null,
         actionLink: null,
         emailSent: false,
-        error: describeAuthError(inviteErr, describeAuthError(listErr, "Erro ao criar acesso — o Supabase recusou a operação sem detalhar o motivo. Provavelmente um limite temporário da API do Supabase; tente de novo em alguns minutos ou convide manualmente pela ficha do parceiro.")),
+        error: describeAuthError(createErr, describeAuthError(listErr, "Erro ao criar acesso — o Supabase recusou a operação sem detalhar o motivo. Provavelmente um limite temporário da API do Supabase; tente de novo em alguns minutos ou convide manualmente pela ficha do parceiro.")),
       };
     }
 
@@ -2239,7 +2243,36 @@ async function provisionPartnerLogin(
     options: { redirectTo: `${SITE_URL}/parceiro` },
   });
   if (linkErr) console.warn("Acesso criado, mas falha ao gerar link de apoio:", linkErr.message);
-  return { userId, actionLink: linkData?.properties?.action_link || null, emailSent };
+  const actionLink = linkData?.properties?.action_link || null;
+
+  // Send the link ourselves via Resend (already configured for booking
+  // confirmations) instead of relying on Supabase's own rate-limited mail
+  // sending. Best-effort: emailSent just stays false — never treated as an
+  // error — if Resend isn't configured or the send itself fails, since
+  // actionLink is always returned above as a manual fallback either way.
+  let emailSent = false;
+  if (resend && actionLink) {
+    try {
+      await resend.emails.send({
+        from: "EcoSafari Brasil <onboarding@resend.dev>",
+        to: email,
+        subject: "Seu acesso de parceiro EcoSafari",
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #2D4635;">Bem-vindo(a) à EcoSafari! 🌿</h2>
+            <p>Seu acesso ao portal do parceiro foi criado. Clique no link abaixo para definir sua senha e acessar seu perfil:</p>
+            <p><a href="${actionLink}" style="display:inline-block; background:#2D4635; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
+            <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${actionLink}</p>
+          </div>
+        `,
+      });
+      emailSent = true;
+    } catch (err: any) {
+      console.warn("Acesso criado, mas falha ao enviar email via Resend:", err.message);
+    }
+  }
+
+  return { userId, actionLink, emailSent };
 }
 
 app.post("/api/partners/invite", requireAdmin, async (req, res) => {
