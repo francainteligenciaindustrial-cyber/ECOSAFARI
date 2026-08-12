@@ -3,6 +3,7 @@ import { Compass, MapPin, Star, BadgeCheck, MessageSquare, LoaderCircle, ArrowLe
 import { Atracao } from "../types";
 import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
+import TopReviewQuote from "./TopReviewQuote";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 const TYPE_LABELS: Record<Atracao["type"], string> = { parada_legal: "Parada Legal", restaurante: "Restaurante" };
@@ -70,7 +71,11 @@ export default function AtracaoDetailsView({ id }: { id: string }) {
           <h1 className="text-3xl md:text-5xl font-serif font-bold text-white tracking-tight">{atracao.name}</h1>
           <div className="flex items-center gap-4 mt-2 text-white/90 text-xs flex-wrap">
             <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {atracao.location}</span>
-            <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {atracao.rating} / 5.0</span>
+            {atracao.rating > 0 ? (
+              <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {atracao.rating} / 5.0</span>
+            ) : (
+              <span className="flex items-center gap-1 text-white/70"><Star className="h-3.5 w-3.5" /> Novo, sem avaliações ainda</span>
+            )}
             {atracao.availability && (
               <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {atracao.availability}</span>
             )}
@@ -81,7 +86,8 @@ export default function AtracaoDetailsView({ id }: { id: string }) {
       <div className="max-w-4xl mx-auto px-6 md:px-10 py-12 space-y-12">
         <div>
           <h2 className="text-xl font-serif font-bold text-editorial-primary mb-3">Sobre</h2>
-          <p className="text-editorial-muted leading-relaxed whitespace-pre-line text-sm font-light">{atracao.description}</p>
+          <p className="text-editorial-muted leading-relaxed whitespace-pre-line text-sm font-light mb-4">{atracao.description}</p>
+          <TopReviewQuote targetType="atracao" targetId={atracao.id} />
         </div>
 
         {atracao.images.length > 1 && (

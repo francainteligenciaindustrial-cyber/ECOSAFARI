@@ -481,6 +481,40 @@ function toStringArray(val: any): string[] {
   return [];
 }
 
+// guides.languages used to be a flat string[] ("Português", "Inglês") before
+// each language got a proficiency level — this reads either shape so
+// existing rows don't break: a plain string becomes { language, level:
+// "intermediario" } (a reasonable assumed default), while already-migrated
+// { language, level } objects pass through untouched.
+function toLanguageArray(val: any): { language: string; level: "basico" | "intermediario" | "avancado" }[] {
+  const raw = toStringArrayOrObjects(val);
+  return raw.map((item: any) => {
+    if (item && typeof item === "object" && typeof item.language === "string") {
+      const level = item.level === "basico" || item.level === "avancado" ? item.level : "intermediario";
+      return { language: item.language, level };
+    }
+    return { language: String(item), level: "intermediario" as const };
+  }).filter(l => l.language.trim());
+}
+
+// Same JSON/Postgres-array-literal tolerance as toStringArray, but doesn't
+// force elements to strings — toLanguageArray above needs the raw parsed
+// objects to tell an old plain-string entry apart from a migrated one.
+function toStringArrayOrObjects(val: any): any[] {
+  if (Array.isArray(val)) return val;
+  if (val == null || val === "") return [];
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val.trim());
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // not JSON — treat the whole string as a single legacy language entry
+    }
+    return [val.trim()];
+  }
+  return [];
+}
+
 // Splits a free-text "Português, Inglês, Espanhol" field (as typed into the
 // public /seja-parceiro form) into a trimmed array — used only when
 // approving a candidatura into a real guides.languages/specialty value,
@@ -544,7 +578,11 @@ function mapPousadaRow(p: any): Pousada {
     description: resolveTranslation(p.description),
     longDescription: resolveTranslation(p.longDescription),
     location: resolveTranslation(p.location),
-    rating: typeof p.rating === "number" ? p.rating : (p.rating ? parseFloat(p.rating) : 5),
+    // 0 (not 5) when there's no rating yet — a genuine average of real
+    // reviews can never be 0 (ratings are 1-5), so it's a safe "sem
+    // avaliações ainda" sentinel the frontend checks for instead of
+    // displaying a fake perfect score before anyone has actually reviewed.
+    rating: typeof p.rating === "number" ? p.rating : (p.rating ? parseFloat(p.rating) : 0),
     pricePerNight: typeof p.pricePerNight === "number" ? p.pricePerNight : (p.pricePerNight ? parseFloat(p.pricePerNight) : 0),
     images: parseJSONSafe(p.images) || [],
     features: parseJSONSafe(p.features) || [],
@@ -632,6 +670,61 @@ function detectImageType(buffer: Buffer): { ext: string; contentType: string } |
   return null;
 }
 
+// Content moderation via Gemini (already integrated for the chat assistant,
+// so this reuses it instead of adding a paid vision/moderation API). Both
+// helpers "fail open" — if Gemini isn't configured or the moderation call
+// itself errors, the upload/review is allowed through rather than blocked,
+// since a third-party API hiccup shouldn't take down core site
+// functionality. This is a best-effort safety net, not a hard guarantee.
+async function moderateImage(buffer: Buffer, mimeType: string): Promise<{ ok: boolean; reason?: string }> {
+  if (!ai) return { ok: true };
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          { inlineData: { mimeType, data: buffer.toString("base64") } },
+          { text: "Esta imagem será publicada em um site público de turismo (perfis de pousadas, guias e atrações). Ela contém nudez, conteúdo sexual explícito, ou violência gráfica? Responda com uma única palavra: SIM ou NAO." },
+        ],
+      }],
+      config: { temperature: 0 },
+    });
+    const answer = (response.text || "").trim().toUpperCase();
+    if (answer.startsWith("SIM")) {
+      return { ok: false, reason: "Esta imagem parece conter conteúdo impróprio (nudez ou conteúdo explícito) e não pode ser publicada no site." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.warn("Erro na moderação de imagem via Gemini:", err);
+    return { ok: true };
+  }
+}
+
+async function moderateText(text: string): Promise<{ ok: boolean; reason?: string }> {
+  if (!ai || !text.trim()) return { ok: true };
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        role: "user",
+        parts: [{
+          text: `Analise o texto abaixo, enviado por um visitante como comentário público em uma avaliação num site de turismo. Ele contém xingamentos, discurso de ódio, assédio, conteúdo sexual explícito, spam ou qualquer outra coisa imprópria para exibição pública? Responda com uma única palavra: SIM ou NAO.\n\nTexto: "${text.replace(/"/g, "'").slice(0, 2000)}"`,
+        }],
+      }],
+      config: { temperature: 0 },
+    });
+    const answer = (response.text || "").trim().toUpperCase();
+    if (answer.startsWith("SIM")) {
+      return { ok: false, reason: "Seu comentário parece conter conteúdo impróprio e não pôde ser publicado. Revise o texto e tente novamente." };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.warn("Erro na moderação de texto via Gemini:", err);
+    return { ok: true };
+  }
+}
+
 app.post("/api/upload-image", requireAdminOrPartner, (req, res) => {
   upload.single("file")(req, res, async (err: any) => {
     if (err) return res.status(400).json({ error: err.message });
@@ -641,6 +734,12 @@ app.post("/api/upload-image", requireAdminOrPartner, (req, res) => {
     if (!detected) {
       return res.status(400).json({ error: "O conteúdo do arquivo não corresponde a uma imagem PNG, JPEG, WebP ou GIF válida." });
     }
+
+    const moderation = await moderateImage(req.file.buffer, detected.contentType);
+    if (!moderation.ok) {
+      return res.status(400).json({ error: moderation.reason });
+    }
+
     const objectPath = `uploads/${randomUUID()}.${detected.ext}`;
 
     const { error } = await supabase.storage
@@ -712,11 +811,11 @@ app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
 function mapGuideRow(g: any): Guide {
   return {
     ...g,
-    languages: toStringArray(g.languages),
+    languages: toLanguageArray(g.languages),
     specialty: toStringArray(g.specialty),
     interests: toStringArray(g.interests),
     images: toStringArray(g.images),
-    rating: typeof g.rating === "number" ? g.rating : (g.rating ? parseFloat(g.rating) : 5),
+    rating: typeof g.rating === "number" ? g.rating : (g.rating ? parseFloat(g.rating) : 0),
   };
 }
 
@@ -794,7 +893,7 @@ function mapAtracaoRow(a: any): Atracao {
     images: parseJSONSafe(a.images) || [],
     menu: parseJSONSafe(a.menu) || undefined,
     availability: a.availability || undefined,
-    rating: typeof a.rating === "number" ? a.rating : (a.rating ? parseFloat(a.rating) : 5),
+    rating: typeof a.rating === "number" ? a.rating : (a.rating ? parseFloat(a.rating) : 0),
     verified: typeof a.verified === "boolean" ? a.verified : false,
     dateCreated: a.dateCreated || ""
   };
@@ -818,7 +917,7 @@ app.post("/api/atracoes", requireAdmin, async (req, res) => {
   const newAtracao: Atracao = {
     ...pickFields<Atracao>(req.body, ATRACAO_FIELDS),
     id: `at_${randomUUID()}`,
-    rating: 5,
+    rating: 0,
     verified: false,
     dateCreated: new Date().toISOString(),
   } as Atracao;
@@ -1569,6 +1668,11 @@ app.post("/api/reviews", publicFormLimiter, async (req, res) => {
     return res.status(400).json({ error: "Informe exatamente um de pousadaId, atracaoId ou guideId." });
   }
 
+  const moderation = await moderateText(String(req.body.comment || ""));
+  if (!moderation.ok) {
+    return res.status(400).json({ error: moderation.reason });
+  }
+
   const newReview: Review = {
     id: `r_${randomUUID()}`,
     pousadaId: pousadaId || undefined,
@@ -2201,7 +2305,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
       name: candidatura.name,
       email,
       phone: candidatura.phone || "",
-      languages: splitCommaList(candidatura.languages),
+      languages: splitCommaList(candidatura.languages).map(language => ({ language, level: "intermediario" as const })),
       specialty: splitCommaList(candidatura.specialty),
       status: "indisponivel",
       bio: candidatura.message || undefined,
@@ -2230,7 +2334,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
       description: candidatura.message || "Nova atração parceira EcoSafari — perfil em preparação.",
       location: candidatura.location || "",
       images: [],
-      rating: 5,
+      rating: 0,
       verified: false,
       dateCreated: new Date().toISOString(),
     };
@@ -2393,7 +2497,7 @@ CREATE TABLE IF NOT EXISTS pousadas (
   description TEXT,
   "longDescription" TEXT,
   location TEXT,
-  rating FLOAT DEFAULT 5.0,
+  rating FLOAT DEFAULT 0, -- 0 = "sem avaliações ainda" (nunca aparece de verdade, já que a média de 1+ avaliação real é sempre >= 1)
   "pricePerNight" NUMERIC DEFAULT 0,
   images TEXT, -- armazenado como string JSON
   features TEXT, -- armazenado como string JSON
@@ -2420,6 +2524,7 @@ ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamSectionTitle" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "teamSectionText" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "officialSiteImages" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS rooms TEXT;
+ALTER TABLE pousadas ALTER COLUMN rating SET DEFAULT 0;
 
 -- Ativar RLS em pousadas (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE pousadas ENABLE ROW LEVEL SECURITY;
@@ -2443,7 +2548,7 @@ CREATE TABLE IF NOT EXISTS guides (
   age INTEGER,
   birthplace TEXT,
   interests TEXT, -- armazenado como string JSON
-  rating FLOAT DEFAULT 5.0,
+  rating FLOAT DEFAULT 0,
   "photoUrl" TEXT,
   images TEXT -- galeria de fotos, armazenado como string JSON
 );
@@ -2453,9 +2558,10 @@ ALTER TABLE guides ADD COLUMN IF NOT EXISTS bio TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS age INTEGER;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS birthplace TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS interests TEXT;
-ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 5.0;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 0;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS images TEXT;
+ALTER TABLE guides ALTER COLUMN rating SET DEFAULT 0;
 
 -- Ativar RLS em guias (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE guides ENABLE ROW LEVEL SECURITY;
@@ -2476,12 +2582,13 @@ CREATE TABLE IF NOT EXISTS atracoes (
   images TEXT, -- armazenado como string JSON
   menu TEXT, -- cardápio (string JSON) — só para type = 'restaurante'
   availability TEXT, -- dias/horário de funcionamento, texto livre
-  rating FLOAT DEFAULT 5.0,
+  rating FLOAT DEFAULT 0,
   verified BOOLEAN DEFAULT false,
   "dateCreated" TEXT
 );
 
 ALTER TABLE atracoes ADD COLUMN IF NOT EXISTS availability TEXT;
+ALTER TABLE atracoes ALTER COLUMN rating SET DEFAULT 0;
 
 -- Ativar RLS em atrações (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE atracoes ENABLE ROW LEVEL SECURITY;

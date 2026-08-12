@@ -39,7 +39,7 @@ export default function PartnerSignupPage() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [guiaForm, setGuiaForm] = useState({
-    name: "", email: "", phone: "", languages: "", availability: "", age: "", experienceYears: "", specialty: "", message: ""
+    name: "", email: "", phone: "", languages: "", age: "", experienceYears: "", specialty: "", message: ""
   });
   const [pousadaForm, setPousadaForm] = useState({
     pousadaName: "", name: "", email: "", phone: "", location: "", capacity: "", message: ""
@@ -64,7 +64,6 @@ export default function PartnerSignupPage() {
           email: guiaForm.email,
           phone: guiaForm.phone,
           languages: guiaForm.languages,
-          availability: guiaForm.availability,
           age: guiaForm.age ? parseInt(guiaForm.age) : undefined,
           experienceYears: guiaForm.experienceYears ? parseInt(guiaForm.experienceYears) : undefined,
           specialty: guiaForm.specialty,
@@ -284,9 +283,6 @@ export default function PartnerSignupPage() {
               </div>
               <Field label="Idiomas que fala" required>
                 <Input required placeholder="Ex: Português, Inglês, Espanhol" value={guiaForm.languages} onChange={e => setGuiaForm({ ...guiaForm, languages: e.target.value })} />
-              </Field>
-              <Field label="Disponibilidade" required>
-                <Input required placeholder="Ex: Fins de semana, período integral, sob demanda" value={guiaForm.availability} onChange={e => setGuiaForm({ ...guiaForm, availability: e.target.value })} />
               </Field>
               <Field label="Especialidade">
                 <Input placeholder="Ex: Observação de aves, safári fotográfico, trilhas" value={guiaForm.specialty} onChange={e => setGuiaForm({ ...guiaForm, specialty: e.target.value })} />

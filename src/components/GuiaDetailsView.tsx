@@ -3,6 +3,9 @@ import { Compass, Star, MessageSquare, LoaderCircle, ArrowLeft, Languages, Spark
 import { Guide } from "../types";
 import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
+import TopReviewQuote from "./TopReviewQuote";
+import { getLanguageFlag } from "../lib/languageFlags";
+import { LEVEL_LABELS } from "./LanguagesEditor";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -62,9 +65,20 @@ export default function GuiaDetailsView({ id }: { id: string }) {
             <User className="h-12 w-12 text-white/60" />
           )}
         </div>
+        {guia.languages.length > 0 && (
+          <div className="flex items-center justify-center gap-1.5 mb-2" title={guia.languages.map(l => l.language).join(", ")}>
+            {guia.languages.map((l, i) => (
+              <span key={i} className="text-lg" aria-label={l.language}>{getLanguageFlag(l.language) || "🏳️"}</span>
+            ))}
+          </div>
+        )}
         <h1 className="text-2xl md:text-3xl font-serif font-bold text-white">{guia.name}</h1>
         <div className="flex items-center justify-center gap-3 mt-2 text-white/80 text-xs">
-          <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {guia.rating ?? 5} / 5.0</span>
+          {guia.rating ? (
+            <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {guia.rating} / 5.0</span>
+          ) : (
+            <span className="flex items-center gap-1 text-white/60"><Star className="h-3.5 w-3.5" /> Novo, sem avaliações ainda</span>
+          )}
           {guia.birthplace && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {guia.birthplace}</span>}
           <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-widest font-bold ${guia.status === "disponivel" ? "bg-emerald-500/90" : "bg-white/20"}`}>
             {guia.status === "disponivel" ? "Disponível" : "Indisponível no momento"}
@@ -76,11 +90,19 @@ export default function GuiaDetailsView({ id }: { id: string }) {
         <div className="bg-white border border-editorial-border p-6 shadow-sm">
           {guia.bio && <p className="text-editorial-text leading-relaxed text-sm font-light mb-5 whitespace-pre-line">{guia.bio}</p>}
 
+          <div className="mb-5">
+            <TopReviewQuote targetType="guia" targetId={guia.id} />
+          </div>
+
           {guia.languages.length > 0 && (
             <div className="mb-4">
               <h3 className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted flex items-center gap-1.5 mb-2"><Languages className="h-3.5 w-3.5" /> Idiomas</h3>
               <div className="flex flex-wrap gap-1.5">
-                {guia.languages.map((l, i) => <span key={i} className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-2.5 py-1 rounded-full text-xs">{l}</span>)}
+                {guia.languages.map((l, i) => (
+                  <span key={i} className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-2.5 py-1 rounded-full text-xs flex items-center gap-1.5">
+                    <span aria-hidden="true">{getLanguageFlag(l.language) || "🏳️"}</span> {l.language} — {LEVEL_LABELS[l.level]}
+                  </span>
+                ))}
               </div>
             </div>
           )}

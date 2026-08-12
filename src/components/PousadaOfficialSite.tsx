@@ -113,8 +113,8 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
           </span>
           <h1 className="text-4xl md:text-6xl font-serif font-bold text-white tracking-tight max-w-3xl">{pousada.name}</h1>
           <div className="flex items-center gap-2 mt-4 text-white">
-            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-            <span className="font-bold text-sm">{pousada.rating} / 5.0</span>
+            <Star className={`h-4 w-4 ${pousada.rating > 0 ? "fill-amber-400 text-amber-400" : "text-white/60"}`} />
+            <span className="font-bold text-sm">{pousada.rating > 0 ? `${pousada.rating} / 5.0` : "Novo, sem avaliações ainda"}</span>
           </div>
         </div>
       </section>
@@ -186,7 +186,7 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
       <section className="max-w-5xl mx-auto px-6 md:px-10 pb-16">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 border border-editorial-border divide-y sm:divide-y-0 sm:divide-x divide-editorial-border">
           {[
-            { Icon: Star, value: `${pousada.rating} / 5.0`, label: "Avaliação" },
+            { Icon: Star, value: pousada.rating > 0 ? `${pousada.rating} / 5.0` : "Novo", label: "Avaliação" },
             { Icon: Users, value: `${pousada.capacity}`, label: "Hóspedes" },
             { Icon: Check, value: `${(pousada.features || []).length}`, label: "Comodidades" },
             { Icon: Compass, value: `${(pousada.activities || []).length}`, label: "Atividades" },

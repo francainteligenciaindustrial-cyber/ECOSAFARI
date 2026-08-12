@@ -3,13 +3,16 @@ import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft } from "luc
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
-import { PartnerProfileResponse } from "../types";
+import { PartnerProfileResponse, GuideLanguage } from "../types";
 import { navigate } from "../lib/router";
 import ImageListEditor from "./ImageListEditor";
 import ImageUploadButton from "./ImageUploadButton";
 import TagInput from "./TagInput";
 import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
 import RoomsEditor, { RoomDraft } from "./RoomsEditor";
+import ToggleSwitch from "./ToggleSwitch";
+import LanguagesEditor from "./LanguagesEditor";
+import { getLanguageFlag } from "../lib/languageFlags";
 
 // Self-service portal for a partner (pousada/atração/guia) to edit only
 // their own profile — no access to bookings, other partners, or anything
@@ -564,8 +567,13 @@ export default function PartnerPortalPage() {
                   <textarea rows={4} value={form.bio} onChange={e => setForm((p: any) => ({ ...p, bio: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
                 </div>
                 <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Idiomas Falados</label>
-                  <TagInput value={form.languages} onChange={languages => setForm((p: any) => ({ ...p, languages }))} placeholder="Digite e pressione Enter" />
+                  <label className="block text-editorial-text font-semibold mb-1.5">Idiomas Falados (com nível)</label>
+                  <LanguagesEditor value={form.languages} onChange={languages => setForm((p: any) => ({ ...p, languages }))} />
+                  {form.languages.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-2 text-lg" title="Prévia das bandeiras exibidas no seu perfil público">
+                      {form.languages.map((l: GuideLanguage, i: number) => <span key={i} aria-hidden="true">{getLanguageFlag(l.language) || "🏳️"}</span>)}
+                    </div>
+                  )}
                 </div>
                 <div className="text-xs">
                   <label className="block text-editorial-text font-semibold mb-1.5">Especialidades</label>
@@ -575,12 +583,13 @@ export default function PartnerPortalPage() {
                   <label className="block text-editorial-text font-semibold mb-1.5">Temas de Interesse</label>
                   <TagInput value={form.interests} onChange={interests => setForm((p: any) => ({ ...p, interests }))} placeholder="Digite e pressione Enter" />
                 </div>
-                <div className="text-xs">
+                <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
                   <label className="block text-editorial-text font-semibold mb-1.5">Disponibilidade</label>
-                  <select value={form.status} onChange={e => setForm((p: any) => ({ ...p, status: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-editorial-primary">
-                    <option value="disponivel">Disponível</option>
-                    <option value="indisponivel">Indisponível</option>
-                  </select>
+                  <p className="text-editorial-muted text-[11px] mb-2">Ligue quando estiver disponível pra novas expedições — pode desligar e ligar de novo sempre que quiser, direto por aqui.</p>
+                  <ToggleSwitch
+                    checked={form.status === "disponivel"}
+                    onChange={checked => setForm((p: any) => ({ ...p, status: checked ? "disponivel" : "indisponivel" }))}
+                  />
                 </div>
                 <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
               </>

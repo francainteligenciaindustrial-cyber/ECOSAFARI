@@ -4,6 +4,7 @@ import { Pousada } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
+import TopReviewQuote from "./TopReviewQuote";
 
 interface PousadaDetailsViewProps {
   pousada: Pousada;
@@ -96,10 +97,18 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4 md:mt-0">
-            <div className="flex items-center gap-1 text-editorial-primary bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-none font-serif text-sm font-bold">
-              <Star className="h-4 w-4 fill-amber-500 text-amber-500" /> {pousada.rating} / 5.0
-            </div>
-            <span className="text-xs text-editorial-muted font-medium">Baseado em avaliações de hóspedes</span>
+            {pousada.rating > 0 ? (
+              <>
+                <div className="flex items-center gap-1 text-editorial-primary bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-none font-serif text-sm font-bold">
+                  <Star className="h-4 w-4 fill-amber-500 text-amber-500" /> {pousada.rating} / 5.0
+                </div>
+                <span className="text-xs text-editorial-muted font-medium">Baseado em avaliações de hóspedes</span>
+              </>
+            ) : (
+              <div className="flex items-center gap-1 text-editorial-muted bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-none font-serif text-sm font-bold">
+                <Star className="h-4 w-4" /> Novo, sem avaliações ainda
+              </div>
+            )}
           </div>
         </div>
 
@@ -224,10 +233,13 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             {/* Overview / Long description */}
             <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
               <h2 className="text-2xl font-serif font-bold text-editorial-primary mb-4">Sobre a Hospedagem</h2>
-              <p className="text-editorial-muted leading-relaxed mb-6 whitespace-pre-line text-xs font-light">
+              <p className="text-editorial-muted leading-relaxed mb-4 whitespace-pre-line text-xs font-light">
                 {pousada.longDescription || pousada.description}
               </p>
-              
+              <div className="mb-6">
+                <TopReviewQuote targetType="pousada" targetId={pousada.id} />
+              </div>
+
               {/* Structure list */}
               <div className="border-t border-editorial-border pt-6">
                 <h3 className="font-serif font-bold text-editorial-primary text-base mb-4 flex items-center gap-2"><Coffee className="h-4.5 w-4.5 text-editorial-primary" /> Estrutura & Comodidades</h3>

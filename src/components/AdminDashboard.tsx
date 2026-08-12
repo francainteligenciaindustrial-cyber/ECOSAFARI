@@ -31,7 +31,7 @@ import {
   Lock,
   type LucideIcon
 } from "lucide-react";
-import { Pousada, Guide, Booking, Notification, Species } from "../types";
+import { Pousada, Guide, Booking, Notification, Species, GuideLanguage } from "../types";
 import TurismoPanel from "./TurismoPanel";
 import CandidaturasPanel from "./CandidaturasPanel";
 import AdminUsersPanel from "./AdminUsersPanel";
@@ -43,6 +43,8 @@ import ImageUploadButton from "./ImageUploadButton";
 import TagInput from "./TagInput";
 import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
 import RoomsEditor, { RoomDraft } from "./RoomsEditor";
+import ToggleSwitch from "./ToggleSwitch";
+import LanguagesEditor, { LEVEL_LABELS } from "./LanguagesEditor";
 import ImageListEditor from "./ImageListEditor";
 import Pagination from "./Pagination";
 import { usePagination } from "../lib/usePagination";
@@ -346,7 +348,7 @@ export default function AdminDashboard({
     name: "",
     email: "",
     phone: "",
-    languages: ["Português", "Inglês"] as string[],
+    languages: [{ language: "Português", level: "avancado" }, { language: "Inglês", level: "intermediario" }] as GuideLanguage[],
     specialty: ["Fotografia", "Rastreamento"] as string[],
     status: "disponivel" as "disponivel" | "indisponivel",
     bio: "",
@@ -365,7 +367,7 @@ export default function AdminDashboard({
     name: "",
     email: "",
     phone: "",
-    languages: [] as string[],
+    languages: [] as GuideLanguage[],
     specialty: [] as string[],
     status: "disponivel" as "disponivel" | "indisponivel",
     bio: "",
@@ -1497,15 +1499,15 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados</label>
-                    <TagInput
-                      value={guideForm.languages}
-                      onChange={languages => setGuideForm(prev => ({ ...prev, languages }))}
-                      placeholder="Ex: Português"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados (com nível)</label>
+                  <LanguagesEditor
+                    value={guideForm.languages}
+                    onChange={languages => setGuideForm(prev => ({ ...prev, languages }))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                   <div>
                     <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
                     <TagInput
@@ -1516,14 +1518,10 @@ export default function AdminDashboard({
                   </div>
                   <div>
                     <label className="block text-zinc-700 font-semibold mb-1">Status do Guia</label>
-                    <select
-                      value={guideForm.status}
-                      onChange={e => setGuideForm(prev => ({ ...prev, status: e.target.value as any }))}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="disponivel">Disponível</option>
-                      <option value="indisponivel">Indisponível</option>
-                    </select>
+                    <ToggleSwitch
+                      checked={guideForm.status === "disponivel"}
+                      onChange={checked => setGuideForm(prev => ({ ...prev, status: checked ? "disponivel" : "indisponivel" }))}
+                    />
                   </div>
                 </div>
 
@@ -1628,24 +1626,23 @@ export default function AdminDashboard({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados</label>
-                      <TagInput value={editGuideForm.languages} onChange={languages => setEditGuideForm(prev => ({ ...prev, languages }))} placeholder="Ex: Português" />
-                    </div>
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
-                      <TagInput value={editGuideForm.specialty} onChange={specialty => setEditGuideForm(prev => ({ ...prev, specialty }))} placeholder="Ex: Rastreamento" />
-                    </div>
+                  <div>
+                    <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados (com nível)</label>
+                    <LanguagesEditor value={editGuideForm.languages} onChange={languages => setEditGuideForm(prev => ({ ...prev, languages }))} />
+                  </div>
+
+                  <div className="text-xs">
+                    <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
+                    <TagInput value={editGuideForm.specialty} onChange={specialty => setEditGuideForm(prev => ({ ...prev, specialty }))} placeholder="Ex: Rastreamento" />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                     <div>
                       <label className="block text-zinc-700 font-semibold mb-1">Status</label>
-                      <select value={editGuideForm.status} onChange={e => setEditGuideForm(prev => ({ ...prev, status: e.target.value as any }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500">
-                        <option value="disponivel">Disponível</option>
-                        <option value="indisponivel">Indisponível</option>
-                      </select>
+                      <ToggleSwitch
+                        checked={editGuideForm.status === "disponivel"}
+                        onChange={checked => setEditGuideForm(prev => ({ ...prev, status: checked ? "disponivel" : "indisponivel" }))}
+                      />
                     </div>
                     <div>
                       <label className="block text-zinc-700 font-semibold mb-1">Idade</label>
@@ -1703,7 +1700,7 @@ export default function AdminDashboard({
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
                           {(g.languages || []).map((l, i) => (
-                            <span key={i} className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded text-[10px] border border-zinc-200">{l}</span>
+                            <span key={i} className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded text-[10px] border border-zinc-200">{l.language} ({LEVEL_LABELS[l.level]})</span>
                           ))}
                         </div>
                       </td>

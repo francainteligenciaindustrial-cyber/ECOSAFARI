@@ -49,10 +49,17 @@ export interface Review {
   photoUrl?: string; // foto real do hóspede, opcional — reforça a prova social do depoimento
 }
 
+export type LanguageLevel = 'basico' | 'intermediario' | 'avancado';
+
+export interface GuideLanguage {
+  language: string;
+  level: LanguageLevel;
+}
+
 export interface Guide {
   id: string;
   name: string;
-  languages: string[];
+  languages: GuideLanguage[];
   specialty: string[]; // ['Observação de aves', 'Safári fotográfico', 'Trilhas de longo curso']
   status: 'disponivel' | 'indisponivel';
   email: string;

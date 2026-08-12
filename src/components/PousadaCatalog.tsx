@@ -327,7 +327,11 @@ export default function PousadaCatalog({
                   <MapPin className="h-3 w-3" /> {pousada.location || "Localização não disponível"}
                 </div>
                 <div className="absolute top-4 right-4 bg-[#FDFCF8] text-editorial-text px-2.5 py-1 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-editorial-border">
-                  <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> {pousada.rating || 5.0}
+                  {pousada.rating > 0 ? (
+                    <><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> {pousada.rating}</>
+                  ) : (
+                    <><Star className="h-3.5 w-3.5 text-editorial-muted" /> Novo</>
+                  )}
                 </div>
               </div>
 
@@ -451,7 +455,11 @@ export default function PousadaCatalog({
                       <h3 className="font-serif font-bold text-editorial-text group-hover:text-editorial-primary transition">{atracao.name}</h3>
                       <div className="flex items-center gap-3 mt-1.5 text-editorial-muted text-xs">
                         <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {atracao.location}</span>
-                        <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {atracao.rating}</span>
+                        {atracao.rating > 0 ? (
+                          <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {atracao.rating}</span>
+                        ) : (
+                          <span className="flex items-center gap-1"><Star className="h-3 w-3" /> Novo</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -467,12 +475,17 @@ export default function PousadaCatalog({
                 <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">Nossos Guias</h2>
                 <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">Conheça os guias locais que conduzem as expedições — cada um com seu próprio perfil.</p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {/* flex-wrap + justify-center (not a plain grid) so an odd
+                  leftover card on the last row centers itself instead of
+                  sitting flush-left — justify-content applies per wrapped
+                  line, so this works for any guide count without special-
+                  casing odd/even. */}
+              <div className="flex flex-wrap justify-center gap-6">
                 {guiasPublicos.map(guia => (
                   <div
                     key={guia.id}
                     onClick={() => navigate(`/guias/${guia.id}`)}
-                    className="group text-center cursor-pointer"
+                    className="group text-center cursor-pointer w-[calc(50%-12px)] sm:w-[calc(33.333%-16px)] lg:w-[calc(25%-18px)]"
                   >
                     <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-editorial-border mx-auto mb-3 bg-editorial-secondary flex items-center justify-center group-hover:border-editorial-primary transition">
                       {guia.photoUrl ? (
@@ -482,7 +495,9 @@ export default function PousadaCatalog({
                       )}
                     </div>
                     <h3 className="font-serif font-bold text-editorial-text text-sm group-hover:text-editorial-primary transition">{guia.name}</h3>
-                    <p className="text-editorial-muted text-[11px] mt-0.5 flex items-center justify-center gap-1"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {guia.rating ?? 5}</p>
+                    <p className="text-editorial-muted text-[11px] mt-0.5 flex items-center justify-center gap-1">
+                      {guia.rating ? <><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {guia.rating}</> : <><Star className="h-3 w-3" /> Novo</>}
+                    </p>
                   </div>
                 ))}
               </div>
