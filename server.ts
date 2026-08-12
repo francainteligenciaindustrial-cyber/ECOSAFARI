@@ -2055,6 +2055,17 @@ app.get("/api/partners/:type/:id/access", requireAdmin, async (req, res) => {
 // copy/share manually if the automatic email doesn't land (e.g. no custom
 // SMTP configured — Supabase's default mail sending is rate-limited on the
 // free tier).
+// Supabase's admin SDK sometimes surfaces a failure with no usable
+// `.message` (just an empty error body, which JSON.stringify turns into the
+// literal text "{}") — most often when an internal Supabase-side rate limit
+// or quota was hit, not something our own request did wrong. Showing that
+// raw "{}" to an admin is useless, so this falls back to a message that at
+// least points at the real likely cause.
+function describeAuthError(err: any, fallback: string): string {
+  const msg = err?.message;
+  return typeof msg === "string" && msg.trim() && msg.trim() !== "{}" ? msg : fallback;
+}
+
 async function provisionPartnerLogin(
   email: string,
   appMetadata: Record<string, unknown>
@@ -2076,7 +2087,14 @@ async function provisionPartnerLogin(
     // them up instead of treating that as a hard failure.
     const { data: existing, error: listErr } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
     const match = existing?.users?.find((u: any) => u.email?.toLowerCase() === email);
-    if (!match) return { userId: null, actionLink: null, emailSent: false, error: inviteErr?.message || listErr?.message || "Erro ao criar acesso." };
+    if (!match) {
+      return {
+        userId: null,
+        actionLink: null,
+        emailSent: false,
+        error: describeAuthError(inviteErr, describeAuthError(listErr, "Erro ao criar acesso — o Supabase recusou a operação sem detalhar o motivo. Provavelmente um limite temporário da API do Supabase; tente de novo em alguns minutos ou convide manualmente pela ficha do parceiro.")),
+      };
+    }
 
     // This account already has SOME role — only proceed if it's the exact
     // same association we're about to (re)grant. Otherwise this would
@@ -2097,7 +2115,14 @@ async function provisionPartnerLogin(
   }
 
   const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: appMetadata });
-  if (updateErr) return { userId, actionLink: null, emailSent: false, error: updateErr.message };
+  if (updateErr) {
+    return {
+      userId,
+      actionLink: null,
+      emailSent: false,
+      error: describeAuthError(updateErr, "Erro ao vincular o acesso — o Supabase recusou a operação sem detalhar o motivo. Provavelmente um limite temporário da API do Supabase; tente de novo em alguns minutos ou convide manualmente pela ficha do parceiro."),
+    };
+  }
 
   // Same reasoning as the admin-invite recovery link above: without an
   // explicit redirectTo this falls back to the Supabase project's "Site
