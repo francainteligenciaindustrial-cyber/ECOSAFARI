@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   TrendingUp,
   DollarSign,
@@ -250,6 +250,16 @@ export default function AdminDashboard({
 
   // Notifications management
   const unreadNotifications = notifications.filter(n => !n.read);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) setShowNotifications(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   // Forms States
   const [pousadaForm, setPousadaForm] = useState({
@@ -903,20 +913,66 @@ export default function AdminDashboard({
             <p className="text-zinc-500 text-xs mt-1">Gestão de pousadas parceiras, guias turísticos, alocação de equipe e agenda de reservas.</p>
           </div>
 
-          {/* Quick Notification alert — jumps to the notification log below */}
-          <div className="flex items-center gap-2">
+          {/* Notification bell — opens a popup instead of a permanent
+              on-page panel, so notifications don't take up space until the
+              admin actually wants to see them. */}
+          <div className="relative" ref={notificationsRef}>
             <button
-              onClick={() => {
-                setActiveTab("bookings");
-                setTimeout(() => {
-                  document.getElementById("notifications-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }, 50);
-              }}
-              className="relative bg-white border border-zinc-200 px-3 py-2 rounded-lg flex items-center gap-2 text-[11px] hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"
+              onClick={() => setShowNotifications(prev => !prev)}
+              className="relative bg-white border border-zinc-200 p-2.5 rounded-lg flex items-center hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"
+              title="Notificações"
             >
-              <Bell className="h-3.5 w-3.5 text-zinc-500" />
-              <span><span className="font-semibold text-zinc-900">{unreadNotifications.length} novas</span> <span className="text-zinc-500">notificações</span></span>
+              <Bell className="h-4 w-4 text-zinc-500" />
+              {unreadNotifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                  {unreadNotifications.length}
+                </span>
+              )}
             </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white border border-zinc-200 rounded-xl shadow-lg z-30">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200">
+                  <h3 className="font-semibold text-sm text-zinc-900 flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-zinc-400" /> Notificações
+                  </h3>
+                  {unreadNotifications.length > 0 && (
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-editorial-primary bg-editorial-secondary px-2 py-0.5 rounded-full">
+                      {unreadNotifications.length} não lida{unreadNotifications.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="text-zinc-400 text-xs px-5 py-6 text-center">Nenhuma notificação ainda.</p>
+                  ) : (
+                    notifications.map((notif) => {
+                      const Icon = NOTIFICATION_ICONS[notif.type] || Bell;
+                      return (
+                        <div
+                          key={notif.id}
+                          className={`flex items-start gap-3 px-5 py-3 border-b border-zinc-100 last:border-none transition-colors ${notif.read ? "" : "bg-editorial-secondary/30"}`}
+                        >
+                          <Icon className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${notif.read ? "text-zinc-300" : "text-editorial-primary"}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs leading-relaxed ${notif.read ? "text-zinc-500" : "text-zinc-900 font-medium"}`}>{notif.message}</p>
+                            <span className="text-[10px] text-zinc-400 mt-0.5 block">{formatRelativeTime(notif.timestamp)}</span>
+                          </div>
+                          {!notif.read && (
+                            <button
+                              onClick={() => handleMarkNotificationRead(notif.id)}
+                              className="text-[10px] font-semibold text-zinc-400 hover:text-editorial-primary transition cursor-pointer flex-shrink-0"
+                            >
+                              Marcar como lida
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1149,50 +1205,6 @@ export default function AdminDashboard({
                 onPageChange={bookingsPagination.setPage}
               />
             </div>
-
-            {/* Notification feed */}
-            <div id="notifications-panel" className="bg-white border border-zinc-200 rounded-xl">
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200">
-                <h3 className="font-semibold text-sm text-zinc-900 flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-zinc-400" /> Notificações
-                </h3>
-                {unreadNotifications.length > 0 && (
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-editorial-primary bg-editorial-secondary px-2 py-0.5 rounded-full">
-                    {unreadNotifications.length} não lida{unreadNotifications.length > 1 ? "s" : ""}
-                  </span>
-                )}
-              </div>
-              <div className="max-h-72 overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <p className="text-zinc-400 text-xs px-5 py-6 text-center">Nenhuma notificação ainda.</p>
-                ) : (
-                  notifications.map((notif) => {
-                    const Icon = NOTIFICATION_ICONS[notif.type] || Bell;
-                    return (
-                      <div
-                        key={notif.id}
-                        className={`flex items-start gap-3 px-5 py-3 border-b border-zinc-100 last:border-none transition-colors ${notif.read ? "" : "bg-editorial-secondary/30"}`}
-                      >
-                        <Icon className={`h-3.5 w-3.5 mt-0.5 flex-shrink-0 ${notif.read ? "text-zinc-300" : "text-editorial-primary"}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs leading-relaxed ${notif.read ? "text-zinc-500" : "text-zinc-900 font-medium"}`}>{notif.message}</p>
-                          <span className="text-[10px] text-zinc-400 mt-0.5 block">{formatRelativeTime(notif.timestamp)}</span>
-                        </div>
-                        {!notif.read && (
-                          <button
-                            onClick={() => handleMarkNotificationRead(notif.id)}
-                            className="text-[10px] font-semibold text-zinc-400 hover:text-editorial-primary transition cursor-pointer flex-shrink-0"
-                          >
-                            Marcar como lida
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
           </div>
         )}
 
