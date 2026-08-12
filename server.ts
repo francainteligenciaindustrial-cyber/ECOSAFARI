@@ -1967,7 +1967,16 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
   // (which needs SMTP configured and isn't guaranteed to be set up on every
   // deploy). Returned to the calling admin to copy and send manually,
   // mirroring the candidatura status-link pattern already used elsewhere.
-  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
+  // Without an explicit redirectTo, Supabase falls back to whatever "Site
+  // URL" is configured in the dashboard — on a project that still has that
+  // set to a local dev URL, the generated link would send the invitee to a
+  // dead localhost address instead of the real site. /parceiro is where the
+  // "defina sua senha" screen actually lives (see PartnerPortalPage).
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${SITE_URL}/parceiro` },
+  });
   if (linkErr) {
     console.warn("Administrador criado, mas falha ao gerar link de acesso:", linkErr.message);
   }
@@ -2080,7 +2089,16 @@ async function provisionPartnerLogin(
   const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: appMetadata });
   if (updateErr) return { userId, actionLink: null, emailSent: false, error: updateErr.message };
 
-  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({ type: "recovery", email });
+  // Same reasoning as the admin-invite recovery link above: without an
+  // explicit redirectTo this falls back to the Supabase project's "Site
+  // URL" setting, which sends the partner to whatever's configured there
+  // (a dead localhost link if that was never updated past local dev)
+  // instead of the real /parceiro portal.
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${SITE_URL}/parceiro` },
+  });
   if (linkErr) console.warn("Acesso criado, mas falha ao gerar link de apoio:", linkErr.message);
   return { userId, actionLink: linkData?.properties?.action_link || null, emailSent };
 }
