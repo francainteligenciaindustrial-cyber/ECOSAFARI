@@ -158,9 +158,19 @@ class SupabaseRateLimitStore {
   }
 }
 
+// Shared across every admin- and partner-authenticated route in the app
+// (requireAdmin, requireAdminOrPartner, requirePartnerAccess,
+// /api/my-partner-profile) — not just a login attempt. There's no separate
+// password-exchange endpoint in this Express app to protect (that happens
+// client-side directly against Supabase Auth), so this limiter's real job
+// is bounding abuse of an already-valid token, not brute-forcing one. 30
+// requests per 5 minutes was tight enough that normal interactive use of
+// the admin dashboard (each tab switch alone fires several authenticated
+// fetches) could exhaust it and start throwing "não foi possível carregar"
+// errors on ordinary panels — raised well above that.
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 30,
+  limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
   store: new SupabaseRateLimitStore() as any,
