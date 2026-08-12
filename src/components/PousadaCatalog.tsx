@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
-import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User } from "lucide-react";
+import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User, Lock, LoaderCircle } from "lucide-react";
 import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
 import { navigate } from "../lib/router";
 import LanguageFlag from "./LanguageFlag";
+import { adminFetch } from "../lib/adminFetch";
+import { useTouristSession } from "../lib/useTouristSession";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -141,13 +143,14 @@ export default function PousadaCatalog({
           bestPousadaName: realPousada?.name || "Pousadas parceiras EcoSafari"
         };
       });
+  const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
   const [filterLocation, setFilterLocation] = useState("all");
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState("");
-  const [nameInput, setNameInput] = useState("");
   const [photoUrlInput, setPhotoUrlInput] = useState("");
   const [selectedPousadaForReview, setSelectedPousadaForReview] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -213,27 +216,29 @@ export default function PousadaCatalog({
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nameInput.trim() || !commentInput.trim() || submittingReview) return;
+    if (!commentInput.trim() || submittingReview) return;
 
     setSubmittingReview(true);
+    setReviewError("");
     try {
-      const response = await fetch("/api/reviews", {
+      const response = await adminFetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pousadaId: selectedPousadaForReview,
-          userName: nameInput,
           rating: ratingInput,
           comment: commentInput,
           photoUrl: photoUrlInput.trim() || undefined
         })
       });
 
-      if (!response.ok) throw new Error();
-      const newRev = await response.json();
-      onAddReview(newRev);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setReviewError(body.error || "Erro ao enviar avaliação.");
+        return;
+      }
+      onAddReview(body);
 
-      setNameInput("");
       setCommentInput("");
       setPhotoUrlInput("");
       setRatingInput(5);
@@ -241,6 +246,7 @@ export default function PousadaCatalog({
       setTimeout(() => setReviewSuccess(false), 4000);
     } catch (err) {
       console.error(err);
+      setReviewError("Erro ao enviar avaliação.");
     } finally {
       setSubmittingReview(false);
     }
@@ -868,39 +874,49 @@ export default function PousadaCatalog({
               Todos os relatos ao lado vêm de hóspedes reais que viveram expedições de conservação em nossas pousadas parceiras. Escreva sua avaliação e ajude outros viajantes!
             </p>
 
-            {/* Form in Editorial style */}
-            <form onSubmit={handleSubmitReview} className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border space-y-4">
-              {reviewSuccess && (
-                <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 p-3 rounded-none text-xs text-center font-bold">
-                  ✓ Avaliação enviada com sucesso e nota recalculada!
-                </div>
-              )}
-              
-              <div>
-                <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Qual pousada você visitou?</label>
-                <select
-                  value={selectedPousadaForReview}
-                  onChange={e => setSelectedPousadaForReview(e.target.value)}
-                  className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
-                >
-                  {pousadas.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+            {/* Avaliar exige perfil de turista — sem ele, mostramos um
+                convite pra criar um em vez do formulário. */}
+            {checkingTourist ? (
+              <div className="bg-white p-6 flex justify-center border border-editorial-border">
+                <LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" />
               </div>
+            ) : !isTourist ? (
+              <div className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border text-center space-y-3">
+                <Lock className="h-6 w-6 text-editorial-muted mx-auto" />
+                <h3 className="font-serif font-bold text-editorial-primary text-lg">Crie seu perfil para avaliar</h3>
+                <p className="text-editorial-muted text-xs leading-relaxed">Para avaliar uma pousada, você precisa ter um perfil de turista EcoSafari — é rápido e gratuito.</p>
+                <button
+                  type="button"
+                  onClick={() => navigate("/turista")}
+                  className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
+                >
+                  Criar perfil / Entrar
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReview} className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border space-y-4">
+                {reviewSuccess && (
+                  <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 p-3 rounded-none text-xs text-center font-bold">
+                    ✓ Avaliação enviada com sucesso e nota recalculada!
+                  </div>
+                )}
+                {touristProfile && (
+                  <p className="text-editorial-muted text-[11px]">Avaliando como <span className="font-semibold text-editorial-text">{touristProfile.name}</span></p>
+                )}
 
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Seu Nome</label>
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={e => setNameInput(e.target.value)}
-                    required
-                    placeholder="Ex: João da Silva"
+                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Qual pousada você visitou?</label>
+                  <select
+                    value={selectedPousadaForReview}
+                    onChange={e => setSelectedPousadaForReview(e.target.value)}
                     className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
-                  />
+                  >
+                    {pousadas.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
+
                 <div>
                   <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Sua Nota</label>
                   <div className="flex items-center gap-1 mt-1">
@@ -916,40 +932,42 @@ export default function PousadaCatalog({
                     ))}
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Sua Avaliação</label>
-                <textarea
-                  value={commentInput}
-                  onChange={e => setCommentInput(e.target.value)}
-                  required
-                  rows={3}
-                  placeholder="Conte como foi sua expedição, a pousada, os guias turísticos..."
-                  className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary resize-none"
-                ></textarea>
-              </div>
+                <div>
+                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Sua Avaliação</label>
+                  <textarea
+                    value={commentInput}
+                    onChange={e => setCommentInput(e.target.value)}
+                    required
+                    rows={3}
+                    placeholder="Conte como foi sua expedição, a pousada, os guias turísticos..."
+                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary resize-none"
+                  ></textarea>
+                </div>
 
-              <div>
-                <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Link de uma Foto Sua na Expedição (opcional)</label>
-                <input
-                  type="url"
-                  value={photoUrlInput}
-                  onChange={e => setPhotoUrlInput(e.target.value)}
-                  placeholder="https://... (cole o link de uma foto real sua no passeio)"
-                  className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
-                />
-                <p className="text-editorial-muted text-[9px] mt-1">Depoimentos com foto real ajudam outros viajantes a confiar mais na experiência.</p>
-              </div>
+                <div>
+                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Link de uma Foto Sua na Expedição (opcional)</label>
+                  <input
+                    type="url"
+                    value={photoUrlInput}
+                    onChange={e => setPhotoUrlInput(e.target.value)}
+                    placeholder="https://... (cole o link de uma foto real sua no passeio)"
+                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
+                  />
+                  <p className="text-editorial-muted text-[9px] mt-1">Depoimentos com foto real ajudam outros viajantes a confiar mais na experiência.</p>
+                </div>
 
-              <button
-                type="submit"
-                className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
-                disabled={submittingReview}
-              >
-                {submittingReview ? "Enviando..." : "Enviar Avaliação"}
-              </button>
-            </form>
+                {reviewError && <p className="text-red-600 text-xs font-medium">{reviewError}</p>}
+
+                <button
+                  type="submit"
+                  className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
+                  disabled={submittingReview}
+                >
+                  {submittingReview ? "Enviando..." : "Enviar Avaliação"}
+                </button>
+              </form>
+            )}
           </div>
 
           {/* List of reviews column */}

@@ -316,6 +316,33 @@ function requirePartnerAccess(partnerType: PartnerType): express.RequestHandler[
   ];
 }
 
+// Verifies the caller is an authenticated tourist (Supabase Auth JWT with
+// app_metadata.role === "tourist") — the actual server-side enforcement of
+// "só é possível avaliar tendo um perfil de turista". Unlike admin/partner,
+// a tourist account is self-service (see POST /api/turista/signup below),
+// but the role still can't be set by the client itself — only
+// supabaseAdminAuth (service_role) sets app_metadata at account creation.
+const requireTourist: express.RequestHandler[] = [
+  authLimiter,
+  async (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: "Crie um perfil de turista (ou faça login) para avaliar." });
+    }
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data.user || data.user.app_metadata?.role !== "tourist") {
+        return res.status(403).json({ error: "É preciso ter um perfil de turista para avaliar." });
+      }
+      res.locals.touristUser = data.user;
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Token inválido." });
+    }
+  },
+];
+
 // Optional Sentry error reporting — lazy-imported only when SENTRY_DSN is
 // set, so an unconfigured deployment doesn't pay for the dependency at
 // startup. Same graceful-degradation pattern as Stripe/Resend/Gemini above.
@@ -1661,11 +1688,30 @@ app.get("/api/reviews", async (req, res) => {
 // "avaliações" for all three partner kinds instead of a separate reviews
 // table per kind. Whichever *Id is present in the body decides both which
 // column gets set and which partner's average "rating" gets recalculated.
-app.post("/api/reviews", publicFormLimiter, async (req, res) => {
+// Requires a tourist profile (requireTourist) — the display name and the
+// review's ownership both come from that profile, never from the request
+// body, so nobody can post under a made-up name or spoof somebody else's
+// account.
+app.post("/api/reviews", requireTourist, async (req, res) => {
   const { pousadaId, atracaoId, guideId } = req.body;
   const targetCount = [pousadaId, atracaoId, guideId].filter(Boolean).length;
   if (targetCount !== 1) {
     return res.status(400).json({ error: "Informe exatamente um de pousadaId, atracaoId ou guideId." });
+  }
+  const [column, table] = pousadaId ? ["pousadaId", "pousadas"] : atracaoId ? ["atracaoId", "atracoes"] : ["guideId", "guides"];
+  const targetId = pousadaId || atracaoId || guideId;
+
+  const touristId = (res.locals.touristUser as { id: string }).id;
+  const { data: touristProfile } = await supabase.from("turistas").select("name").eq("id", touristId).maybeSingle();
+  if (!touristProfile) {
+    return res.status(403).json({ error: "Complete seu perfil de turista antes de avaliar." });
+  }
+
+  // One review per tourist per target — otherwise requiring a profile would
+  // only add a login step in front of review-bombing, not actually stop it.
+  const { data: existingReview } = await supabase.from("reviews").select("id").eq(column, targetId).eq("turistaId", touristId).maybeSingle();
+  if (existingReview) {
+    return res.status(400).json({ error: "Você já avaliou este item." });
   }
 
   const moderation = await moderateText(String(req.body.comment || ""));
@@ -1678,11 +1724,12 @@ app.post("/api/reviews", publicFormLimiter, async (req, res) => {
     pousadaId: pousadaId || undefined,
     atracaoId: atracaoId || undefined,
     guideId: guideId || undefined,
-    userName: req.body.userName || "Turista Satisfeito",
+    userName: touristProfile.name,
     rating: req.body.rating || 5,
     comment: req.body.comment,
     date: new Date().toISOString().split("T")[0],
-    photoUrl: req.body.photoUrl || undefined
+    photoUrl: req.body.photoUrl || undefined,
+    turistaId: touristId,
   };
 
   const { error } = await supabase.from("reviews").insert(newReview);
@@ -1692,8 +1739,6 @@ app.post("/api/reviews", publicFormLimiter, async (req, res) => {
   }
 
   // Recalculate the target's average rating from every review it has now
-  const [column, table] = pousadaId ? ["pousadaId", "pousadas"] : atracaoId ? ["atracaoId", "atracoes"] : ["guideId", "guides"];
-  const targetId = pousadaId || atracaoId || guideId;
   const { data: targetReviews } = await supabase.from("reviews").select("rating").eq(column, targetId);
   if (targetReviews && targetReviews.length > 0) {
     const avg = Number((targetReviews.reduce((sum, r) => sum + r.rating, 0) / targetReviews.length).toFixed(1));
@@ -1789,6 +1834,67 @@ app.delete("/api/turistas/:id", requireAdmin, async (req, res) => {
   const { error } = await supabase.from("turistas").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir turista" });
   res.json({ success: true, message: "Turista excluído com sucesso" });
+});
+
+// TURISTA SELF-SERVICE (Supabase Auth) — unlike admin/partner (invite-only,
+// provisioned by an admin), a tourist creates their own account: no vetting
+// needed, this is just the "profile required to review" gate (see
+// requireTourist above and POST /api/reviews below). The "turistas" row IS
+// the profile the gate checks for — it's the same table TURISTAS CRUD above
+// already exposes to the admin, just with the row's id set to the Supabase
+// Auth user id itself (instead of a t_ prefix) so a self-service signup and
+// its account are the same lookup.
+app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — cadastro de turista indisponível." });
+
+  const email = String(req.body.email || "").trim().toLowerCase();
+  const password = String(req.body.password || "");
+  const name = String(req.body.name || "").trim();
+  const whatsapp = String(req.body.whatsapp || "").trim();
+  const country = String(req.body.country || "").trim();
+  const age = Number(req.body.age);
+  const preferences = String(req.body.preferences || "").trim();
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Informe um email válido." });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: "A senha precisa ter pelo menos 8 caracteres." });
+  }
+  // All profile fields are mandatory at signup — a "perfil de turista"
+  // that's just an empty shell defeats the point of requiring one to review.
+  if (!name || !whatsapp || !country || !preferences || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idade e preferências de viagem." });
+  }
+
+  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: { role: "tourist" },
+  });
+  if (createErr || !created.user) {
+    return res.status(400).json({ error: describeAuthError(createErr, "Erro ao criar sua conta (o email já pode estar em uso).") });
+  }
+
+  const newTurista: Turista = { id: created.user.id, name, email, whatsapp, country, age, preferences };
+  const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
+  if (insertErr) {
+    // Don't leave a bare auth account behind with no profile row — it would
+    // pass requireTourist's role check but have nothing for a review to use.
+    await supabaseAdminAuth.auth.admin.deleteUser(created.user.id).catch(() => {});
+    console.error("Erro ao salvar perfil de turista no Supabase:", insertErr.message);
+    return res.status(500).json({ error: "Erro ao criar seu perfil." });
+  }
+
+  res.status(201).json({ success: true });
+});
+
+app.get("/api/turista/me", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { data, error } = await supabase.from("turistas").select("*").eq("id", userId).maybeSingle();
+  if (error || !data) return res.status(404).json({ error: "Perfil de turista não encontrado." });
+  res.json(data as Turista);
 });
 
 // ROTEIROS CRUD
@@ -2674,11 +2780,13 @@ CREATE TABLE IF NOT EXISTS reviews (
   rating FLOAT,
   comment TEXT,
   date TEXT,
-  "photoUrl" TEXT
+  "photoUrl" TEXT,
+  "turistaId" TEXT
 );
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "atracaoId" TEXT;
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "guideId" TEXT;
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "turistaId" TEXT;
 
 -- Ativar RLS em avaliações (sem policies públicas — só o backend com service_role acessa)
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
@@ -2767,6 +2875,10 @@ DROP POLICY IF EXISTS "Permitir exclusão pública de espécies" ON species;
 -- ======================================================
 
 -- 8. TABELA DE TURISTAS
+-- id: para uma linha criada pelo admin (TURISTAS CRUD) é um id qualquer
+-- ("t_..."); para um cadastro self-service (/api/turista/signup) é o próprio
+-- id do usuário no Supabase Auth, o que permite localizar "seu perfil" e
+-- exigir um perfil de turista para avaliar (ver requireTourist no server.ts).
 CREATE TABLE IF NOT EXISTS turistas (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

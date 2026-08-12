@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Star, LoaderCircle } from "lucide-react";
+import { Star, LoaderCircle, Lock } from "lucide-react";
 import { Review } from "../types";
+import { navigate } from "../lib/router";
+import { adminFetch } from "../lib/adminFetch";
+import { useTouristSession } from "../lib/useTouristSession";
 
 interface ReviewsSectionProps {
   targetType: "atracao" | "guia";
@@ -11,13 +14,17 @@ interface ReviewsSectionProps {
 // Pousada keeps its own richer review UI (with photo upload) inside
 // PousadaCatalog.tsx — this is the lighter-weight version reused by the two
 // newer profile types instead of duplicating the same ~80 lines twice.
+// Submitting now requires a perfil de turista (see requireTourist in
+// server.ts) — the display name comes from that profile, not a free-text
+// field, so there's no "quem está avaliando" input here anymore.
 export default function ReviewsSection({ targetType, targetId }: ReviewsSectionProps) {
+  const { checking, isTourist, profile } = useTouristSession();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState(false);
 
   const fetchReviews = () => {
@@ -32,28 +39,31 @@ export default function ReviewsSection({ targetType, targetId }: ReviewsSectionP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !comment.trim() || submitting) return;
+    if (!comment.trim() || submitting) return;
     setSubmitting(true);
+    setSubmitError("");
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await adminFetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           [targetType === "atracao" ? "atracaoId" : "guideId"]: targetId,
-          userName: name,
           rating,
           comment,
         }),
       });
-      if (!res.ok) throw new Error();
-      setName("");
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubmitError(body.error || "Erro ao enviar avaliação.");
+        return;
+      }
       setComment("");
       setRating(5);
       setSuccess(true);
       fetchReviews();
       setTimeout(() => setSuccess(false), 4000);
     } catch {
-      // best-effort — a failed review submission isn't worth a blocking error UI here
+      setSubmitError("Erro ao enviar avaliação.");
     } finally {
       setSubmitting(false);
     }
@@ -62,31 +72,47 @@ export default function ReviewsSection({ targetType, targetId }: ReviewsSectionP
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       <div className="lg:col-span-5">
-        <form onSubmit={handleSubmit} className="bg-white border border-editorial-border p-6 space-y-3">
-          <h3 className="font-serif font-bold text-editorial-primary text-lg mb-1">Deixe sua Avaliação</h3>
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1">Nota</label>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button key={n} type="button" onClick={() => setRating(n)} className="cursor-pointer">
-                  <Star className={`h-6 w-6 ${n <= rating ? "text-amber-500 fill-amber-500" : "text-zinc-200"}`} />
-                </button>
-              ))}
+        {checking ? (
+          <div className="bg-white border border-editorial-border p-6 flex justify-center">
+            <LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" />
+          </div>
+        ) : !isTourist ? (
+          <div className="bg-white border border-editorial-border p-6 text-center space-y-3">
+            <Lock className="h-6 w-6 text-editorial-muted mx-auto" />
+            <h3 className="font-serif font-bold text-editorial-primary text-lg">Crie seu perfil para avaliar</h3>
+            <p className="text-editorial-muted text-xs leading-relaxed">Para avaliar, você precisa ter um perfil de turista EcoSafari — é rápido e gratuito.</p>
+            <button
+              onClick={() => navigate("/turista")}
+              className="w-full bg-editorial-primary hover:opacity-90 text-white text-xs font-bold uppercase tracking-widest py-3 rounded-md transition cursor-pointer"
+            >
+              Criar perfil / Entrar
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-white border border-editorial-border p-6 space-y-3">
+            <h3 className="font-serif font-bold text-editorial-primary text-lg mb-1">Deixe sua Avaliação</h3>
+            {profile && <p className="text-editorial-muted text-[11px]">Avaliando como <span className="font-semibold text-editorial-text">{profile.name}</span></p>}
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1">Nota</label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} type="button" onClick={() => setRating(n)} className="cursor-pointer">
+                    <Star className={`h-6 w-6 ${n <= rating ? "text-amber-500 fill-amber-500" : "text-zinc-200"}`} />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1">Seu Nome</label>
-            <input type="text" required value={name} onChange={e => setName(e.target.value)} className="w-full border border-editorial-border rounded-md p-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1">Sua Avaliação</label>
-            <textarea required rows={3} value={comment} onChange={e => setComment(e.target.value)} className="w-full border border-editorial-border rounded-md p-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
-          </div>
-          <button type="submit" disabled={submitting} className="w-full bg-editorial-primary hover:opacity-90 text-white text-xs font-bold uppercase tracking-widest py-3 rounded-md transition disabled:opacity-60 cursor-pointer">
-            {submitting ? "Enviando..." : "Enviar Avaliação"}
-          </button>
-          {success && <p className="text-emerald-700 text-xs font-semibold text-center">Avaliação enviada, obrigado!</p>}
-        </form>
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1">Sua Avaliação</label>
+              <textarea required rows={3} value={comment} onChange={e => setComment(e.target.value)} className="w-full border border-editorial-border rounded-md p-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
+            </div>
+            {submitError && <p className="text-red-600 text-xs font-medium">{submitError}</p>}
+            <button type="submit" disabled={submitting} className="w-full bg-editorial-primary hover:opacity-90 text-white text-xs font-bold uppercase tracking-widest py-3 rounded-md transition disabled:opacity-60 cursor-pointer">
+              {submitting ? "Enviando..." : "Enviar Avaliação"}
+            </button>
+            {success && <p className="text-emerald-700 text-xs font-semibold text-center">Avaliação enviada, obrigado!</p>}
+          </form>
+        )}
       </div>
 
       <div className="lg:col-span-7 space-y-4 max-h-[500px] overflow-y-auto pr-1">

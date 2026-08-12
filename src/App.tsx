@@ -36,6 +36,7 @@ const CandidateStatusPage = lazy(() => import("./components/CandidateStatusPage"
 const PaymentConfirmationPage = lazy(() => import("./components/PaymentConfirmationPage"));
 const PartnerPortalPage = lazy(() => import("./components/PartnerPortalPage"));
 const PartnerOAuthConsentPage = lazy(() => import("./components/PartnerOAuthConsentPage"));
+const TuristaAuthPage = lazy(() => import("./components/TuristaAuthPage"));
 
 function LazyFallback() {
   return (
@@ -66,6 +67,7 @@ const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   // Matches the Supabase OAuth Server config exactly: Site URL =
   // .../parceiro, Authorization Path = /oauth/consent.
   "/parceiro/oauth/consent": PartnerOAuthConsentPage,
+  "/turista": TuristaAuthPage,
 };
 
 export default function App() {

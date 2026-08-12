@@ -47,6 +47,7 @@ export interface Review {
   comment: string;
   date: string;
   photoUrl?: string; // foto real do hóspede, opcional — reforça a prova social do depoimento
+  turistaId?: string; // id do turista autenticado que avaliou — obrigatório desde que avaliar passou a exigir perfil de turista
 }
 
 export type LanguageLevel = 'basico' | 'intermediario' | 'avancado';
