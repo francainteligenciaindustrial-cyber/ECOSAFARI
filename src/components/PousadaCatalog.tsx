@@ -3,6 +3,7 @@ import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, Ch
 import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
 import { navigate } from "../lib/router";
+import { getLanguageFlag } from "../lib/languageFlags";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -494,10 +495,18 @@ export default function PousadaCatalog({
                         <User className="h-8 w-8 text-editorial-muted" />
                       )}
                     </div>
+                    {guia.languages && guia.languages.length > 0 && (
+                      <div className="flex items-center justify-center gap-1 mb-1" title={guia.languages.map(l => l.language).join(", ")}>
+                        {guia.languages.map((l, i) => <span key={i} aria-hidden="true">{getLanguageFlag(l.language) || "🏳️"}</span>)}
+                      </div>
+                    )}
                     <h3 className="font-serif font-bold text-editorial-text text-sm group-hover:text-editorial-primary transition">{guia.name}</h3>
                     <p className="text-editorial-muted text-[11px] mt-0.5 flex items-center justify-center gap-1">
                       {guia.rating ? <><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {guia.rating}</> : <><Star className="h-3 w-3" /> Novo</>}
                     </p>
+                    {guia.bio && (
+                      <p className="text-editorial-muted text-[11px] mt-1 line-clamp-2 leading-snug">{guia.bio}</p>
+                    )}
                   </div>
                 ))}
               </div>
