@@ -3,7 +3,7 @@ import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, Ch
 import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
 import { navigate } from "../lib/router";
-import { getLanguageFlag } from "../lib/languageFlags";
+import LanguageFlag from "./LanguageFlag";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -497,7 +497,7 @@ export default function PousadaCatalog({
                     </div>
                     {guia.languages && guia.languages.length > 0 && (
                       <div className="flex items-center justify-center gap-1 mb-1" title={guia.languages.map(l => l.language).join(", ")}>
-                        {guia.languages.map((l, i) => <span key={i} aria-hidden="true">{getLanguageFlag(l.language) || "🏳️"}</span>)}
+                        {guia.languages.map((l, i) => <LanguageFlag key={i} language={l.language} className="w-5 h-3.5" />)}
                       </div>
                     )}
                     <h3 className="font-serif font-bold text-editorial-text text-sm group-hover:text-editorial-primary transition">{guia.name}</h3>

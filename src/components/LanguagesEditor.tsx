@@ -1,7 +1,7 @@
 import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { GuideLanguage, LanguageLevel } from "../types";
-import { getLanguageFlag } from "../lib/languageFlags";
+import LanguageFlag from "./LanguageFlag";
 
 export const LEVEL_LABELS: Record<LanguageLevel, string> = {
   basico: "Básico",
@@ -21,7 +21,7 @@ export default function LanguagesEditor({ value, onChange }: { value: GuideLangu
     <div className="space-y-2">
       {value.map((item, idx) => (
         <div key={idx} className="flex items-center gap-2">
-          <span className="w-5 text-center flex-shrink-0 text-base" aria-hidden="true">{getLanguageFlag(item.language) || ""}</span>
+          <LanguageFlag language={item.language} className="w-6 h-4" />
           <input
             type="text"
             value={item.language}

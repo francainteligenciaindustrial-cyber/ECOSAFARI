@@ -4,7 +4,7 @@ import { Guide } from "../types";
 import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
 import TopReviewQuote from "./TopReviewQuote";
-import { getLanguageFlag } from "../lib/languageFlags";
+import LanguageFlag from "./LanguageFlag";
 import { LEVEL_LABELS } from "./LanguagesEditor";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
@@ -68,7 +68,7 @@ export default function GuiaDetailsView({ id }: { id: string }) {
         {guia.languages.length > 0 && (
           <div className="flex items-center justify-center gap-1.5 mb-2" title={guia.languages.map(l => l.language).join(", ")}>
             {guia.languages.map((l, i) => (
-              <span key={i} className="text-lg" aria-label={l.language}>{getLanguageFlag(l.language) || "🏳️"}</span>
+              <LanguageFlag key={i} language={l.language} className="w-6 h-4" />
             ))}
           </div>
         )}
@@ -100,7 +100,7 @@ export default function GuiaDetailsView({ id }: { id: string }) {
               <div className="flex flex-wrap gap-1.5">
                 {guia.languages.map((l, i) => (
                   <span key={i} className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-2.5 py-1 rounded-full text-xs flex items-center gap-1.5">
-                    <span aria-hidden="true">{getLanguageFlag(l.language) || "🏳️"}</span> {l.language} — {LEVEL_LABELS[l.level]}
+                    <LanguageFlag language={l.language} className="w-4 h-2.5" /> {l.language} — {LEVEL_LABELS[l.level]}
                   </span>
                 ))}
               </div>

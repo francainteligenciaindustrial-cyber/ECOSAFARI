@@ -3,7 +3,7 @@ import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldChec
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
-import { PartnerProfileResponse, GuideLanguage } from "../types";
+import { PartnerProfileResponse } from "../types";
 import { navigate } from "../lib/router";
 import ImageListEditor from "./ImageListEditor";
 import ImageUploadButton from "./ImageUploadButton";
@@ -12,7 +12,7 @@ import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
 import RoomsEditor, { RoomDraft } from "./RoomsEditor";
 import ToggleSwitch from "./ToggleSwitch";
 import LanguagesEditor from "./LanguagesEditor";
-import { getLanguageFlag } from "../lib/languageFlags";
+import LanguageFlag from "./LanguageFlag";
 
 // Self-service portal for a partner (pousada/atração/guia) to edit only
 // their own profile — no access to bookings, other partners, or anything
@@ -603,11 +603,6 @@ export default function PartnerPortalPage() {
                 <div className="text-xs">
                   <label className="block text-editorial-text font-semibold mb-1.5">Idiomas Falados (com nível)</label>
                   <LanguagesEditor value={form.languages} onChange={languages => setForm((p: any) => ({ ...p, languages }))} />
-                  {form.languages.length > 0 && (
-                    <div className="flex items-center gap-1.5 mt-2 text-lg" title="Prévia das bandeiras exibidas no seu perfil público">
-                      {form.languages.map((l: GuideLanguage, i: number) => <span key={i} aria-hidden="true">{getLanguageFlag(l.language) || "🏳️"}</span>)}
-                    </div>
-                  )}
                 </div>
                 <div className="text-xs">
                   <label className="block text-editorial-text font-semibold mb-1.5">Especialidades</label>
