@@ -9,17 +9,19 @@ export default function PaymentConfirmationPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [booking, setBooking] = useState<Booking | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [sessionId, setSessionId] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id");
-    if (!sessionId) {
+    const sid = params.get("session_id");
+    if (!sid) {
       setStatus("error");
       setErrorMsg("Sessão de pagamento não encontrada.");
       return;
     }
+    setSessionId(sid);
 
-    fetch(`/api/payments/confirm?session_id=${encodeURIComponent(sessionId)}`)
+    fetch(`/api/payments/confirm?session_id=${encodeURIComponent(sid)}`)
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Erro ao confirmar pagamento");
@@ -80,7 +82,7 @@ export default function PaymentConfirmationPage() {
             </div>
 
             <a
-              href={`/api/bookings/${booking.id}/voucher.pdf`}
+              href={`/api/bookings/${booking.id}/voucher.pdf?session_id=${encodeURIComponent(sessionId)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full bg-editorial-primary text-white text-xs uppercase tracking-widest font-bold py-3 rounded-md hover:opacity-90 transition mb-3"

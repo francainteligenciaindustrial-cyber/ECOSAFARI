@@ -1605,11 +1605,48 @@ app.get("/api/resend/status", (req, res) => {
   res.json({ configured: !!resend });
 });
 
-app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {
+// Autoriza o acesso ao voucher de duas formas: (1) admin autenticado, ou
+// (2) posse comprovada da sessão de pagamento Stripe que gerou esta reserva
+// (?session_id=..., o mesmo valor que a página de confirmação já tem na URL
+// logo após o checkout). Sem uma dessas duas provas, o UUID da reserva
+// sozinho não abre mais o PDF de ninguém — antes disso, qualquer pessoa que
+// descobrisse um booking.id (histórico do navegador, link encaminhado,
+// captura de tela) conseguia baixar nome, email, datas e valor pago de
+// qualquer hóspede, para sempre, sem nunca ter se autenticado.
+async function getAuthorizedBooking(req: express.Request, res: express.Response): Promise<Booking | null> {
   const { data: booking, error: fetchErr } = await supabase.from("bookings").select("*").eq("id", req.params.id).maybeSingle();
   if (fetchErr || !booking) {
-    return res.status(404).json({ error: "Reserva não encontrada" });
+    res.status(404).json({ error: "Reserva não encontrada" });
+    return null;
   }
+
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (token) {
+    const { data } = await supabase.auth.getUser(token);
+    if (data.user?.app_metadata?.role === "admin") return booking as Booking;
+  }
+
+  const sessionId = String(req.query.session_id || "");
+  if (stripe && sessionId) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status === "paid" && session.metadata?.bookingId === booking.id) {
+        return booking as Booking;
+      }
+    } catch {
+      // session_id inválido/inexistente cai no 403 abaixo
+    }
+  }
+
+  res.status(403).json({ error: "Acesso ao voucher não autorizado." });
+  return null;
+}
+
+app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {
+  const booking = await getAuthorizedBooking(req, res);
+  if (!booking) return; // getAuthorizedBooking já respondeu o erro
+
   try {
     const buffer = await generateVoucherPdfBuffer(booking);
     res.setHeader("Content-Type", "application/pdf");
@@ -1678,8 +1715,13 @@ app.post("/api/sightings/:id/like", publicFormLimiter, async (req, res) => {
 });
 
 // REVIEWS
+// Público — só os campos exibidos na vitrine de avaliações. turistaId fica de
+// fora de propósito: é o id interno (Supabase Auth) de quem avaliou, sem uso
+// nenhum no front-end, e não deveria vazar numa rota sem autenticação.
 app.get("/api/reviews", async (req, res) => {
-  const { data, error } = await supabase.from("reviews").select("*");
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("id,pousadaId,atracaoId,guideId,userName,rating,comment,date,photoUrl");
   if (error) return res.status(500).json({ error: "Erro ao buscar avaliações" });
   res.json(data);
 });
