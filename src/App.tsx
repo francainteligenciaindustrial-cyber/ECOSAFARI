@@ -13,6 +13,7 @@ import GuiaDetailsView from "./components/GuiaDetailsView";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getSupabaseClient } from "./lib/supabaseClient";
+import { isAdminUser } from "./lib/authRoles";
 import { useRoute, navigate } from "./lib/router";
 import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./types";
 
@@ -82,7 +83,9 @@ export default function App() {
   const guiaRouteMatch = path.match(/^\/guias\/(.+)$/);
 
   // Supabase Auth: the "Gestão" tab is only shown to authenticated users whose
-  // account has app_metadata.role === "admin" (set via the Supabase dashboard).
+  // account has app_metadata.isAdmin === true (concedido via a votação dos 3
+  // admins-chefe — ver ADMIN GOVERNANCE em server.ts). Convive com qualquer
+  // outro papel que a mesma conta já tenha (turista, parceiro).
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -94,11 +97,11 @@ export default function App() {
       setSupabase(client);
 
       client.auth.getSession().then(({ data }) => {
-        setIsAdmin(data.session?.user?.app_metadata?.role === "admin");
+        setIsAdmin(isAdminUser(data.session?.user));
       });
 
       const { data } = client.auth.onAuthStateChange((_event, newSession) => {
-        setIsAdmin(newSession?.user?.app_metadata?.role === "admin");
+        setIsAdmin(isAdminUser(newSession?.user));
       });
       subscription = data.subscription;
     });

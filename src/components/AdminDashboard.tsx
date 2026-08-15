@@ -29,12 +29,14 @@ import {
   PawPrint,
   Map as MapIcon,
   Lock,
+  ScrollText,
   type LucideIcon
 } from "lucide-react";
 import { Pousada, Guide, Booking, Notification, Species, GuideLanguage } from "../types";
 import TurismoPanel from "./TurismoPanel";
 import CandidaturasPanel from "./CandidaturasPanel";
 import AdminUsersPanel from "./AdminUsersPanel";
+import AdminAuditLogPanel from "./AdminAuditLogPanel";
 import AtracoesPanel from "./AtracoesPanel";
 import PartnerAccessManager from "./PartnerAccessManager";
 import ReferralStatsWidget from "./ReferralStatsWidget";
@@ -55,7 +57,7 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins";
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
 // hand-written <button> per tab. Grouped into sections (rather than one flat
@@ -73,6 +75,7 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "species", icon: PawPrint, label: "Espécies", group: "Conteúdo" },
   { id: "turismo", icon: MapIcon, label: "Turistas & Roteiros", group: "Conteúdo" },
   { id: "admins", icon: Lock, label: "Administradores", group: "Sistema" },
+  { id: "auditlog", icon: ScrollText, label: "Log de Auditoria", group: "Sistema" },
 ];
 const ADMIN_TAB_GROUPS = ["Operação", "Parceiros", "Conteúdo", "Sistema"] as const;
 
@@ -1076,6 +1079,7 @@ export default function AdminDashboard({
 
         {/* TAB: GESTÃO DE ADMINISTRADORES (Supabase Auth) */}
         {activeTab === "admins" && <AdminUsersPanel />}
+        {activeTab === "auditlog" && <AdminAuditLogPanel />}
 
         {/* TAB 1: RESERVAS & CONFIRMAÇÕES */}
         {activeTab === "bookings" && (

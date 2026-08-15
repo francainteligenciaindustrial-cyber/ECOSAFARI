@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Lock, LoaderCircle } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isAdminUser } from "../lib/authRoles";
 
 interface AdminLoginModalProps {
   supabase: SupabaseClient;
@@ -27,8 +28,7 @@ export default function AdminLoginModal({ supabase, onClose, onAdminAuthenticate
       return;
     }
 
-    const role = data.user.app_metadata?.role;
-    if (role !== "admin") {
+    if (!isAdminUser(data.user)) {
       await supabase.auth.signOut();
       setError("Esta conta não tem permissão de administrador.");
       setLoading(false);

@@ -216,8 +216,18 @@ const viewLimiter = rateLimit({
   message: { error: "Muitas requisições em pouco tempo." },
 });
 
+// A conta é admin se tiver app_metadata.isAdmin === true — o jeito atual,
+// que convive com qualquer outro papel que a mesma conta já tenha (turista,
+// parceiro), porque conceder admin nunca substitui o app_metadata inteiro,
+// só acrescenta essa chave (ver finalizeGrantAdmin). role === "admin" fica
+// como fallback só para contas antigas criadas antes dessa mudança (scripts/
+// create-admin.ts e o extinto POST /api/admin/users usavam esse formato).
+function isAdminUser(user: { app_metadata?: Record<string, unknown> } | null | undefined): boolean {
+  return user?.app_metadata?.isAdmin === true || user?.app_metadata?.role === "admin";
+}
+
 // Verifies the caller is an authenticated admin (Supabase Auth JWT with
-// app_metadata.role === "admin") before allowing access to admin-only routes.
+// app_metadata.isAdmin === true) before allowing access to admin-only routes.
 // The Gestão tab hides itself client-side for non-admins, but that's cosmetic —
 // this is what actually stops someone from calling the API directly.
 const requireAdmin: express.RequestHandler[] = [
@@ -232,11 +242,12 @@ const requireAdmin: express.RequestHandler[] = [
 
     try {
       const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data.user || data.user.app_metadata?.role !== "admin") {
+      if (error || !data.user || !isAdminUser(data.user)) {
         return res.status(403).json({ error: "Acesso restrito a administradores." });
       }
       // Stashed for routes that need to know which admin is calling — e.g.
-      // preventing an admin from revoking their own access below.
+      // preventing an admin from revoking their own access below, or
+      // atribuindo autoria no log de auditoria (logAdminAction).
       res.locals.adminUser = data.user;
       next();
     } catch (err) {
@@ -262,7 +273,7 @@ const requireAdminOrPartner: express.RequestHandler[] = [
     try {
       const { data, error } = await supabase.auth.getUser(token);
       const role = data.user?.app_metadata?.role;
-      if (error || !data.user || (role !== "admin" && role !== "partner")) {
+      if (error || !data.user || (!isAdminUser(data.user) && role !== "partner")) {
         return res.status(403).json({ error: "Acesso restrito a administradores ou parceiros." });
       }
       next();
@@ -295,8 +306,11 @@ function requirePartnerAccess(partnerType: PartnerType): express.RequestHandler[
         if (error || !data.user) {
           return res.status(401).json({ error: "Token inválido." });
         }
+        // Stashed for logAdminAction — quem editou, seja admin ou o próprio
+        // parceiro autoeditando o registro.
+        res.locals.actorUser = data.user;
         const role = data.user.app_metadata?.role;
-        if (role === "admin") {
+        if (isAdminUser(data.user)) {
           res.locals.isAdmin = true;
           return next();
         }
@@ -342,6 +356,63 @@ const requireTourist: express.RequestHandler[] = [
     }
   },
 ];
+
+// Só os 3 admins-chefe fundadores (app_metadata.isChief === true, marcado
+// direto no banco via scripts/set-chief-admins.ts com a service_role key —
+// nunca por uma rota que o cliente possa chamar) podem votar em propostas de
+// admin. É isso que transforma conceder/revogar acesso administrativo numa
+// decisão dos 3, em vez de algo que um único admin decide sozinho — ver
+// ADMIN GOVERNANCE mais abaixo.
+const requireChief: express.RequestHandler[] = [
+  authLimiter,
+  async (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: "Autenticação necessária." });
+    }
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data.user || data.user.app_metadata?.isChief !== true) {
+        return res.status(403).json({ error: "Ação restrita aos administradores-chefe." });
+      }
+      res.locals.chiefUser = data.user;
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Token inválido." });
+    }
+  },
+];
+
+// Registra uma ação administrativa (criar/editar/excluir um registro,
+// aprovar candidatura, votar numa proposta de admin...) para que qualquer
+// admin veja o que os outros fizeram no painel de Gestão. Nunca bloqueia a
+// operação principal — se o log falhar (ex: tabela ainda não criada via
+// scripts/add-admin-governance.sql), só um warning no console, igual ao
+// padrão "fail open" já usado em addNotification/moderateText.
+async function logAdminAction(
+  actor: { id: string; email?: string | null } | null | undefined,
+  action: string,
+  resourceType: string,
+  resourceId: string | null,
+  resourceLabel: string | null
+) {
+  if (!actor) return;
+  try {
+    const { error } = await supabase.from("admin_audit_log").insert({
+      id: `log_${randomUUID()}`,
+      actor_id: actor.id,
+      actor_email: actor.email || "desconhecido",
+      action,
+      resource_type: resourceType,
+      resource_id: resourceId,
+      resource_label: resourceLabel,
+    });
+    if (error) console.warn("Erro ao registrar log de auditoria:", error.message);
+  } catch (err: any) {
+    console.warn("Erro ao registrar log de auditoria:", err.message);
+  }
+}
 
 // Optional Sentry error reporting — lazy-imported only when SENTRY_DSN is
 // set, so an unconfigured deployment doesn't pay for the dependency at
@@ -799,6 +870,7 @@ app.post("/api/pousadas", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar pousada no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar pousada" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "pousada", newPousada.id, newPousada.name);
   res.status(201).json(newPousada);
 });
 
@@ -811,17 +883,19 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
   const updates = pickFields<Pousada>(req.body, res.locals.isAdmin ? POUSADA_UPDATE_FIELDS : POUSADA_CREATE_FIELDS);
   const { data, error } = await supabase.from("pousadas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Pousada não encontrada" });
+  await logAdminAction(res.locals.actorUser, "update", "pousada", id, data.name);
   res.json(mapPousadaRow(data));
 });
 
 app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("pousadas").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("pousadas").delete().eq("id", id);
   if (error) {
     console.error("Erro ao excluir pousada no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao excluir pousada" });
   }
-  
+  await logAdminAction(res.locals.adminUser, "delete", "pousada", id, existing?.name || id);
   res.json({ success: true, message: "Pousada excluída com sucesso" });
 });
 
@@ -889,6 +963,7 @@ app.post("/api/guides", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar guia no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar guia" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "guide", newGuide.id, newGuide.name);
   res.status(201).json(newGuide);
 });
 
@@ -897,13 +972,16 @@ app.put("/api/guides/:id", requirePartnerAccess("guia"), async (req, res) => {
   const updates = pickFields<Guide>(req.body, GUIDE_FIELDS);
   const { data, error } = await supabase.from("guides").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
+  await logAdminAction(res.locals.actorUser, "update", "guide", id, data.name);
   res.json(mapGuideRow(data));
 });
 
 app.delete("/api/guides/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("guides").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("guides").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir guia" });
+  await logAdminAction(res.locals.adminUser, "delete", "guide", id, existing?.name || id);
   res.json({ success: true, message: "Guia excluído com sucesso" });
 });
 
@@ -953,6 +1031,7 @@ app.post("/api/atracoes", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar atração no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar atração" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "atracao", newAtracao.id, newAtracao.name);
   res.status(201).json(newAtracao);
 });
 
@@ -964,13 +1043,16 @@ app.put("/api/atracoes/:id", requirePartnerAccess("atracao"), async (req, res) =
   const updates = pickFields<Atracao>(req.body, fields);
   const { data, error } = await supabase.from("atracoes").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Atração não encontrada" });
+  await logAdminAction(res.locals.actorUser, "update", "atracao", id, data.name);
   res.json(mapAtracaoRow(data));
 });
 
 app.delete("/api/atracoes/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("atracoes").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("atracoes").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir atração" });
+  await logAdminAction(res.locals.adminUser, "delete", "atracao", id, existing?.name || id);
   res.json({ success: true, message: "Atração excluída com sucesso" });
 });
 
@@ -1068,6 +1150,7 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
   }
 
   addNotification("admin", `Nova reserva criada: ${newBooking.customerName} na ${newBooking.pousadaName}.`, "booking_new", newBooking.id);
+  await logAdminAction(res.locals.adminUser, "create", "booking", newBooking.id, `${newBooking.customerName} — ${newBooking.pousadaName}`);
 
   res.status(201).json({ available: true, booking: newBooking });
 });
@@ -1409,6 +1492,7 @@ app.put("/api/bookings/:id/status", requireAdmin, async (req, res) => {
   if (!updated) {
     return res.status(404).json({ error: "Reserva não encontrada" });
   }
+  await logAdminAction(res.locals.adminUser, "update_status", "booking", updated.id, `${updated.customerName} — ${updated.status}`);
   res.json(updated);
 });
 
@@ -1822,6 +1906,7 @@ app.post("/api/species", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar espécie no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar espécie" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "species", newSpecie.id, (newSpecie as any).name || newSpecie.id);
   res.status(201).json(newSpecie);
 });
 
@@ -1830,13 +1915,16 @@ app.put("/api/species/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<Species>(req.body, SPECIES_FIELDS);
   const { data, error } = await supabase.from("species").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Espécie não encontrada" });
+  await logAdminAction(res.locals.adminUser, "update", "species", id, (data as any).name || id);
   res.json(data);
 });
 
 app.delete("/api/species/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("species").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("species").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir espécie" });
+  await logAdminAction(res.locals.adminUser, "delete", "species", id, (existing as any)?.name || id);
   res.json({ success: true, message: "Espécie excluída com sucesso" });
 });
 
@@ -1860,6 +1948,7 @@ app.post("/api/turistas", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar turista no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar turista" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "turista", newTurista.id, newTurista.name);
   res.status(201).json(newTurista);
 });
 
@@ -1868,13 +1957,16 @@ app.put("/api/turistas/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<Turista>(req.body, TURISTA_FIELDS);
   const { data, error } = await supabase.from("turistas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Turista não encontrado" });
+  await logAdminAction(res.locals.adminUser, "update", "turista", id, data.name);
   res.json(data);
 });
 
 app.delete("/api/turistas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("turistas").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("turistas").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir turista" });
+  await logAdminAction(res.locals.adminUser, "delete", "turista", id, existing?.name || id);
   res.json({ success: true, message: "Turista excluído com sucesso" });
 });
 
@@ -1953,6 +2045,7 @@ app.post("/api/roteiros", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar roteiro no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar roteiro" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "roteiro", newRoteiro.id, newRoteiro.name);
   res.status(201).json(newRoteiro);
 });
 
@@ -1961,13 +2054,16 @@ app.put("/api/roteiros/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<Roteiro>(req.body, ROTEIRO_FIELDS);
   const { data, error } = await supabase.from("roteiros").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Roteiro não encontrado" });
+  await logAdminAction(res.locals.adminUser, "update", "roteiro", id, data.name);
   res.json(data);
 });
 
 app.delete("/api/roteiros/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("roteiros").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("roteiros").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir roteiro" });
+  await logAdminAction(res.locals.adminUser, "delete", "roteiro", id, existing?.name || id);
   res.json({ success: true, message: "Roteiro excluído com sucesso" });
 });
 
@@ -1985,6 +2081,7 @@ app.post("/api/reservas", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar reserva no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar reserva" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "reserva_roteiro", newReserva.id, `roteiro ${newReserva.roteiroId} — turista ${newReserva.turistaId}`);
   res.status(201).json(newReserva);
 });
 
@@ -1993,6 +2090,7 @@ app.put("/api/reservas/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<Reserva>(req.body, RESERVA_FIELDS);
   const { data, error } = await supabase.from("reservas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Reserva não encontrada" });
+  await logAdminAction(res.locals.adminUser, "update", "reserva_roteiro", id, `status: ${data.status}`);
   res.json(data);
 });
 
@@ -2000,6 +2098,7 @@ app.delete("/api/reservas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { error } = await supabase.from("reservas").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir reserva" });
+  await logAdminAction(res.locals.adminUser, "delete", "reserva_roteiro", id, id);
   res.json({ success: true, message: "Reserva excluída com sucesso" });
 });
 
@@ -2017,6 +2116,7 @@ app.post("/api/pagamentos", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar pagamento no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar pagamento" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "pagamento", newPagamento.id, `R$ ${newPagamento.amount} — reserva ${newPagamento.reservaId}`);
   res.status(201).json(newPagamento);
 });
 
@@ -2025,6 +2125,7 @@ app.put("/api/pagamentos/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<Pagamento>(req.body, PAGAMENTO_FIELDS);
   const { data, error } = await supabase.from("pagamentos").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Pagamento não encontrado" });
+  await logAdminAction(res.locals.adminUser, "update", "pagamento", id, `status: ${data.status}`);
   res.json(data);
 });
 
@@ -2032,6 +2133,7 @@ app.delete("/api/pagamentos/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { error } = await supabase.from("pagamentos").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir pagamento" });
+  await logAdminAction(res.locals.adminUser, "delete", "pagamento", id, id);
   res.json({ success: true, message: "Pagamento excluído com sucesso" });
 });
 
@@ -2049,6 +2151,7 @@ app.post("/api/guias", requireAdmin, async (req, res) => {
     console.error("Erro ao salvar guia no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar guia" });
   }
+  await logAdminAction(res.locals.adminUser, "create", "guia_turistico", newGuia.id, newGuia.name);
   res.status(201).json(newGuia);
 });
 
@@ -2057,13 +2160,16 @@ app.put("/api/guias/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<GuiaTuristico>(req.body, GUIA_TURISTICO_FIELDS);
   const { data, error } = await supabase.from("guias").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
+  await logAdminAction(res.locals.adminUser, "update", "guia_turistico", id, data.name);
   res.json(data);
 });
 
 app.delete("/api/guias/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("guias").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("guias").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir guia" });
+  await logAdminAction(res.locals.adminUser, "delete", "guia_turistico", id, existing?.name || id);
   res.json({ success: true, message: "Guia excluído com sucesso" });
 });
 
@@ -2149,13 +2255,16 @@ app.put("/api/candidaturas/:id", requireAdmin, async (req, res) => {
   const updates = pickFields<Candidatura>(req.body, ["status"]);
   const { data, error } = await supabase.from("candidaturas").update(updates).eq("id", id).select().single();
   if (error || !data) return res.status(404).json({ error: "Candidatura não encontrada" });
+  await logAdminAction(res.locals.adminUser, "update_status", "candidatura", id, `${data.name} — ${data.status}`);
   res.json(data);
 });
 
 app.delete("/api/candidaturas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
+  const { data: existing } = await supabase.from("candidaturas").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("candidaturas").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir candidatura" });
+  await logAdminAction(res.locals.adminUser, "delete", "candidatura", id, existing?.name || id);
   res.json({ success: true, message: "Candidatura excluída com sucesso" });
 });
 
@@ -2189,9 +2298,6 @@ app.get("/api/referral-sources", requireAdmin, async (req, res) => {
 
 // ----------------------------------------------------
 // ADMIN USER MANAGEMENT (Supabase Auth)
-// Lets an existing admin invite/revoke other admins from the dashboard
-// itself, instead of requiring terminal + service_role access to run
-// scripts/create-admin.ts every time someone new needs access.
 // ----------------------------------------------------
 
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
@@ -2199,70 +2305,276 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
   const { data, error } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 200 });
   if (error || !data?.users) return res.status(500).json({ error: "Erro ao listar administradores." });
   const admins = data.users
-    .filter((u: any) => u.app_metadata?.role === "admin")
-    .map((u: any) => ({ id: u.id, email: u.email, createdAt: u.created_at, lastSignInAt: u.last_sign_in_at || null }));
+    .filter((u: any) => isAdminUser(u))
+    .map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      createdAt: u.created_at,
+      lastSignInAt: u.last_sign_in_at || null,
+      isChief: u.app_metadata?.isChief === true,
+    }));
   res.json(admins);
 });
 
-app.post("/api/admin/users", requireAdmin, async (req, res) => {
-  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de administradores indisponível." });
-  const email = String(req.body.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: "Informe um email válido." });
+// ----------------------------------------------------
+// ADMIN GOVERNANCE — propostas + votação dos 3 admins-chefe
+//
+// Conceder acesso de admin deixou de ser uma ação unilateral: qualquer admin
+// pode propor um email (grant) ou propor remover o acesso de outro admin
+// (revoke) via POST /api/admin/proposals — mas isso só se efetiva com os
+// votos dos 3 admins-chefe (app_metadata.isChief === true, marcado só via
+// scripts/set-chief-admins.ts). Concessão exige unanimidade (3/3); revogação
+// exige maioria (2/3). Um "não" de qualquer chefe já rejeita uma proposta de
+// concessão na hora — não faz sentido esperar unanimidade que já ficou
+// impossível.
+// ----------------------------------------------------
+
+const REQUIRED_YES_VOTES: Record<"grant" | "revoke", number> = { grant: 3, revoke: 2 };
+
+// Concede admin — se o email já tem conta (ex: um guia ou turista que também
+// vai virar admin), só ACRESCENTA isAdmin=true ao app_metadata existente,
+// nunca substitui: o papel de turista/parceiro que a conta já tinha continua
+// intacto. Se não existir conta, cria uma nova (sem role nenhum, só admin).
+async function finalizeGrantAdmin(email: string): Promise<{ ok: boolean; message?: string; actionLink?: string | null }> {
+  if (!supabaseAdminAuth) return { ok: false, message: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
+
+  const { data: existing, error: listErr } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+  if (listErr) return { ok: false, message: describeAuthError(listErr, "Erro ao verificar contas existentes.") };
+  const match = existing?.users?.find((u: any) => u.email?.toLowerCase() === email);
+
+  let userId: string;
+  if (match) {
+    const mergedMetadata = { ...(match.app_metadata || {}), isAdmin: true };
+    const { error } = await supabaseAdminAuth.auth.admin.updateUserById(match.id, { app_metadata: mergedMetadata });
+    if (error) return { ok: false, message: describeAuthError(error, "Erro ao conceder acesso de administrador.") };
+    userId = match.id;
+  } else {
+    const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+      email,
+      password: randomUUID(),
+      email_confirm: true,
+      app_metadata: { isAdmin: true },
+    });
+    if (createErr || !created.user) return { ok: false, message: describeAuthError(createErr, "Erro ao criar administrador.") };
+    userId = created.user.id;
   }
 
-  // Created directly with app_metadata.role="admin" (same as
-  // scripts/create-admin.ts) with a random password the invitee never
-  // needs to know — they set their own via the recovery link below.
-  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
-    email,
-    password: randomUUID(),
-    email_confirm: true,
-    app_metadata: { role: "admin" },
-  });
-  if (createErr || !created.user) {
-    return res.status(400).json({ error: createErr?.message || "Erro ao criar administrador (o email já pode estar em uso)." });
-  }
-
-  // A recovery link the new admin uses to set their own password —
-  // generated directly instead of relying on Supabase's transactional email
-  // (which needs SMTP configured and isn't guaranteed to be set up on every
-  // deploy). Returned to the calling admin to copy and send manually,
-  // mirroring the candidatura status-link pattern already used elsewhere.
-  // Without an explicit redirectTo, Supabase falls back to whatever "Site
-  // URL" is configured in the dashboard — on a project that still has that
-  // set to a local dev URL, the generated link would send the invitee to a
-  // dead localhost address instead of the real site. /parceiro is where the
-  // "defina sua senha" screen actually lives (see PartnerPortalPage).
+  // Link de recuperação pra pessoa definir a própria senha — sem
+  // redirectTo explícito o Supabase usa a "Site URL" do painel, que pode
+  // estar apontando pra localhost num projeto mal configurado.
   const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
     type: "recovery",
     email,
     options: { redirectTo: `${SITE_URL}/parceiro` },
   });
-  if (linkErr) {
-    console.warn("Administrador criado, mas falha ao gerar link de acesso:", linkErr.message);
+  if (linkErr) console.warn(`Admin ${email} criado/promovido, mas falha ao gerar link de acesso:`, linkErr.message);
+  return { ok: true, actionLink: linkData?.properties?.action_link || null };
+}
+
+// Revoga só a chave isAdmin (e isChief, por segurança — ninguém fica chefe
+// sem ser admin) do app_metadata — qualquer outro papel (turista, parceiro)
+// que a conta tenha continua intacto.
+async function finalizeRevokeAdmin(userId: string | null): Promise<{ ok: boolean; message?: string }> {
+  if (!supabaseAdminAuth) return { ok: false, message: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
+  if (!userId) return { ok: false, message: "Administrador não identificado." };
+  const { data: existing, error: listErr } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+  if (listErr) return { ok: false, message: describeAuthError(listErr, "Erro ao verificar contas existentes.") };
+  const match = existing?.users?.find((u: any) => u.id === userId);
+  if (!match) return { ok: false, message: "Administrador não encontrado." };
+
+  const remainingMetadata: Record<string, unknown> = { ...(match.app_metadata || {}) };
+  delete remainingMetadata.isAdmin;
+  delete remainingMetadata.isChief;
+  if (remainingMetadata.role === "admin") delete remainingMetadata.role;
+
+  const { error } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: remainingMetadata });
+  if (error) return { ok: false, message: describeAuthError(error, "Erro ao revogar acesso de administrador.") };
+  return { ok: true };
+}
+
+// Lista as propostas (mais recentes primeiro) junto com os votos já
+// registrados em cada uma — qualquer admin vê o andamento, mas só um chefe
+// consegue de fato votar (POST .../vote, abaixo, usa requireChief).
+app.get("/api/admin/proposals", requireAdmin, async (req, res) => {
+  const { data: proposals, error } = await supabase
+    .from("admin_invite_proposals")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return res.status(500).json({ error: "Erro ao buscar propostas de administrador." });
+
+  const ids = (proposals || []).map((p: any) => p.id);
+  const { data: votes } = ids.length
+    ? await supabase.from("admin_invite_votes").select("*").in("proposal_id", ids)
+    : { data: [] as any[] };
+
+  const withVotes = (proposals || []).map((p: any) => ({
+    ...p,
+    votes: (votes || []).filter((v: any) => v.proposal_id === p.id),
+  }));
+  res.json(withVotes);
+});
+
+app.post("/api/admin/proposals", requireAdmin, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — governança de administradores indisponível." });
+  const actor = res.locals.adminUser as { id: string; email?: string };
+  const action = req.body.action === "revoke" ? "revoke" : "grant";
+
+  if (action === "grant") {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Informe um email válido." });
+    }
+    const { data: existingUsers } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+    const match = existingUsers?.users?.find((u: any) => u.email?.toLowerCase() === email);
+    if (match && isAdminUser(match)) {
+      return res.status(400).json({ error: "Este email já tem acesso de administrador." });
+    }
+    const { data: pending } = await supabase
+      .from("admin_invite_proposals")
+      .select("id")
+      .eq("email", email)
+      .eq("action", "grant")
+      .eq("status", "pending");
+    if (pending && pending.length > 0) {
+      return res.status(400).json({ error: "Já existe uma proposta pendente de concessão para este email." });
+    }
+
+    const proposal = {
+      id: `prop_${randomUUID()}`,
+      email,
+      action: "grant",
+      target_user_id: null,
+      proposed_by_id: actor.id,
+      proposed_by_email: actor.email || "",
+      status: "pending",
+    };
+    const { error } = await supabase.from("admin_invite_proposals").insert(proposal);
+    if (error) return res.status(500).json({ error: "Erro ao criar proposta." });
+    await logAdminAction(actor, "propose_grant_admin", "admin_proposal", proposal.id, email);
+    return res.status(201).json(proposal);
   }
 
-  res.status(201).json({
-    user: { id: created.user.id, email: created.user.email },
-    actionLink: linkData?.properties?.action_link || null,
+  // action === "revoke"
+  const targetUserId = String(req.body.targetUserId || "");
+  if (!targetUserId) return res.status(400).json({ error: "Informe o administrador a ser removido." });
+  const { data: existingUsers } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+  const match = existingUsers?.users?.find((u: any) => u.id === targetUserId);
+  if (!match || !isAdminUser(match)) {
+    return res.status(404).json({ error: "Administrador não encontrado." });
+  }
+  const { data: pending } = await supabase
+    .from("admin_invite_proposals")
+    .select("id")
+    .eq("target_user_id", targetUserId)
+    .eq("action", "revoke")
+    .eq("status", "pending");
+  if (pending && pending.length > 0) {
+    return res.status(400).json({ error: "Já existe uma proposta pendente para remover este administrador." });
+  }
+
+  const proposal = {
+    id: `prop_${randomUUID()}`,
+    email: match.email,
+    action: "revoke",
+    target_user_id: targetUserId,
+    proposed_by_id: actor.id,
+    proposed_by_email: actor.email || "",
+    status: "pending",
+  };
+  const { error } = await supabase.from("admin_invite_proposals").insert(proposal);
+  if (error) return res.status(500).json({ error: "Erro ao criar proposta." });
+  await logAdminAction(actor, "propose_revoke_admin", "admin_proposal", proposal.id, match.email);
+  res.status(201).json(proposal);
+});
+
+app.post("/api/admin/proposals/:id/vote", requireChief, async (req, res) => {
+  const chief = res.locals.chiefUser as { id: string; email?: string };
+  const approve = req.body.approve === true;
+  const { id } = req.params;
+
+  const { data: proposal, error: fetchErr } = await supabase
+    .from("admin_invite_proposals")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchErr || !proposal) return res.status(404).json({ error: "Proposta não encontrada." });
+  if (proposal.status !== "pending") return res.status(400).json({ error: "Esta proposta já foi resolvida." });
+
+  const { error: voteErr } = await supabase
+    .from("admin_invite_votes")
+    .upsert(
+      { proposal_id: id, chief_id: chief.id, chief_email: chief.email || "", approve },
+      { onConflict: "proposal_id,chief_id" }
+    );
+  if (voteErr) return res.status(500).json({ error: "Erro ao registrar voto." });
+  await logAdminAction(chief, approve ? "vote_approve" : "vote_reject", "admin_proposal", id, proposal.email);
+
+  if (!approve) {
+    await supabase.from("admin_invite_proposals").update({ status: "rejected", resolved_at: new Date().toISOString() }).eq("id", id);
+    return res.json({ status: "rejected" });
+  }
+
+  const { data: votes } = await supabase.from("admin_invite_votes").select("*").eq("proposal_id", id);
+  const yesVotes = (votes || []).filter((v: any) => v.approve).length;
+  const required = REQUIRED_YES_VOTES[proposal.action as "grant" | "revoke"];
+
+  if (yesVotes < required) {
+    return res.json({ status: "pending", yesVotes, required });
+  }
+
+  const result = proposal.action === "grant"
+    ? await finalizeGrantAdmin(proposal.email)
+    : await finalizeRevokeAdmin(proposal.target_user_id);
+
+  await supabase
+    .from("admin_invite_proposals")
+    .update({
+      status: result.ok ? "approved" : "rejected",
+      result_message: result.ok ? null : result.message || null,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (result.ok) {
+    await logAdminAction(chief, proposal.action === "grant" ? "grant_admin" : "revoke_admin", "admin", proposal.target_user_id || null, proposal.email);
+  }
+
+  res.json({
+    status: result.ok ? "approved" : "error",
+    actionLink: result.ok ? (result as { actionLink?: string | null }).actionLink || null : null,
+    error: result.ok ? null : result.message,
   });
 });
 
-// Revokes admin access (clears app_metadata.role) rather than deleting the
-// Supabase Auth account outright — reversible from the Supabase dashboard if
-// it turns out to be a mistake. A caller can never revoke their own access
-// through this route, so one admin can't accidentally lock everyone out.
-app.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
-  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de administradores indisponível." });
-  const { id } = req.params;
-  const requester = res.locals.adminUser as { id: string } | undefined;
-  if (requester?.id === id) {
-    return res.status(400).json({ error: "Você não pode remover seu próprio acesso por aqui." });
-  }
-  const { error } = await supabaseAdminAuth.auth.admin.updateUserById(id, { app_metadata: { role: null } });
-  if (error) return res.status(500).json({ error: "Erro ao revogar acesso." });
+// Cancela uma proposta ainda pendente — qualquer admin pode cancelar (não só
+// quem propôs ou os chefes), já que a votação em si é o que precisa de
+// governança forte; desistir de uma proposta não concede nada a ninguém.
+app.delete("/api/admin/proposals/:id", requireAdmin, async (req, res) => {
+  const actor = res.locals.adminUser as { id: string; email?: string };
+  const { data: proposal } = await supabase.from("admin_invite_proposals").select("*").eq("id", req.params.id).maybeSingle();
+  if (!proposal) return res.status(404).json({ error: "Proposta não encontrada." });
+  if (proposal.status !== "pending") return res.status(400).json({ error: "Esta proposta já foi resolvida." });
+  const { error } = await supabase
+    .from("admin_invite_proposals")
+    .update({ status: "cancelled", resolved_at: new Date().toISOString() })
+    .eq("id", req.params.id);
+  if (error) return res.status(500).json({ error: "Erro ao cancelar proposta." });
+  await logAdminAction(actor, "cancel_admin_proposal", "admin_proposal", req.params.id, proposal.email);
   res.json({ success: true });
+});
+
+// Log de auditoria — toda ação administrativa registrada por logAdminAction
+// (criar/editar/excluir conteúdo, aprovar candidatura, votar/conceder/
+// revogar admin...), visível para qualquer admin autenticado.
+app.get("/api/admin/audit-log", requireAdmin, async (req, res) => {
+  const { data, error } = await supabase
+    .from("admin_audit_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(300);
+  if (error) return res.status(500).json({ error: "Erro ao buscar log de auditoria." });
+  res.json(data);
 });
 
 // ----------------------------------------------------
@@ -2445,6 +2757,8 @@ app.post("/api/partners/invite", requireAdmin, async (req, res) => {
   const result = await provisionPartnerLogin(email, { role: "partner", partnerType, partnerId });
   if (result.error) return res.status(400).json({ error: result.error });
 
+  await logAdminAction(res.locals.adminUser, "invite_partner", "partner_access", partnerId, `${email} — ${partnerType}`);
+
   res.status(201).json({
     user: { id: result.userId, email },
     actionLink: result.actionLink,
@@ -2542,6 +2856,8 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
     .single();
   if (updateErr) console.warn("Parceiro criado, mas falha ao marcar candidatura como aprovada:", updateErr.message);
 
+  await logAdminAction(res.locals.adminUser, "approve", "candidatura", id, `${candidatura.name} → ${partnerType} ${newRecord.id}`);
+
   res.status(201).json({
     candidatura: updatedCandidatura || { ...candidatura, status: "aprovado", partnerId: newRecord.id },
     partnerType,
@@ -2558,8 +2874,18 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
 
 app.delete("/api/partners/access/:userId", requireAdmin, async (req, res) => {
   if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — gestão de acesso de parceiros indisponível." });
-  const { error } = await supabaseAdminAuth.auth.admin.updateUserById(req.params.userId, { app_metadata: { role: null } });
+  // Remove só o papel de parceiro (role/partnerType/partnerId) — preserva
+  // qualquer isAdmin/isChief que essa mesma conta também tenha, em vez de
+  // substituir o app_metadata inteiro (o que apagaria acesso de admin junto).
+  const { data: existing, error: fetchErr } = await supabaseAdminAuth.auth.admin.getUserById(req.params.userId);
+  if (fetchErr || !existing?.user) return res.status(404).json({ error: "Usuário não encontrado." });
+  const remainingMetadata: Record<string, unknown> = { ...(existing.user.app_metadata || {}) };
+  delete remainingMetadata.role;
+  delete remainingMetadata.partnerType;
+  delete remainingMetadata.partnerId;
+  const { error } = await supabaseAdminAuth.auth.admin.updateUserById(req.params.userId, { app_metadata: remainingMetadata });
   if (error) return res.status(500).json({ error: "Erro ao revogar acesso." });
+  await logAdminAction(res.locals.adminUser, "revoke_partner_access", "partner_access", req.params.userId, existing.user.email || req.params.userId);
   res.json({ success: true });
 });
 
@@ -2661,6 +2987,7 @@ app.post("/api/integrity/purge-fake-data", requireAdmin, async (req, res) => {
     const { error, count } = await supabase.from(table).delete({ count: "exact" }).in("id", ids);
     if (!error && count) removed[table] = count;
   }
+  await logAdminAction(res.locals.adminUser, "purge_fake_data", "integrity", null, JSON.stringify(removed));
   res.json({ removed });
 });
 
