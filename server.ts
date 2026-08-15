@@ -11,7 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { Resend } from "resend";
 import PDFDocument from "pdfkit";
-import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource, Atracao, PartnerType } from "./src/types.js";
+import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource, Atracao, PartnerType, Recompensa, Resgate } from "./src/types.js";
 import { slugify } from "./src/lib/slug.js";
 
 dotenv.config();
@@ -437,6 +437,12 @@ async function reportServerError(err: unknown) {
 // submission) when RECAPTCHA_SECRET_KEY isn't configured yet, or when Google's
 // endpoint itself is unreachable — a captcha outage shouldn't block real users.
 const RECAPTCHA_SECRET_KEY = process.env.RECAPTCHA_SECRET_KEY;
+
+// Compartilhado com o backend do aplicativo separado que distribui Coins por
+// avistamento — é o que autentica POST /api/integrations/app-coins-sync
+// (server-to-server, nunca chamado pelo navegador). Sem essa variável
+// configurada nos dois lados, o endpoint recusa qualquer chamada.
+const APP_COINS_SYNC_SECRET = process.env.APP_COINS_SYNC_SECRET;
 async function verifyRecaptcha(token: unknown): Promise<boolean> {
   if (!RECAPTCHA_SECRET_KEY) return true;
   if (typeof token !== "string" || !token) return false;
@@ -645,9 +651,9 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // client payload.
 const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms"] as const;
 const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
-const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images"] as const;
+const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images", "unavailableDates"] as const;
 const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
-const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "age", "preferences"] as const;
+const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "language", "age", "preferences"] as const;
 const ROTEIRO_FIELDS = ["name", "duration", "price", "difficulty", "capacity", "description"] as const;
 const RESERVA_FIELDS = ["turistaId", "roteiroId", "date", "status", "totalPrice"] as const;
 const PAGAMENTO_FIELDS = ["reservaId", "amount", "date", "method", "status"] as const;
@@ -916,6 +922,7 @@ function mapGuideRow(g: any): Guide {
     specialty: toStringArray(g.specialty),
     interests: toStringArray(g.interests),
     images: toStringArray(g.images),
+    unavailableDates: toStringArray(g.unavailableDates),
     rating: typeof g.rating === "number" ? g.rating : (g.rating ? parseFloat(g.rating) : 0),
   };
 }
@@ -1773,7 +1780,8 @@ app.post("/api/sightings", publicFormLimiter, async (req, res) => {
     imageUrl: imageUrl || "/pousadas/vagalume-lago-deck.png",
     location: location || "Pantanal",
     timestamp: new Date().toISOString(),
-    likes: 0
+    likes: 0,
+    status: "aprovado",
   };
 
   const { error } = await supabase.from("sightings").insert(newSighting);
@@ -1986,6 +1994,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   const name = String(req.body.name || "").trim();
   const whatsapp = String(req.body.whatsapp || "").trim();
   const country = String(req.body.country || "").trim();
+  const language = String(req.body.language || "").trim();
   const age = Number(req.body.age);
   const preferences = String(req.body.preferences || "").trim();
 
@@ -1997,8 +2006,8 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   }
   // All profile fields are mandatory at signup — a "perfil de turista"
   // that's just an empty shell defeats the point of requiring one to review.
-  if (!name || !whatsapp || !country || !preferences || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idade e preferências de viagem." });
+  if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
   }
 
   const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
@@ -2011,7 +2020,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     return res.status(400).json({ error: describeAuthError(createErr, "Erro ao criar sua conta (o email já pode estar em uso).") });
   }
 
-  const newTurista: Turista = { id: created.user.id, name, email, whatsapp, country, age, preferences };
+  const newTurista: Turista = { id: created.user.id, name, email, whatsapp, country, language, age, preferences };
   const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
   if (insertErr) {
     // Don't leave a bare auth account behind with no profile row — it would
@@ -2029,6 +2038,246 @@ app.get("/api/turista/me", requireTourist, async (req, res) => {
   const { data, error } = await supabase.from("turistas").select("*").eq("id", userId).maybeSingle();
   if (error || !data) return res.status(404).json({ error: "Perfil de turista não encontrado." });
   res.json(data as Turista);
+});
+
+// Pousadas que o turista já visitou de verdade — inferido a partir de
+// reservas pagas/confirmadas feitas com o mesmo email da conta (bookings não
+// tem vínculo direto de turistaId, só o email do hóspede na hora da reserva).
+const VISITED_BOOKING_STATUSES = ["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"];
+
+app.get("/api/turista/visitados", requireTourist, async (req, res) => {
+  const email = (res.locals.touristUser as { email?: string }).email;
+  if (!email) return res.json([]);
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("pousadaId,pousadaName,checkIn,checkOut,status")
+    .eq("customerEmail", email)
+    .in("status", VISITED_BOOKING_STATUSES);
+  if (error) return res.status(500).json({ error: "Erro ao buscar histórico de visitas." });
+  // Uma pousada só aparece uma vez, mesmo com várias reservas — mostra a
+  // estadia mais recente.
+  const byPousada = new Map<string, any>();
+  for (const b of data || []) {
+    const existing = byPousada.get(b.pousadaId);
+    if (!existing || b.checkIn > existing.checkIn) byPousada.set(b.pousadaId, b);
+  }
+  res.json(Array.from(byPousada.values()));
+});
+
+// ----------------------------------------------------
+// FAVORITOS — pousadas que um turista logado marcou como "gostei". Alimenta
+// o widget de perfil no cabeçalho e a lista de favoritos.
+// ----------------------------------------------------
+
+app.get("/api/turista/favoritos", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { data: favs, error } = await supabase.from("turista_favoritos").select("pousadaId").eq("turistaId", userId);
+  if (error) return res.status(500).json({ error: "Erro ao buscar favoritos." });
+  const ids = (favs || []).map((f: any) => f.pousadaId);
+  if (ids.length === 0) return res.json([]);
+  const { data: rows } = await supabase.from("pousadas").select("*").in("id", ids);
+  res.json((rows || []).map(mapPousadaRow));
+});
+
+app.post("/api/turista/favoritos/:pousadaId", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { pousadaId } = req.params;
+  const { data: pousada } = await supabase.from("pousadas").select("id").eq("id", pousadaId).maybeSingle();
+  if (!pousada) return res.status(404).json({ error: "Pousada não encontrada." });
+  const { error } = await supabase.from("turista_favoritos").upsert({ turistaId: userId, pousadaId }, { onConflict: "turistaId,pousadaId" });
+  if (error) return res.status(500).json({ error: "Erro ao favoritar pousada." });
+  res.status(201).json({ success: true });
+});
+
+app.delete("/api/turista/favoritos/:pousadaId", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { error } = await supabase.from("turista_favoritos").delete().eq("turistaId", userId).eq("pousadaId", req.params.pousadaId);
+  if (error) return res.status(500).json({ error: "Erro ao remover favorito." });
+  res.json({ success: true });
+});
+
+// ----------------------------------------------------
+// RECOMPENSAS & RESGATES — o programa de Coins em si. Cada pousada cadastra
+// os próprios brindes (recompensas); o turista troca Coins por um código,
+// que a pousada confirma presencialmente (resgate). As Coins em si nunca são
+// geradas aqui — vêm só do app separado, ver POST /api/integrations/app-coins-sync.
+// ----------------------------------------------------
+
+const RECOMPENSA_FIELDS = ["title", "description", "coinCost", "active"] as const;
+
+// Público — só as recompensas ativas, para o turista escolher o que resgatar.
+app.get("/api/pousadas/:id/recompensas", async (req, res) => {
+  const { data, error } = await supabase
+    .from("pousada_recompensas")
+    .select("*")
+    .eq("pousadaId", req.params.id)
+    .eq("active", true)
+    .order("coinCost", { ascending: true });
+  if (error) return res.status(500).json({ error: "Erro ao buscar recompensas." });
+  res.json(data);
+});
+
+// Visão de gestão do próprio parceiro (ou admin) — inclui as inativas também,
+// pra dar pra reativar depois.
+app.get("/api/pousadas/:id/recompensas/manage", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data, error } = await supabase
+    .from("pousada_recompensas")
+    .select("*")
+    .eq("pousadaId", req.params.id)
+    .order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar recompensas." });
+  res.json(data);
+});
+
+app.post("/api/pousadas/:id/recompensas", requirePartnerAccess("pousada"), async (req, res) => {
+  const { id: pousadaId } = req.params;
+  const coinCost = Number(req.body.coinCost);
+  if (!req.body.title || !Number.isFinite(coinCost) || coinCost <= 0) {
+    return res.status(400).json({ error: "Informe um título e um custo em Coins válido (maior que zero)." });
+  }
+  const newRecompensa: Recompensa = {
+    ...pickFields<Recompensa>(req.body, RECOMPENSA_FIELDS),
+    id: `rc_${randomUUID()}`,
+    pousadaId,
+    coinCost,
+    active: true,
+    createdAt: new Date().toISOString(),
+  } as Recompensa;
+  const { error } = await supabase.from("pousada_recompensas").insert(newRecompensa);
+  if (error) return res.status(500).json({ error: "Erro ao criar recompensa." });
+  await logAdminAction(res.locals.actorUser, "create", "recompensa", newRecompensa.id, `${newRecompensa.title} — ${coinCost} coins`);
+  res.status(201).json(newRecompensa);
+});
+
+app.put("/api/pousadas/:id/recompensas/:recompensaId", requirePartnerAccess("pousada"), async (req, res) => {
+  const updates = pickFields<Recompensa>(req.body, RECOMPENSA_FIELDS);
+  const { data, error } = await supabase
+    .from("pousada_recompensas")
+    .update(updates)
+    .eq("id", req.params.recompensaId)
+    .eq("pousadaId", req.params.id)
+    .select()
+    .single();
+  if (error || !data) return res.status(404).json({ error: "Recompensa não encontrada." });
+  await logAdminAction(res.locals.actorUser, "update", "recompensa", data.id, data.title);
+  res.json(data);
+});
+
+app.delete("/api/pousadas/:id/recompensas/:recompensaId", requirePartnerAccess("pousada"), async (req, res) => {
+  const { error } = await supabase.from("pousada_recompensas").delete().eq("id", req.params.recompensaId).eq("pousadaId", req.params.id);
+  if (error) return res.status(500).json({ error: "Erro ao excluir recompensa." });
+  await logAdminAction(res.locals.actorUser, "delete", "recompensa", req.params.recompensaId, req.params.recompensaId);
+  res.json({ success: true });
+});
+
+app.post("/api/turista/resgates", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { recompensaId } = req.body;
+
+  const { data: recompensa } = await supabase.from("pousada_recompensas").select("*").eq("id", recompensaId).maybeSingle();
+  if (!recompensa || !recompensa.active) return res.status(404).json({ error: "Recompensa não encontrada ou não está mais disponível." });
+
+  const { data: turista } = await supabase.from("turistas").select("coins").eq("id", userId).maybeSingle();
+  const currentCoins = turista?.coins || 0;
+  if (currentCoins < recompensa.coinCost) {
+    return res.status(400).json({ error: `Coins insuficientes — você tem ${currentCoins}, essa recompensa custa ${recompensa.coinCost}.` });
+  }
+
+  const newResgate: Resgate = {
+    id: `rs_${randomUUID()}`,
+    turistaId: userId,
+    recompensaId,
+    pousadaId: recompensa.pousadaId,
+    coinCost: recompensa.coinCost,
+    code: randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase(),
+    status: "pendente",
+    createdAt: new Date().toISOString(),
+  };
+
+  const { error: insertErr } = await supabase.from("turista_resgates").insert(newResgate);
+  if (insertErr) return res.status(500).json({ error: "Erro ao criar resgate." });
+
+  const { error: updateErr } = await supabase.from("turistas").update({ coins: currentCoins - recompensa.coinCost }).eq("id", userId);
+  if (updateErr) {
+    // Desfaz o resgate se não conseguiu debitar as Coins — não deixa o
+    // turista com um código válido sem ter pago por ele.
+    await supabase.from("turista_resgates").delete().eq("id", newResgate.id);
+    return res.status(500).json({ error: "Erro ao debitar Coins." });
+  }
+
+  res.status(201).json(newResgate);
+});
+
+app.get("/api/turista/resgates", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { data, error } = await supabase.from("turista_resgates").select("*").eq("turistaId", userId).order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar resgates." });
+  res.json(data);
+});
+
+// A pousada confirma presencialmente digitando o código que o turista
+// mostrou — assim que usado, o código não vale mais.
+app.post("/api/pousadas/:id/resgates/:code/usar", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data: resgate } = await supabase
+    .from("turista_resgates")
+    .select("*")
+    .eq("code", req.params.code.toUpperCase())
+    .eq("pousadaId", req.params.id)
+    .maybeSingle();
+  if (!resgate) return res.status(404).json({ error: "Código não encontrado para esta pousada." });
+  if (resgate.status !== "pendente") return res.status(400).json({ error: "Este código já foi usado ou cancelado." });
+
+  const { data: updated, error } = await supabase
+    .from("turista_resgates")
+    .update({ status: "usado", usedAt: new Date().toISOString() })
+    .eq("id", resgate.id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: "Erro ao confirmar resgate." });
+  await logAdminAction(res.locals.actorUser, "redeem", "resgate", resgate.id, `código ${resgate.code}`);
+  res.json(updated);
+});
+
+// ----------------------------------------------------
+// SINCRONIZAÇÃO DE COINS COM O APP — chamado pelo backend do aplicativo
+// separado (nunca pelo navegador), autenticado por segredo compartilhado, não
+// por login de usuário. O app é a única fonte de verdade de como as Coins são
+// ganhas (foto de avistamento aprovada por lá); aqui só espelhamos o saldo
+// pra poder gastar em recompensas das pousadas parceiras.
+// ----------------------------------------------------
+
+app.post("/api/integrations/app-coins-sync", async (req, res) => {
+  if (!APP_COINS_SYNC_SECRET) {
+    return res.status(503).json({ error: "APP_COINS_SYNC_SECRET não configurada — sincronização de Coins indisponível." });
+  }
+  if (req.headers["x-sync-secret"] !== APP_COINS_SYNC_SECRET) {
+    return res.status(401).json({ error: "Segredo de sincronização inválido." });
+  }
+
+  // Aceita tanto uma chamada direta simples ({email, coins}) quanto o formato
+  // nativo de Database Webhook do Supabase ({record: {email, coins, ...}}) —
+  // assim o app pode disparar isso via um Database Webhook, sem precisar de
+  // nenhum servidor próprio no meio.
+  const source = req.body.record && typeof req.body.record === "object" ? req.body.record : req.body;
+  const email = String(source.email || "").trim().toLowerCase();
+  const coins = Number(source.coins);
+  if (!email || !Number.isFinite(coins) || coins < 0) {
+    return res.status(400).json({ error: "Informe email e um saldo de coins válido (número >= 0)." });
+  }
+
+  // Saldo ABSOLUTO reportado pelo app (não um delta) — evita divergência se
+  // o app reenviar a mesma chamada depois de uma falha de rede.
+  const { data: turista, error: findErr } = await supabase.from("turistas").select("id").eq("email", email).maybeSingle();
+  if (findErr) return res.status(500).json({ error: "Erro ao buscar turista." });
+  if (!turista) {
+    // Sem conta no site ainda com esse email — nada a sincronizar por
+    // enquanto (não é erro: o turista pode criar a conta depois).
+    return res.status(200).json({ synced: false, reason: "Nenhuma conta de turista com este email no site." });
+  }
+
+  const { error: updateErr } = await supabase.from("turistas").update({ coins }).eq("id", turista.id);
+  if (updateErr) return res.status(500).json({ error: "Erro ao atualizar saldo de Coins." });
+  res.json({ synced: true, coins });
 });
 
 // ROTEIROS CRUD
@@ -3069,6 +3318,7 @@ ALTER TABLE guides ADD COLUMN IF NOT EXISTS interests TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS rating FLOAT DEFAULT 0;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS images TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS "unavailableDates" TEXT;
 ALTER TABLE guides ALTER COLUMN rating SET DEFAULT 0;
 
 -- Ativar RLS em guias (sem policies públicas — só o backend com service_role acessa)
@@ -3405,6 +3655,22 @@ async function getPousadasContext() {
   }).join("\n");
 }
 
+// Só guias disponíveis — não faz sentido a IA recomendar alguém que não pode
+// atender agora. Dados já eram públicos (o mesmo catálogo de /api/guides/public),
+// só reaproveitados aqui pra deixar a Sofia sugerir o guia certo pelo
+// idioma/especialidade/interesse em vez de sempre responder de forma genérica.
+async function getGuidesContext() {
+  const { data } = await supabase.from("guides").select("*");
+  return (data || [])
+    .map(mapGuideRow)
+    .filter(g => g.status === "disponivel")
+    .map(g => {
+      const languages = g.languages.map(l => l.language).join(", ") || "não informado";
+      const interests = [...g.specialty, ...(g.interests || [])].join(", ") || "não informado";
+      return `- ID: "${g.id}", Nome: "${g.name}", Idiomas: [${languages}], Especialidades/temas: [${interests}].`;
+    }).join("\n");
+}
+
 const AGENCY_WHATSAPP = "+55 65 99986-8334";
 
 app.post("/api/chat", chatLimiter, async (req, res) => {
@@ -3424,17 +3690,21 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
   // Simple public-info support assistant: answers general questions about the
   // agency using only public catalog data, and always steers anything about
   // an actual booking/payment/personal request to the real agency WhatsApp.
-  const pousadasContext = await getPousadasContext();
+  const [pousadasContext, guidesContext] = await Promise.all([getPousadasContext(), getGuidesContext()]);
   const systemInstruction = `Você é a "Sofia", assistente de suporte do site da agência de turismo ecológico "EcoSafari Brasil".
-Seu único papel é responder dúvidas PÚBLICAS sobre o site e as pousadas parceiras: localizações, preços de diária, experiências e atividades disponíveis, estrutura das pousadas, e dúvidas gerais de viagem (documentação, vacinas, o que levar, melhor época para avistamentos).
+Seu papel é responder dúvidas PÚBLICAS sobre o site, as pousadas parceiras e os guias disponíveis: localizações, preços de diária, experiências e atividades disponíveis, estrutura das pousadas, dúvidas gerais de viagem (documentação, vacinas, o que levar, melhor época para avistamentos), e qual guia combina melhor com o que o visitante procura.
 
 Catálogo público de pousadas parceiras:
 ${pousadasContext}
 
+Catálogo público de guias disponíveis (idiomas e especialidades/temas de interesse de cada um):
+${guidesContext}
+
 Regras importantes:
 1. Você NÃO coleta dados pessoais do cliente e NÃO fecha reservas, pagamentos ou datas — isso é feito só pela equipe humana.
-2. Sempre que o cliente quiser reservar, pagar, negociar preço, tratar de algo específico da viagem dele, ou qualquer coisa que exija um atendimento humano, direcione educadamente para o WhatsApp oficial da agência: ${AGENCY_WHATSAPP} (ex: "Para seguir com sua reserva, é só chamar a gente no WhatsApp oficial: ${AGENCY_WHATSAPP} 😊").
-3. Seja breve, calorosa e direta — respostas curtas, adequadas para leitura rápida, sem blocos gigantes de texto.`;
+2. Quando o visitante mencionar um interesse específico (observação de aves, pesca, fotografia, história, algum idioma que precisa) ou perguntar por um guia, recomende pelo nome o guia do catálogo acima cujo idioma/especialidade/tema combina melhor — e só esse, não liste todos. Se nenhum combinar bem, diga isso com sinceridade em vez de forçar uma recomendação.
+3. Sempre que o cliente quiser reservar, pagar, negociar preço, confirmar um guia específico, tratar de algo específico da viagem dele, ou qualquer coisa que exija um atendimento humano, direcione educadamente para o WhatsApp oficial da agência: ${AGENCY_WHATSAPP} (ex: "Para seguir com sua reserva, é só chamar a gente no WhatsApp oficial: ${AGENCY_WHATSAPP} 😊").
+4. Seja breve, calorosa e direta — respostas curtas, adequadas para leitura rápida, sem blocos gigantes de texto.`;
 
   // Check if AI is active
   if (ai) {

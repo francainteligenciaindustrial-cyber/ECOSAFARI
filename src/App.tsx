@@ -12,6 +12,7 @@ import AtracaoDetailsView from "./components/AtracaoDetailsView";
 import GuiaDetailsView from "./components/GuiaDetailsView";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
+import TouristProfileWidget from "./components/TouristProfileWidget";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { isAdminUser } from "./lib/authRoles";
 import { useRoute, navigate } from "./lib/router";
@@ -344,6 +345,9 @@ export default function App() {
         <div className="flex items-center gap-4">
           {/* Subtle site-wide translation switcher */}
           <LanguageSwitcher />
+
+          {/* Tourist account menu — Coins, favoritos, histórico */}
+          <TouristProfileWidget />
 
           {/* Discreet admin access control */}
           {isAdmin ? (

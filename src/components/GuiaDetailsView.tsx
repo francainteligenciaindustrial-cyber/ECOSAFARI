@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Star, MessageSquare, LoaderCircle, ArrowLeft, Languages, Sparkles, MapPin, User } from "lucide-react";
+import { Compass, Star, MessageSquare, LoaderCircle, ArrowLeft, Languages, Sparkles, MapPin, User, CalendarOff } from "lucide-react";
 import { Guide } from "../types";
 import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
@@ -40,6 +40,9 @@ export default function GuiaDetailsView({ id }: { id: string }) {
       </div>
     );
   }
+
+  const todayISO = new Date().toISOString().split("T")[0];
+  const upcomingUnavailable = (guia.unavailableDates || []).filter(d => d >= todayISO).sort().slice(0, 8);
 
   const whatsappMessage = `Olá! Vi o perfil do guia ${guia.name} na EcoSafari e gostaria de saber mais sobre expedições com ele(a).`;
   const whatsappLink = `https://wa.me/${AGENCY_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
@@ -121,6 +124,19 @@ export default function GuiaDetailsView({ id }: { id: string }) {
               <h3 className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-2">Temas de Interesse</h3>
               <div className="flex flex-wrap gap-1.5">
                 {guia.interests.map((t, i) => <span key={i} className="bg-white text-editorial-muted border border-editorial-border px-2.5 py-1 rounded-full text-xs">{t}</span>)}
+              </div>
+            </div>
+          )}
+
+          {upcomingUnavailable.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-editorial-border">
+              <h3 className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted flex items-center gap-1.5 mb-2"><CalendarOff className="h-3.5 w-3.5" /> Próximas indisponibilidades</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {upcomingUnavailable.map(d => (
+                  <span key={d} className="bg-red-50 text-red-700 border border-red-100 px-2.5 py-1 rounded-full text-xs">
+                    {new Date(d + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </span>
+                ))}
               </div>
             </div>
           )}

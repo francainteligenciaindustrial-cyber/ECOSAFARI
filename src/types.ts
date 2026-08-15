@@ -72,6 +72,7 @@ export interface Guide {
   rating?: number; // média calculada a partir das avaliações recebidas
   photoUrl?: string; // foto de perfil — exibida na página pública do guia, tipo um perfil de rede social
   images?: string[]; // galeria de fotos do guia em campo/expedições — separada da foto de perfil
+  unavailableDates?: string[]; // datas específicas bloqueadas (YYYY-MM-DD) — além do liga/desliga geral em "status"
 }
 
 // Atração: parceiro que não é uma hospedagem — "Parada Legal" (passeio,
@@ -148,6 +149,7 @@ export interface Sighting {
   location: string;
   timestamp: string;
   likes: number;
+  status?: 'pendente' | 'aprovado' | 'rejeitado'; // legado — avistamentos são só do app, isso não é mais usado no site
 }
 
 export interface Species {
@@ -188,6 +190,42 @@ export interface Turista {
   country: string;
   age: number;
   preferences: string;
+  language?: string;
+  coins?: number;
+}
+
+// Pousada que um turista logado marcou como "gostei" — alimenta o widget de
+// perfil no cabeçalho e a lista de favoritos.
+export interface Favorito {
+  turistaId: string;
+  pousadaId: string;
+  createdAt: string;
+}
+
+// Brinde que uma pousada oferece em troca de Coins — cadastrado pelo próprio
+// parceiro no portal de autoatendimento.
+export interface Recompensa {
+  id: string;
+  pousadaId: string;
+  title: string;
+  description?: string;
+  coinCost: number;
+  active: boolean;
+  createdAt: string;
+}
+
+// Troca de Coins por uma recompensa — gera um código que o turista mostra
+// na pousada, que confirma o resgate no próprio portal dela.
+export interface Resgate {
+  id: string;
+  turistaId: string;
+  recompensaId: string;
+  pousadaId: string;
+  coinCost: number;
+  code: string;
+  status: 'pendente' | 'usado' | 'cancelado';
+  createdAt: string;
+  usedAt?: string;
 }
 
 export interface Roteiro {

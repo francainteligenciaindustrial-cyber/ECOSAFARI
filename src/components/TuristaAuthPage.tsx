@@ -35,6 +35,7 @@ export default function TuristaAuthPage() {
   const [password, setPassword] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [country, setCountry] = useState("");
+  const [language, setLanguage] = useState("");
   const [age, setAge] = useState("");
   const [preferences, setPreferences] = useState("");
   const [signupError, setSignupError] = useState("");
@@ -109,7 +110,7 @@ export default function TuristaAuthPage() {
       const res = await fetch("/api/turista/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, whatsapp, country, age: Number(age), preferences }),
+        body: JSON.stringify({ name, email, password, whatsapp, country, language, age: Number(age), preferences }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -172,7 +173,9 @@ export default function TuristaAuthPage() {
                 <p><span className="text-editorial-muted text-xs block">Email</span> {profile.email}</p>
                 <p><span className="text-editorial-muted text-xs block">WhatsApp</span> {profile.whatsapp}</p>
                 <p><span className="text-editorial-muted text-xs block">País</span> {profile.country}</p>
+                {profile.language && <p><span className="text-editorial-muted text-xs block">Idioma</span> {profile.language}</p>}
                 <p><span className="text-editorial-muted text-xs block">Idade</span> {profile.age}</p>
+                {typeof profile.coins === "number" && <p><span className="text-editorial-muted text-xs block">Coins</span> {profile.coins}</p>}
                 <p><span className="text-editorial-muted text-xs block">Preferências</span> {profile.preferences}</p>
                 <p className="text-emerald-700 text-xs font-semibold pt-2">✓ Você já pode avaliar pousadas, guias e atrações.</p>
               </div>
@@ -262,6 +265,10 @@ export default function TuristaAuthPage() {
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                 />
               </div>
+              <input
+                type="text" required placeholder="Idioma preferido (ex: Português, English, Español)" value={language} onChange={e => setLanguage(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
               <textarea
                 required rows={2} placeholder="O que você gosta de fazer em viagens? (ex: trilhas, observação de aves, gastronomia...)"
                 value={preferences} onChange={e => setPreferences(e.target.value)}

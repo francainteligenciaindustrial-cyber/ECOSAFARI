@@ -49,6 +49,7 @@ import ToggleSwitch from "./ToggleSwitch";
 import LanguagesEditor, { LEVEL_LABELS } from "./LanguagesEditor";
 import ImageListEditor from "./ImageListEditor";
 import Pagination from "./Pagination";
+import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
@@ -388,7 +389,8 @@ export default function AdminDashboard({
     birthplace: "",
     interests: [] as string[],
     photoUrl: "",
-    images: [] as string[]
+    images: [] as string[],
+    unavailableDates: [] as string[]
   });
 
   const openEditGuide = (g: Guide) => {
@@ -405,7 +407,8 @@ export default function AdminDashboard({
       birthplace: g.birthplace || "",
       interests: [...(g.interests || [])],
       photoUrl: g.photoUrl || "",
-      images: [...(g.images || [])]
+      images: [...(g.images || [])],
+      unavailableDates: [...(g.unavailableDates || [])]
     });
   };
 
@@ -424,7 +427,8 @@ export default function AdminDashboard({
       age: editGuideForm.age ? Number(editGuideForm.age) : undefined,
       birthplace: editGuideForm.birthplace,
       interests: editGuideForm.interests,
-      images: editGuideForm.images
+      images: editGuideForm.images,
+      unavailableDates: editGuideForm.unavailableDates
     };
     const response = await adminFetch(`/api/guides/${editingGuideId}`, {
       method: "PUT",
@@ -1681,6 +1685,11 @@ export default function AdminDashboard({
                   </div>
 
                   <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={editGuideForm.images} onChange={images => setEditGuideForm(prev => ({ ...prev, images }))} />
+
+                  <div className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-3">
+                    <label className="block text-zinc-700 font-semibold mb-1.5">Agenda — datas indisponíveis</label>
+                    <GuideAvailabilityCalendar value={editGuideForm.unavailableDates} onChange={unavailableDates => setEditGuideForm(prev => ({ ...prev, unavailableDates }))} />
+                  </div>
 
                   <div className="flex gap-2 justify-end pt-2 text-xs border-t border-zinc-100">
                     <button type="button" onClick={() => setEditingGuideId(null)} className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-lg font-semibold hover:bg-zinc-200 transition cursor-pointer">

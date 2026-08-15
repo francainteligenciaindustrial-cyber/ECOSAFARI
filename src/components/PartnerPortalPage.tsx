@@ -13,6 +13,8 @@ import RoomsEditor, { RoomDraft } from "./RoomsEditor";
 import ToggleSwitch from "./ToggleSwitch";
 import LanguagesEditor from "./LanguagesEditor";
 import LanguageFlag from "./LanguageFlag";
+import PousadaRecompensasManager from "./PousadaRecompensasManager";
+import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 
 // Self-service portal for a partner (pousada/atração/guia) to edit only
 // their own profile — no access to bookings, other partners, or anything
@@ -158,6 +160,7 @@ export default function PartnerPortalPage() {
             interests: [...(data.guia.interests || [])],
             status: data.guia.status,
             images: [...(data.guia.images || [])],
+            unavailableDates: [...(data.guia.unavailableDates || [])],
           });
         }
       })
@@ -297,6 +300,7 @@ export default function PartnerPortalPage() {
           interests: form.interests,
           status: form.status,
           images: form.images.map((i: string) => i.trim()).filter(Boolean),
+          unavailableDates: form.unavailableDates,
         };
       }
       const res = await adminFetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -620,6 +624,11 @@ export default function PartnerPortalPage() {
                     onChange={checked => setForm((p: any) => ({ ...p, status: checked ? "disponivel" : "indisponivel" }))}
                   />
                 </div>
+                <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
+                  <label className="block text-editorial-text font-semibold mb-1.5">Agenda — datas indisponíveis</label>
+                  <p className="text-editorial-muted text-[11px] mb-3">Bloqueie datas específicas (uma viagem já marcada, uma folga) sem precisar desligar a disponibilidade geral acima.</p>
+                  <GuideAvailabilityCalendar value={form.unavailableDates} onChange={unavailableDates => setForm((p: any) => ({ ...p, unavailableDates }))} />
+                </div>
                 <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
               </>
             )}
@@ -636,6 +645,12 @@ export default function PartnerPortalPage() {
             </div>
           </form>
         ) : null}
+
+        {profile.partnerType === "pousada" && (
+          <div className="mt-8">
+            <PousadaRecompensasManager pousadaId={profile.partnerId} />
+          </div>
+        )}
 
         {!loadingGrants && grants.length > 0 && (
           <div className="mt-8 bg-white border border-editorial-border rounded-lg p-6">

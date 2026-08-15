@@ -6,6 +6,7 @@ import { navigate } from "../lib/router";
 import LanguageFlag from "./LanguageFlag";
 import { adminFetch } from "../lib/adminFetch";
 import { useTouristSession } from "../lib/useTouristSession";
+import { isCompletePousadaProfile } from "../lib/pousadaCompleteness";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -210,9 +211,10 @@ export default function PousadaCatalog({
   // Por enquanto, exibimos só o filtro de Mato Grosso (demais biomas ocultos temporariamente).
   const uniqueLocations = ["Mato Grosso"];
 
+  const completePousadas = pousadas.filter(isCompletePousadaProfile);
   const filteredPousadas = filterLocation === "all"
-    ? pousadas
-    : pousadas.filter(p => p && typeof p.location === "string" && p.location.includes(filterLocation));
+    ? completePousadas
+    : completePousadas.filter(p => p && typeof p.location === "string" && p.location.includes(filterLocation));
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();

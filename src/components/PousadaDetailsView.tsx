@@ -5,6 +5,8 @@ import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 import TopReviewQuote from "./TopReviewQuote";
+import FavoriteButton from "./FavoriteButton";
+import PousadaRecompensas from "./PousadaRecompensas";
 
 interface PousadaDetailsViewProps {
   pousada: Pousada;
@@ -97,6 +99,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4 md:mt-0">
+            <FavoriteButton pousadaId={pousada.id} />
             {pousada.rating > 0 ? (
               <>
                 <div className="flex items-center gap-1 text-editorial-primary bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-none font-serif text-sm font-bold">
@@ -273,6 +276,8 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 </div>
               )}
             </div>
+
+            <PousadaRecompensas pousadaId={pousada.id} />
 
             {/* Featured experiences (photo + pitch, alternating sides) */}
             {hasPousadaHighlights(pousada.id) && (
