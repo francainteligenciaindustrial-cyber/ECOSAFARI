@@ -42,20 +42,20 @@ export default function GuideAvailabilityCalendar({ value, onChange }: Props) {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <button type="button" onClick={() => setCursor(new Date(year, month - 1, 1))} className="p-1.5 text-editorial-muted hover:text-editorial-primary transition cursor-pointer" aria-label="Mês anterior">
-          <ChevronLeft className="h-4 w-4" />
+    <div className="max-w-[240px]">
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={() => setCursor(new Date(year, month - 1, 1))} className="p-1 text-editorial-muted hover:text-editorial-primary transition cursor-pointer" aria-label="Mês anterior">
+          <ChevronLeft className="h-3.5 w-3.5" />
         </button>
-        <span className="text-xs font-bold text-editorial-text uppercase tracking-widest">{MONTHS[month]} {year}</span>
-        <button type="button" onClick={() => setCursor(new Date(year, month + 1, 1))} className="p-1.5 text-editorial-muted hover:text-editorial-primary transition cursor-pointer" aria-label="Próximo mês">
-          <ChevronRight className="h-4 w-4" />
+        <span className="text-[11px] font-bold text-editorial-text uppercase tracking-wider">{MONTHS[month]} {year}</span>
+        <button type="button" onClick={() => setCursor(new Date(year, month + 1, 1))} className="p-1 text-editorial-muted hover:text-editorial-primary transition cursor-pointer" aria-label="Próximo mês">
+          <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center">
+      <div className="grid grid-cols-7 gap-0.5 text-center">
         {WEEKDAYS.map((w, i) => (
-          <div key={i} className="text-[10px] font-bold text-editorial-muted uppercase py-1">{w}</div>
+          <div key={i} className="text-[8px] font-bold text-editorial-muted uppercase py-0.5">{w}</div>
         ))}
         {cells.map((d, i) => {
           if (!d) return <div key={`blank-${i}`} />;
@@ -69,7 +69,7 @@ export default function GuideAvailabilityCalendar({ value, onChange }: Props) {
               disabled={isPast}
               onClick={() => toggleDate(d)}
               title={isBlocked ? "Indisponível — clique para liberar" : "Disponível — clique para bloquear"}
-              className={`aspect-square rounded-md text-xs font-medium transition cursor-pointer disabled:cursor-not-allowed ${
+              className={`aspect-square w-full rounded text-[10px] font-medium transition cursor-pointer disabled:cursor-not-allowed leading-none ${
                 isPast
                   ? "text-editorial-border"
                   : isBlocked
@@ -83,9 +83,9 @@ export default function GuideAvailabilityCalendar({ value, onChange }: Props) {
         })}
       </div>
 
-      <div className="flex items-center gap-2 mt-3 text-[10px] text-editorial-muted">
-        <span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block flex-shrink-0" />
-        <span>Indisponível — clique numa data pra bloquear ou liberar</span>
+      <div className="flex items-center gap-1.5 mt-2 text-[9px] text-editorial-muted">
+        <span className="w-2.5 h-2.5 rounded bg-red-100 border border-red-200 inline-block flex-shrink-0" />
+        <span>Indisponível — clique pra bloquear/liberar</span>
       </div>
     </div>
   );
