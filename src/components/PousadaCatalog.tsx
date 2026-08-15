@@ -982,7 +982,21 @@ export default function PousadaCatalog({
               </div>
             )}
             {reviews.map((review) => {
-              const matchedP = pousadas.find(p => p.id === review.pousadaId);
+              // Cada avaliação é de exatamente um alvo (pousada, atração ou
+              // guia) — resolve qual é e pra onde a avaliação "pertence",
+              // pra nunca mostrar um comentário sem dizer quem está sendo
+              // avaliado nem misturar avaliações de gente diferente sem rótulo.
+              const matchedP = review.pousadaId ? pousadas.find(p => p.id === review.pousadaId) : undefined;
+              const matchedA = review.atracaoId ? atracoes.find(a => a.id === review.atracaoId) : undefined;
+              const matchedG = review.guideId ? guiasPublicos.find(g => g.id === review.guideId) : undefined;
+
+              const targetLabel = matchedP ? `Pousada ${matchedP.name}` : matchedA ? `Atração ${matchedA.name}` : matchedG ? `Guia ${matchedG.name}` : null;
+              const handleOpenTarget = () => {
+                if (matchedP) onSelectPousada(matchedP);
+                else if (matchedA) navigate(`/atracoes/${matchedA.id}`);
+                else if (matchedG) navigate(`/guias/${matchedG.id}`);
+              };
+
               return (
                 <div key={review.id} className="bg-white text-editorial-text border border-editorial-border p-6 rounded-none shadow-sm transition">
                   <div className="flex items-center justify-between mb-3 border-b border-editorial-border pb-3">
@@ -1001,10 +1015,14 @@ export default function PousadaCatalog({
                       )}
                       <div>
                         <h4 className="font-serif text-base font-semibold text-editorial-primary">{review.userName}</h4>
-                        {matchedP && (
-                          <span className="text-[9px] text-editorial-muted font-bold uppercase tracking-widest mt-0.5 block">
-                            visitou {matchedP.name}
-                          </span>
+                        {targetLabel && (
+                          <button
+                            onClick={handleOpenTarget}
+                            className="text-[9px] text-editorial-muted hover:text-editorial-primary font-bold uppercase tracking-widest mt-0.5 block transition cursor-pointer"
+                            title="Ver perfil completo"
+                          >
+                            avaliou {targetLabel}
+                          </button>
                         )}
                       </div>
                     </div>
