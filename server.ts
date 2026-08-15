@@ -1991,6 +1991,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
 
   const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
+  const confirmPassword = String(req.body.confirmPassword || "");
   const name = String(req.body.name || "").trim();
   const whatsapp = String(req.body.whatsapp || "").trim();
   const country = String(req.body.country || "").trim();
@@ -2004,16 +2005,25 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   if (password.length < 8) {
     return res.status(400).json({ error: "A senha precisa ter pelo menos 8 caracteres." });
   }
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: "As senhas não coincidem." });
+  }
   // All profile fields are mandatory at signup — a "perfil de turista"
   // that's just an empty shell defeats the point of requiring one to review.
   if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
     return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
   }
 
+  // Só exige a confirmação de email de verdade quando dá pra mandar o link
+  // (Resend configurado) — sem isso, cai pro comportamento antigo (conta já
+  // confirmada, login imediato) pra não travar o cadastro em ambientes sem
+  // Resend configurado ainda.
+  const requireEmailConfirmation = !!resend;
+
   const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: !requireEmailConfirmation,
     app_metadata: { role: "tourist" },
   });
   if (createErr || !created.user) {
@@ -2030,7 +2040,46 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     return res.status(500).json({ error: "Erro ao criar seu perfil." });
   }
 
-  res.status(201).json({ success: true });
+  if (!requireEmailConfirmation) {
+    return res.status(201).json({ success: true, emailConfirmationSent: false });
+  }
+
+  // Gera o link de confirmação e manda pelo Resend — mesmo padrão já usado
+  // pro convite de admin/parceiro (server-to-server, não depende do envio de
+  // email nativo do Supabase, que precisa de SMTP configurado à parte).
+  // redirectTo aponta de volta pra /turista, a mesma aba onde a pessoa criou
+  // o cadastro — ao clicar, o Supabase já autentica a sessão e essa página
+  // detecta o login sozinha, sem precisar de nenhum passo extra.
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
+    type: "signup",
+    email,
+    password,
+    options: { redirectTo: `${SITE_URL}/turista` },
+  });
+  if (linkErr || !linkData?.properties?.action_link) {
+    console.warn("Turista criado, mas falha ao gerar link de confirmação:", linkErr?.message);
+    return res.status(201).json({ success: true, emailConfirmationSent: false });
+  }
+
+  try {
+    await resend!.emails.send({
+      from: "EcoSafari Brasil <onboarding@resend.dev>",
+      to: email,
+      subject: "Confirme seu email — EcoSafari Brasil",
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #2D4635;">Bem-vindo(a) à EcoSafari! 🌿</h2>
+          <p>Olá, ${name}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e poder avaliar pousadas, guias e atrações.</p>
+          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#2D4635; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+          <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${linkData.properties.action_link}</p>
+        </div>
+      `,
+    });
+    res.status(201).json({ success: true, emailConfirmationSent: true });
+  } catch (err: any) {
+    console.warn("Turista criado, mas falha ao enviar email de confirmação via Resend:", err.message);
+    res.status(201).json({ success: true, emailConfirmationSent: false });
+  }
 });
 
 app.get("/api/turista/me", requireTourist, async (req, res) => {

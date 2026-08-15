@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, LoaderCircle, User, LogOut, ArrowLeft } from "lucide-react";
+import { Compass, LoaderCircle, User, LogOut, ArrowLeft, MailCheck } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
@@ -33,6 +33,7 @@ export default function TuristaAuthPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [country, setCountry] = useState("");
   const [language, setLanguage] = useState("");
@@ -40,6 +41,10 @@ export default function TuristaAuthPage() {
   const [preferences, setPreferences] = useState("");
   const [signupError, setSignupError] = useState("");
   const [signingUp, setSigningUp] = useState(false);
+  // Depois do cadastro, se o site conseguiu mandar o email de confirmação
+  // (Resend configurado), a conta fica pendente até a pessoa clicar no link
+  // — mostra essa tela em vez de tentar logar direto.
+  const [awaitingEmailConfirmation, setAwaitingEmailConfirmation] = useState(false);
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
@@ -105,18 +110,30 @@ export default function TuristaAuthPage() {
       setSignupError("A senha precisa ter pelo menos 8 caracteres.");
       return;
     }
+    if (password !== confirmPassword) {
+      setSignupError("As senhas não coincidem.");
+      return;
+    }
     setSigningUp(true);
     try {
       const res = await fetch("/api/turista/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, whatsapp, country, language, age: Number(age), preferences }),
+        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language, age: Number(age), preferences }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setSignupError(body.error || "Erro ao criar seu perfil.");
         return;
       }
+
+      // Email de confirmação enviado — a conta só fica utilizável depois que
+      // a pessoa clicar no link (que já traz ela de volta logada pra cá).
+      if (body.emailConfirmationSent) {
+        setAwaitingEmailConfirmation(true);
+        return;
+      }
+
       if (!supabase) return;
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
@@ -154,6 +171,27 @@ export default function TuristaAuthPage() {
       )}
     </header>
   );
+
+  if (awaitingEmailConfirmation) {
+    return (
+      <div className="min-h-screen bg-editorial-bg font-sans">
+        {header}
+        <div className="flex items-center justify-center px-6 py-16">
+          <div className="max-w-sm w-full bg-white border border-editorial-border rounded-lg p-8 shadow-sm text-center">
+            <MailCheck className="h-10 w-10 text-editorial-primary mx-auto mb-4" />
+            <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary mb-2">Confirme seu email</h1>
+            <p className="text-editorial-muted text-xs leading-relaxed">
+              Mandamos um link de confirmação pra <span className="font-semibold text-editorial-text">{email}</span>. Clique nele pra ativar seu perfil de turista — você vai cair de volta bem aqui, já logado.
+            </p>
+            <p className="text-editorial-muted text-[11px] mt-3">Não chegou? Confira também a caixa de spam.</p>
+            <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="mt-6 inline-flex items-center gap-2 text-editorial-primary text-[11px] uppercase tracking-widest font-bold hover:opacity-80 transition cursor-pointer">
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao catálogo
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isTourist) {
     return (
@@ -249,6 +287,10 @@ export default function TuristaAuthPage() {
               />
               <input
                 type="password" required minLength={8} placeholder="Senha (mínimo 8 caracteres)" value={password} onChange={e => setPassword(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
+              <input
+                type="password" required minLength={8} placeholder="Confirme a senha" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
                 className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
               />
               <input
