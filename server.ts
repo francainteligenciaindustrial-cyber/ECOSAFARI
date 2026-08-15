@@ -226,6 +226,16 @@ function isAdminUser(user: { app_metadata?: Record<string, unknown> } | null | u
   return user?.app_metadata?.isAdmin === true || user?.app_metadata?.role === "admin";
 }
 
+// Mesma lógica, pro papel de turista: isTourist convive com isAdmin/role de
+// parceiro que a conta já tenha — é o que permite um admin ou parceiro virar
+// turista com a MESMA conta (ver POST /api/turista/upgrade) em vez de ter
+// que criar uma segunda conta desconectada. role === "tourist" continua
+// valendo pras contas de turista "puras" (criadas direto por
+// POST /api/turista/signup, sem nenhum outro papel).
+function isTouristUser(user: { app_metadata?: Record<string, unknown> } | null | undefined): boolean {
+  return user?.app_metadata?.isTourist === true || user?.app_metadata?.role === "tourist";
+}
+
 // Verifies the caller is an authenticated admin (Supabase Auth JWT with
 // app_metadata.isAdmin === true) before allowing access to admin-only routes.
 // The Gestão tab hides itself client-side for non-admins, but that's cosmetic —
@@ -331,11 +341,11 @@ function requirePartnerAccess(partnerType: PartnerType): express.RequestHandler[
 }
 
 // Verifies the caller is an authenticated tourist (Supabase Auth JWT with
-// app_metadata.role === "tourist") — the actual server-side enforcement of
-// "só é possível avaliar tendo um perfil de turista". Unlike admin/partner,
-// a tourist account is self-service (see POST /api/turista/signup below),
-// but the role still can't be set by the client itself — only
-// supabaseAdminAuth (service_role) sets app_metadata at account creation.
+// isTouristUser() true) — the actual server-side enforcement of "só é
+// possível avaliar tendo um perfil de turista". Unlike admin/partner, a
+// tourist account is self-service (see POST /api/turista/signup below), but
+// the role still can't be set by the client itself — only supabaseAdminAuth
+// (service_role) sets app_metadata at account creation/upgrade.
 const requireTourist: express.RequestHandler[] = [
   authLimiter,
   async (req, res, next) => {
@@ -346,10 +356,34 @@ const requireTourist: express.RequestHandler[] = [
     }
     try {
       const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data.user || data.user.app_metadata?.role !== "tourist") {
+      if (error || !data.user || !isTouristUser(data.user)) {
         return res.status(403).json({ error: "É preciso ter um perfil de turista para avaliar." });
       }
       res.locals.touristUser = data.user;
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Token inválido." });
+    }
+  },
+];
+
+// Qualquer usuário autenticado, seja lá qual for o papel — usado só pra
+// virar turista com a conta atual (POST /api/turista/upgrade), onde o que
+// importa é apenas "existe uma sessão válida", não um papel específico.
+const requireAnyAuth: express.RequestHandler[] = [
+  authLimiter,
+  async (req, res, next) => {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: "Autenticação necessária." });
+    }
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data.user) {
+        return res.status(401).json({ error: "Token inválido." });
+      }
+      res.locals.authUser = data.user;
       next();
     } catch (err) {
       res.status(401).json({ error: "Token inválido." });
@@ -2087,6 +2121,48 @@ app.get("/api/turista/me", requireTourist, async (req, res) => {
   const { data, error } = await supabase.from("turistas").select("*").eq("id", userId).maybeSingle();
   if (error || !data) return res.status(404).json({ error: "Perfil de turista não encontrado." });
   res.json(data as Turista);
+});
+
+// Deixa uma conta já autenticada (admin, parceiro...) virar turista também,
+// SEM criar uma segunda conta desconectada — só acrescenta isTourist=true ao
+// app_metadata que a conta já tem (nunca mexe em role/isAdmin/partnerType já
+// existentes) e cria o perfil em "turistas" com o mesmo id/email. Não pede
+// email nem senha porque a pessoa já está logada; só falta o perfil.
+app.post("/api/turista/upgrade", requireAnyAuth, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — não é possível virar turista agora." });
+  const user = res.locals.authUser as { id: string; email?: string; app_metadata?: Record<string, unknown> };
+
+  if (isTouristUser(user)) {
+    return res.status(400).json({ error: "Esta conta já tem um perfil de turista." });
+  }
+  const email = String(user.email || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: "Esta conta não tem um email associado." });
+
+  const name = String(req.body.name || "").trim();
+  const whatsapp = String(req.body.whatsapp || "").trim();
+  const country = String(req.body.country || "").trim();
+  const language = String(req.body.language || "").trim();
+  const age = Number(req.body.age);
+  const preferences = String(req.body.preferences || "").trim();
+  if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
+  }
+
+  const mergedMetadata = { ...(user.app_metadata || {}), isTourist: true };
+  const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(user.id, { app_metadata: mergedMetadata });
+  if (updateErr) return res.status(500).json({ error: describeAuthError(updateErr, "Erro ao ativar o perfil de turista.") });
+
+  const newTurista: Turista = { id: user.id, name, email, whatsapp, country, language, age, preferences };
+  const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
+  if (insertErr) {
+    // Desfaz o isTourist se não conseguiu criar o perfil — não deixa a conta
+    // passando no requireTourist sem ter uma linha em "turistas" pra usar.
+    await supabaseAdminAuth.auth.admin.updateUserById(user.id, { app_metadata: user.app_metadata || {} }).catch(() => {});
+    console.error("Erro ao salvar perfil de turista no Supabase:", insertErr.message);
+    return res.status(500).json({ error: "Erro ao criar seu perfil de turista." });
+  }
+
+  res.status(201).json({ success: true });
 });
 
 // Pousadas que o turista já visitou de verdade — inferido a partir de

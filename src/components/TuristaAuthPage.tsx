@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Compass, LoaderCircle, User, LogOut, ArrowLeft, MailCheck } from "lucide-react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { Compass, LoaderCircle, User, LogOut, ArrowLeft, MailCheck, Sparkles } from "lucide-react";
+import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
+import { isTouristUser } from "../lib/authRoles";
 import { Turista } from "../types";
 import { navigate } from "../lib/router";
 
@@ -16,8 +17,14 @@ export default function TuristaAuthPage() {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [isTourist, setIsTourist] = useState(false);
+  // Sessão existente que NÃO é de turista (ex: admin ou parceiro navegando)
+  // — usada pra oferecer "virar turista com esta conta" em vez de mandar
+  // pra tela de login/cadastro como se a pessoa estivesse deslogada.
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Turista | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
 
   const [mode, setMode] = useState<"login" | "signup">("signup");
 
@@ -51,11 +58,13 @@ export default function TuristaAuthPage() {
     getSupabaseClient().then(client => {
       setSupabase(client);
       client.auth.getSession().then(({ data }) => {
-        setIsTourist(data.session?.user?.app_metadata?.role === "tourist");
+        setCurrentUser(data.session?.user || null);
+        setIsTourist(isTouristUser(data.session?.user));
         setCheckingSession(false);
       });
       const { data } = client.auth.onAuthStateChange((_event, session) => {
-        setIsTourist(session?.user?.app_metadata?.role === "tourist");
+        setCurrentUser(session?.user || null);
+        setIsTourist(isTouristUser(session?.user));
       });
       subscription = data.subscription;
     });
@@ -78,6 +87,7 @@ export default function TuristaAuthPage() {
   const handleLogout = async () => {
     if (supabase) await supabase.auth.signOut();
     setIsTourist(false);
+    setCurrentUser(null);
     setProfile(null);
   };
 
@@ -92,7 +102,7 @@ export default function TuristaAuthPage() {
       setLoggingIn(false);
       return;
     }
-    if (data.user.app_metadata?.role !== "tourist") {
+    if (!isTouristUser(data.user)) {
       await supabase.auth.signOut();
       setLoginError("Esta conta não tem um perfil de turista.");
       setLoggingIn(false);
@@ -100,6 +110,37 @@ export default function TuristaAuthPage() {
     }
     setIsTourist(true);
     setLoggingIn(false);
+  };
+
+  // Ativa o perfil de turista numa conta que já está logada (admin,
+  // parceiro...) — sem pedir email/senha de novo, só o perfil em si.
+  const handleUpgrade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (upgrading) return;
+    setUpgradeError("");
+    setUpgrading(true);
+    try {
+      const res = await adminFetch("/api/turista/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, whatsapp, country, language, age: Number(age), preferences }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUpgradeError(body.error || "Erro ao ativar seu perfil de turista.");
+        return;
+      }
+      // O token que o navegador já tem foi emitido antes do isTourist=true
+      // existir no app_metadata — precisa renovar a sessão pra essa
+      // informação chegar no token e o resto do site reconhecer na hora.
+      if (supabase) {
+        const { data } = await supabase.auth.refreshSession();
+        setCurrentUser(data.session?.user || null);
+        setIsTourist(isTouristUser(data.session?.user));
+      }
+    } finally {
+      setUpgrading(false);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -184,6 +225,68 @@ export default function TuristaAuthPage() {
               Mandamos um link de confirmação pra <span className="font-semibold text-editorial-text">{email}</span>. Clique nele pra ativar seu perfil de turista — você vai cair de volta bem aqui, já logado.
             </p>
             <p className="text-editorial-muted text-[11px] mt-3">Não chegou? Confira também a caixa de spam.</p>
+            <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="mt-6 inline-flex items-center gap-2 text-editorial-primary text-[11px] uppercase tracking-widest font-bold hover:opacity-80 transition cursor-pointer">
+              <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao catálogo
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Sessão existente (admin, parceiro...) que ainda não tem perfil de
+  // turista — em vez de login/cadastro (que criaria uma segunda conta
+  // desconectada), oferece ativar o turista na MESMA conta: só falta o
+  // perfil, email e senha ela já tem.
+  if (currentUser && !isTourist) {
+    return (
+      <div className="min-h-screen bg-editorial-bg font-sans">
+        {header}
+        <div className="flex items-center justify-center px-6 py-16">
+          <div className="max-w-sm w-full bg-white border border-editorial-border rounded-lg p-8 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="h-4 w-4 text-editorial-primary" />
+              <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary">Virar Turista</h1>
+            </div>
+            <p className="text-editorial-muted text-xs mb-6">
+              Você já está logado como <span className="font-semibold text-editorial-text">{currentUser.email}</span>. Complete o perfil abaixo pra ativar o turista nessa mesma conta e poder avaliar pousadas, guias e atrações.
+            </p>
+            <form onSubmit={handleUpgrade} className="flex flex-col gap-3">
+              <input
+                type="text" required placeholder="Nome completo" value={name} onChange={e => setName(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
+              <input
+                type="tel" required placeholder="WhatsApp (com DDD/país)" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text" required placeholder="País" value={country} onChange={e => setCountry(e.target.value)}
+                  className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                />
+                <input
+                  type="number" required min={1} placeholder="Idade" value={age} onChange={e => setAge(e.target.value)}
+                  className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                />
+              </div>
+              <input
+                type="text" required placeholder="Idioma preferido (ex: Português, English, Español)" value={language} onChange={e => setLanguage(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              />
+              <textarea
+                required rows={2} placeholder="O que você gosta de fazer em viagens? (ex: trilhas, observação de aves, gastronomia...)"
+                value={preferences} onChange={e => setPreferences(e.target.value)}
+                className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none"
+              />
+              {upgradeError && <p className="text-red-600 text-xs font-medium">{upgradeError}</p>}
+              <button
+                type="submit" disabled={upgrading}
+                className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
+              >
+                {upgrading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Ativar perfil de turista"}
+              </button>
+            </form>
             <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="mt-6 inline-flex items-center gap-2 text-editorial-primary text-[11px] uppercase tracking-widest font-bold hover:opacity-80 transition cursor-pointer">
               <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao catálogo
             </a>
