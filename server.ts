@@ -2093,6 +2093,24 @@ app.delete("/api/turistas/:id", requireAdmin, async (req, res) => {
   res.json({ success: true, message: "Turista excluído com sucesso" });
 });
 
+// Categorias fixas de interesse (passeios/aventuras, fauna/flora) que o
+// turista marca no próprio perfil — espelha TOURIST_INTEREST_OPTIONS em
+// src/lib/touristInterests.ts. Validado aqui filtrando qualquer valor fora
+// da lista em vez de rejeitar a requisição inteira — defensivo contra o
+// front enviar algo desatualizado, nunca quebra o cadastro/edição por causa
+// disso.
+const TOURIST_INTEREST_OPTIONS = [
+  "Trilhas guiadas", "Passeio de barco", "Focagem noturna", "Pesca esportiva",
+  "Observação de aves", "Cavalgada", "Fotografia de vida selvagem", "Canoagem / Stand-up paddle",
+  "Onça-pintada", "Jacarés", "Aves e araras", "Capivaras", "Primatas",
+  "Vida aquática", "Flora do Pantanal", "Flora do Cerrado",
+];
+
+function sanitizeTouristInterests(val: unknown): string[] {
+  if (!Array.isArray(val)) return [];
+  return val.filter((v): v is string => typeof v === "string" && TOURIST_INTEREST_OPTIONS.includes(v));
+}
+
 // TURISTA SELF-SERVICE (Supabase Auth) — unlike admin/partner (invite-only,
 // provisioned by an admin), a tourist creates their own account: no vetting
 // needed, this is just the "profile required to review" gate (see
@@ -2145,7 +2163,8 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     return res.status(400).json({ error: describeAuthError(createErr, "Erro ao criar sua conta (o email já pode estar em uso).") });
   }
 
-  const newTurista: Turista = { id: created.user.id, name, email, whatsapp, country, language, age, preferences };
+  const interests = sanitizeTouristInterests(req.body.interests);
+  const newTurista: Turista = { id: created.user.id, name, email, whatsapp, country, language, age, preferences, interests };
   const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
   if (insertErr) {
     // Don't leave a bare auth account behind with no profile row — it would
@@ -2204,6 +2223,34 @@ app.get("/api/turista/me", requireTourist, async (req, res) => {
   res.json(data as Turista);
 });
 
+// Edição do próprio perfil — nunca mexe em email/coins aqui: email é a
+// identidade de login (mudar exigiria reautenticação), coins só espelham o
+// saldo do app via POST /api/integrations/app-coins-sync, nunca são
+// escritas pelo próprio turista.
+app.put("/api/turista/me", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+
+  const name = String(req.body.name || "").trim();
+  const whatsapp = String(req.body.whatsapp || "").trim();
+  const country = String(req.body.country || "").trim();
+  const language = String(req.body.language || "").trim();
+  const age = Number(req.body.age);
+  const preferences = String(req.body.preferences || "").trim();
+  if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
+  }
+  const interests = sanitizeTouristInterests(req.body.interests);
+
+  const { data, error } = await supabase
+    .from("turistas")
+    .update({ name, whatsapp, country, language, age, preferences, interests })
+    .eq("id", userId)
+    .select()
+    .maybeSingle();
+  if (error || !data) return res.status(500).json({ error: "Erro ao salvar seu perfil." });
+  res.json(data as Turista);
+});
+
 // Deixa uma conta já autenticada (admin, parceiro...) virar turista também,
 // SEM criar uma segunda conta desconectada — só acrescenta isTourist=true ao
 // app_metadata que a conta já tem (nunca mexe em role/isAdmin/partnerType já
@@ -2233,7 +2280,8 @@ app.post("/api/turista/upgrade", requireAnyAuth, async (req, res) => {
   const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(user.id, { app_metadata: mergedMetadata });
   if (updateErr) return res.status(500).json({ error: describeAuthError(updateErr, "Erro ao ativar o perfil de turista.") });
 
-  const newTurista: Turista = { id: user.id, name, email, whatsapp, country, language, age, preferences };
+  const interests = sanitizeTouristInterests(req.body.interests);
+  const newTurista: Turista = { id: user.id, name, email, whatsapp, country, language, age, preferences, interests };
   const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
   if (insertErr) {
     // Desfaz o isTourist se não conseguiu criar o perfil — não deixa a conta

@@ -192,6 +192,10 @@ export interface Turista {
   preferences: string;
   language?: string;
   coins?: number;
+  // Categorias fixas (ver src/lib/touristInterests.ts) que o turista marca
+  // no próprio perfil — alimenta o cruzamento feito pela IA no chat (guia,
+  // pousada, roteiro) com o que a pessoa realmente quer ver/fazer.
+  interests?: string[];
 }
 
 // Pousada que um turista logado marcou como "gostei" — alimenta o widget de
