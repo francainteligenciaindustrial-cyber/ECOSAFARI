@@ -377,6 +377,7 @@ export default function App() {
               onClick={handleAdminLogout}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
               title="Sair do modo administrador"
+              aria-label="Sair do modo administrador"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Sair</span>
@@ -386,6 +387,7 @@ export default function App() {
               onClick={() => navigate("/parceiro")}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
               title="Meu painel de parceiro"
+              aria-label="Meu painel de parceiro"
             >
               <User className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Meu Painel</span>
@@ -395,6 +397,7 @@ export default function App() {
               onClick={() => navigate("/entrar")}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
               title="Entrar"
+              aria-label="Entrar"
             >
               <User className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Entrar</span>

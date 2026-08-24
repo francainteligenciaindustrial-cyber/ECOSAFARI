@@ -39,19 +39,19 @@ app.use((req, res, next) => {
   res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
   res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   // Allowlist reflects the third-party scripts this app actually loads:
-  // Google reCAPTCHA v3, Meta Pixel, Supabase (API + Storage), Sentry.
-  // If you add a new external script/embed later, this will block it until
-  // its domain is added here — check the browser console for the CSP
-  // violation, it names the exact directive/domain to add.
+  // Google reCAPTCHA v3, Meta Pixel, Google Analytics 4, Supabase (API +
+  // Storage), Sentry. If you add a new external script/embed later, this
+  // will block it until its domain is added here — check the browser
+  // console for the CSP violation, it names the exact directive/domain to add.
   res.setHeader(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' https://www.google.com https://www.gstatic.com https://connect.facebook.net",
+      "script-src 'self' https://www.google.com https://www.gstatic.com https://connect.facebook.net https://www.googletagmanager.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https:",
-      "connect-src 'self' https://*.supabase.co https://www.google.com https://www.facebook.com https://*.sentry.io",
+      "connect-src 'self' https://*.supabase.co https://www.google.com https://www.facebook.com https://*.sentry.io https://www.googletagmanager.com https://*.google-analytics.com",
       "frame-src https://www.google.com",
       "object-src 'none'",
       "base-uri 'self'",

@@ -2,14 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Cookie } from "lucide-react";
 import { navigate } from "../lib/router";
 import { initMetaPixel } from "../lib/metaPixel";
+import { initGoogleAnalytics } from "../lib/googleAnalytics";
 
 const STORAGE_KEY = "ecosafari_cookie_consent";
 
 // LGPD requires informing visitors before non-essential cookies/trackers
-// (Meta Pixel, Google Analytics once installed, etc.) run. Any such tracker
-// must check localStorage.getItem(STORAGE_KEY) === "accepted" before
-// initializing itself — this component just records that decision and
-// kicks off the ones we already have (initMetaPixel is a no-op otherwise).
+// (Meta Pixel, Google Analytics, etc.) run. Any such tracker must check
+// localStorage.getItem(STORAGE_KEY) === "accepted" before initializing
+// itself — this component just records that decision and kicks off the ones
+// we already have (both are no-ops without their env var set).
 export default function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
 
@@ -19,7 +20,10 @@ export default function CookieConsentBanner() {
 
   const decide = (value: "accepted" | "rejected") => {
     localStorage.setItem(STORAGE_KEY, value);
-    if (value === "accepted") initMetaPixel();
+    if (value === "accepted") {
+      initMetaPixel();
+      initGoogleAnalytics();
+    }
     setVisible(false);
   };
 

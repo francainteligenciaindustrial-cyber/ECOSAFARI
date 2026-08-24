@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users } from "lucide-react";
-import { Pousada } from "../types";
+import { Pousada, Review } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 import TopReviewQuote from "./TopReviewQuote";
 import FavoriteButton from "./FavoriteButton";
 import PousadaRecompensas from "./PousadaRecompensas";
+import { useStructuredData } from "../lib/structuredData";
 
 interface PousadaDetailsViewProps {
   pousada: Pousada;
@@ -20,6 +21,41 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const images = pousada.images && pousada.images.length > 0 ? pousada.images : [""];
+
+  // Conta de avaliações real (não só a nota média já presente em
+  // pousada.rating) — AggregateRating no schema.org só é um dado estruturado
+  // válido pro Google se vier acompanhado da contagem de avaliações.
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/reviews")
+      .then(res => (res.ok ? res.json() : []))
+      .then((all: Review[]) => {
+        if (cancelled) return;
+        setReviewCount(all.filter(r => r.pousadaId === pousada.id).length);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pousada.id]);
+
+  useStructuredData({
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name: pousada.name,
+    description: pousada.longDescription || pousada.description,
+    image: (pousada.images || []).filter(Boolean),
+    url: `${window.location.origin}/pousadas/${pousada.id}`,
+    address: { "@type": "PostalAddress", addressLocality: pousada.location, addressCountry: "BR" },
+    priceRange: `R$ ${pousada.pricePerNight}`,
+    ...(pousada.rating > 0 && reviewCount ? {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: pousada.rating,
+        reviewCount,
+        bestRating: 5,
+      },
+    } : {}),
+  });
 
   const showPrev = () => setLightboxIndex(i => i === null ? null : (i - 1 + images.length) % images.length);
   const showNext = () => setLightboxIndex(i => i === null ? null : (i + 1) % images.length);

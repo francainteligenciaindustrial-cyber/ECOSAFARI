@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
-import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User, Lock, LoaderCircle } from "lucide-react";
+import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User, Lock, LoaderCircle, Search } from "lucide-react";
 import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
 import { navigate } from "../lib/router";
@@ -7,6 +7,7 @@ import LanguageFlag from "./LanguageFlag";
 import { adminFetch } from "../lib/adminFetch";
 import { useTouristSession } from "../lib/useTouristSession";
 import { isCompletePousadaProfile } from "../lib/pousadaCompleteness";
+import { filterAndSortPousadas, SortOption } from "../lib/catalogFilters";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -146,6 +147,10 @@ export default function PousadaCatalog({
       });
   const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
   const [filterLocation, setFilterLocation] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("relevance");
+  const [priceMin, setPriceMin] = useState("");
+  const [priceMax, setPriceMax] = useState("");
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState("");
   const [photoUrlInput, setPhotoUrlInput] = useState("");
@@ -212,9 +217,14 @@ export default function PousadaCatalog({
   const uniqueLocations = ["Mato Grosso"];
 
   const completePousadas = pousadas.filter(isCompletePousadaProfile);
-  const filteredPousadas = filterLocation === "all"
-    ? completePousadas
-    : completePousadas.filter(p => p && typeof p.location === "string" && p.location.includes(filterLocation));
+  const filteredPousadas = filterAndSortPousadas(completePousadas, {
+    location: filterLocation,
+    search: searchQuery,
+    priceMin: priceMin === "" ? undefined : Number(priceMin),
+    priceMax: priceMax === "" ? undefined : Number(priceMax),
+    sortBy,
+  });
+  const hasActiveFilters = searchQuery.trim() !== "" || priceMin !== "" || priceMax !== "" || sortBy !== "relevance" || filterLocation !== "all";
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,13 +292,13 @@ export default function PousadaCatalog({
 
       {/* Catalog Filters and Section */}
       <section id="catalogo" className="max-w-7xl mx-auto px-6 py-16 scroll-mt-10">
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-12 border-b border-editorial-border pb-6 gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-6 gap-6">
           <div>
             <span className="text-[10px] uppercase tracking-[0.3em] text-editorial-primary font-bold">Acomodações Exclusivas</span>
             <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">Nossas Pousadas Parceiras</h2>
             <p className="text-editorial-muted text-xs mt-2 max-w-xl">Hospedagens selecionadas que respeitam o meio ambiente e promovem a conservação local.</p>
           </div>
-          
+
           {/* Location Filters */}
           <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold">
             <button
@@ -315,6 +325,61 @@ export default function PousadaCatalog({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Search / price range / sort — o coração de uma plataforma de
+            busca de hospedagem, faltava até então (só existia o filtro de
+            bioma). */}
+        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-12 border-b border-editorial-border pb-6">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-editorial-muted pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nome, localização ou comodidade..."
+              aria-label="Buscar por nome, localização ou comodidade"
+              className="w-full pl-9 pr-3 py-2.5 text-xs border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <input
+              type="number" min={0} inputMode="numeric" placeholder="R$ mín."
+              aria-label="Preço mínimo por noite"
+              value={priceMin} onChange={e => setPriceMin(e.target.value)}
+              className="w-24 px-2.5 py-2.5 border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+            />
+            <span className="text-editorial-muted">–</span>
+            <input
+              type="number" min={0} inputMode="numeric" placeholder="R$ máx."
+              aria-label="Preço máximo por noite"
+              value={priceMax} onChange={e => setPriceMax(e.target.value)}
+              className="w-24 px-2.5 py-2.5 border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+            />
+          </div>
+
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortOption)}
+            aria-label="Ordenar por"
+            className="px-3 py-2.5 text-xs uppercase tracking-widest font-bold border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary cursor-pointer"
+          >
+            <option value="relevance">Mais relevantes</option>
+            <option value="price-asc">Menor preço</option>
+            <option value="price-desc">Maior preço</option>
+            <option value="rating-desc">Melhor avaliadas</option>
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => { setSearchQuery(""); setPriceMin(""); setPriceMax(""); setSortBy("relevance"); setFilterLocation("all"); }}
+              className="text-editorial-muted hover:text-editorial-primary text-[10px] uppercase tracking-widest font-bold transition cursor-pointer whitespace-nowrap"
+            >
+              Limpar filtros
+            </button>
+          )}
         </div>
 
         {/* Catalog Grid */}
@@ -421,7 +486,7 @@ export default function PousadaCatalog({
             <p className="text-editorial-muted text-sm max-w-md mx-auto">
               {pousadas.length === 0
                 ? "Estamos selecionando as melhores pousadas do Pantanal para você. Volte em breve para conferir o catálogo completo."
-                : "Tente outra localização ou fale com a gente pelo WhatsApp para indicações personalizadas."}
+                : "Tente ajustar a busca, o preço ou a localização — ou fale com a gente pelo WhatsApp para indicações personalizadas."}
             </p>
           </div>
         )}

@@ -26,6 +26,29 @@
     <meta name="twitter:title" content="EcoSafari Brasil — Turismo Ecológico e Safáris Fotográficos" />
     <meta name="twitter:description" content="Reserve pousadas parceiras, guias especializados e roteiros de safári fotográfico no Pantanal, Cerrado e Amazônia." />
     <meta name="twitter:image" content="https://www.ecosafaribrasil.com.br/species/onca-pintada.png" />
+
+    <!-- Dados estruturados sitewide (schema.org) — Organization + WebSite,
+         separado do LodgingBusiness por pousada (injetado em runtime por
+         PousadaDetailsView.tsx via useStructuredData). Ajuda o Google a
+         entender quem é a empresa por trás do site nos resultados de busca. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "EcoSafari Brasil",
+        "url": "https://www.ecosafaribrasil.com.br/",
+        "logo": "https://www.ecosafaribrasil.com.br/favicon.svg",
+        "sameAs": ["https://instagram.com/ecosafari"]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "EcoSafari Brasil",
+        "url": "https://www.ecosafaribrasil.com.br/"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

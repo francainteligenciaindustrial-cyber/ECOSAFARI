@@ -76,6 +76,8 @@ export default function TouristProfileWidget() {
         onClick={() => setOpen(v => !v)}
         className="flex items-center gap-2 cursor-pointer group"
         title={profile?.name || "Minha conta"}
+        aria-label={profile?.name ? `Menu da conta de ${profile.name}` : "Minha conta"}
+        aria-expanded={open}
       >
         <span className="w-8 h-8 rounded-full bg-editorial-primary text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 ring-2 ring-transparent group-hover:ring-editorial-primary/30 transition">
           {profile ? initials(profile.name) : <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
