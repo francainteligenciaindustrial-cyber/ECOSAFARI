@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Coins, MapPin, Languages, Heart, Ticket, LogOut, User, ChevronDown, LoaderCircle, Check, Copy } from "lucide-react";
+import { Coins, MapPin, Languages, Heart, Ticket, LogOut, ChevronDown, LoaderCircle, Check, Copy } from "lucide-react";
 import { useTouristSession } from "../lib/useTouristSession";
 import { adminFetch } from "../lib/adminFetch";
 import { navigate } from "../lib/router";
@@ -21,7 +21,7 @@ function initials(name: string): string {
 // perfil do Google/Instagram: um avatar que abre um painel resumido com
 // saldo de Coins, favoritos e histórico, sem sair da página atual.
 export default function TouristProfileWidget() {
-  const { checking, isTourist, hasSession, profile, supabase } = useTouristSession();
+  const { checking, isTourist, profile, supabase } = useTouristSession();
   const [open, setOpen] = useState(false);
   const [favoritos, setFavoritos] = useState<Pousada[] | null>(null);
   const [visitados, setVisitados] = useState<VisitedPousada[] | null>(null);
@@ -65,24 +65,10 @@ export default function TouristProfileWidget() {
     setTimeout(() => setCopiedCode(null), 1500);
   };
 
-  if (checking) return null;
-
-  if (!isTourist) {
-    // Uma conta já logada como admin/parceiro não está "deslogada" — só não
-    // tem perfil de turista ainda. "Entrar" ficaria enganoso nesse caso; o
-    // clique leva pra /turista, que detecta a sessão existente e oferece
-    // ativar o turista na mesma conta em vez de pedir login de novo.
-    return (
-      <button
-        onClick={() => navigate("/turista")}
-        className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-        title={hasSession ? "Ativar perfil de turista" : "Entrar como turista"}
-      >
-        <User className="h-3.5 w-3.5" />
-        <span className="hidden md:inline">{hasSession ? "Virar turista" : "Entrar"}</span>
-      </button>
-    );
-  }
+  // Quem não tem perfil de turista não vê nada aqui — o ponto de entrada
+  // único de login/cadastro é o botão "Entrar" do cabeçalho (App.tsx), que
+  // leva pra /entrar (AuthPage.tsx, aba Turista).
+  if (checking || !isTourist) return null;
 
   return (
     <div className="relative" ref={ref}>

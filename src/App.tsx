@@ -1,12 +1,11 @@
 import React, { useState, useEffect, Suspense, lazy } from "react";
-import { Compass, ShieldAlert, Monitor, CheckCircle, Smartphone, HelpCircle, Mail, MessageSquare, Instagram, Lock, LogOut } from "lucide-react";
+import { Compass, ShieldAlert, Monitor, CheckCircle, Smartphone, HelpCircle, Mail, MessageSquare, Instagram, LogOut, User } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import PousadaCatalog from "./components/PousadaCatalog";
 import PousadaDetailsView from "./components/PousadaDetailsView";
 import VideoPlayerView from "./components/VideoPlayerView";
 import WhatsAppChatbot from "./components/WhatsAppChatbot";
 import WhatsAppGateView from "./components/WhatsAppGateView";
-import AdminLoginModal from "./components/AdminLoginModal";
 import PousadaOfficialSite from "./components/PousadaOfficialSite";
 import AtracaoDetailsView from "./components/AtracaoDetailsView";
 import GuiaDetailsView from "./components/GuiaDetailsView";
@@ -14,7 +13,7 @@ import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import TouristProfileWidget from "./components/TouristProfileWidget";
 import { getSupabaseClient } from "./lib/supabaseClient";
-import { isAdminUser } from "./lib/authRoles";
+import { isAdminUser, isTouristUser, isPartnerUser } from "./lib/authRoles";
 import { useRoute, navigate } from "./lib/router";
 import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./types";
 
@@ -39,6 +38,7 @@ const PaymentConfirmationPage = lazy(() => import("./components/PaymentConfirmat
 const PartnerPortalPage = lazy(() => import("./components/PartnerPortalPage"));
 const PartnerOAuthConsentPage = lazy(() => import("./components/PartnerOAuthConsentPage"));
 const TuristaAuthPage = lazy(() => import("./components/TuristaAuthPage"));
+const AuthPage = lazy(() => import("./components/AuthPage"));
 
 function LazyFallback() {
   return (
@@ -89,7 +89,12 @@ export default function App() {
   // outro papel que a mesma conta já tenha (turista, parceiro).
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  // Usados só pra decidir o que o cabeçalho mostra no lugar do antigo
+  // cadeado/"Portal do Parceiro": turista já tem seu próprio widget de
+  // avatar (TouristProfileWidget), então aqui só precisamos saber se existe
+  // uma sessão de parceiro pra oferecer "Meu Painel" em vez de "Entrar".
+  const [isTouristSession, setIsTouristSession] = useState(false);
+  const [isPartnerSession, setIsPartnerSession] = useState(false);
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
@@ -99,10 +104,14 @@ export default function App() {
 
       client.auth.getSession().then(({ data }) => {
         setIsAdmin(isAdminUser(data.session?.user));
+        setIsTouristSession(isTouristUser(data.session?.user));
+        setIsPartnerSession(isPartnerUser(data.session?.user));
       });
 
       const { data } = client.auth.onAuthStateChange((_event, newSession) => {
         setIsAdmin(isAdminUser(newSession?.user));
+        setIsTouristSession(isTouristUser(newSession?.user));
+        setIsPartnerSession(isPartnerUser(newSession?.user));
       });
       subscription = data.subscription;
     });
@@ -260,6 +269,22 @@ export default function App() {
     return <GuiaDetailsView id={guiaRouteMatch[1]} />;
   }
 
+  // /entrar precisa ficar fora de STANDALONE_ROUTES (que só suporta
+  // componentes sem props) porque o login de Gestão bem-sucedido precisa
+  // chamar de volta pro setCurrentModule/navigate daqui.
+  if (path === "/entrar") {
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <AuthPage
+          onAdminAuthenticated={() => {
+            setCurrentModule("admin");
+            navigate("/");
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   if (isMobileNative) {
     if (loading) {
       return (
@@ -321,13 +346,6 @@ export default function App() {
           >
             Portal
           </button>
-          <button
-            onClick={() => navigate("/parceiro")}
-            className="transition duration-200 pb-1 border-b-2 border-transparent hover:text-editorial-text flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">Portal do Parceiro</span>
-            <span className="sm:hidden">Parceiro</span>
-          </button>
           {isAdmin && (
             <button
               onClick={() => setCurrentModule("admin")}
@@ -349,7 +367,11 @@ export default function App() {
           {/* Tourist account menu — Coins, favoritos, histórico */}
           <TouristProfileWidget />
 
-          {/* Discreet admin access control */}
+          {/* Ponto único de entrada: admin logado vê "Sair"; parceiro
+              logado (sem ser admin) vê um atalho pro próprio painel; todo
+              o resto vê "Entrar", que leva pra /entrar (Turista/Parceiros/
+              Gestão numa tela só). Quem já é turista não precisa de nenhum
+              dos dois — o avatar do TouristProfileWidget já cobre isso. */}
           {isAdmin ? (
             <button
               onClick={handleAdminLogout}
@@ -359,28 +381,27 @@ export default function App() {
               <LogOut className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Sair</span>
             </button>
+          ) : isTouristSession ? null : isPartnerSession ? (
+            <button
+              onClick={() => navigate("/parceiro")}
+              className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
+              title="Meu painel de parceiro"
+            >
+              <User className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Meu Painel</span>
+            </button>
           ) : (
             <button
-              onClick={() => setShowAdminLogin(true)}
+              onClick={() => navigate("/entrar")}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-              title="Acesso administrativo"
+              title="Entrar"
             >
-              <Lock className="h-3.5 w-3.5" />
+              <User className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Entrar</span>
             </button>
           )}
         </div>
       </header>
-
-      {showAdminLogin && supabase && (
-        <AdminLoginModal
-          supabase={supabase}
-          onClose={() => setShowAdminLogin(false)}
-          onAdminAuthenticated={() => {
-            setShowAdminLogin(false);
-            setCurrentModule("admin");
-          }}
-        />
-      )}
 
       {/* MAIN LAYOUT */}
       <main className="flex-1 bg-editorial-secondary">
@@ -464,13 +485,6 @@ export default function App() {
             <span className="font-serif font-bold text-lg tracking-normal capitalize text-white">
               EcoSafari Brasil
             </span>
-            <a
-              href="/seja-parceiro"
-              onClick={(e) => { e.preventDefault(); navigate("/seja-parceiro"); }}
-              className="inline-block border border-white/40 hover:bg-white hover:text-editorial-primary transition-colors px-4 py-2 text-[10px] font-bold cursor-pointer"
-            >
-              É Guia ou Pousada? Seja um Parceiro →
-            </a>
           </div>
 
           {/* Contact Direct Links as requested */}

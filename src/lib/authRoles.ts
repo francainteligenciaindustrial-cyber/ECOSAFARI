@@ -19,3 +19,12 @@ export function isChiefUser(user: { app_metadata?: Record<string, unknown> } | n
 export function isTouristUser(user: { app_metadata?: Record<string, unknown> } | null | undefined): boolean {
   return user?.app_metadata?.isTourist === true || user?.app_metadata?.role === "tourist";
 }
+
+// Parceiro (pousada/atração/guia) nunca ganhou um flag booleano próprio como
+// isAdmin/isTourist — continua identificado só pelo campo legado role, já
+// que a conta é sempre provisionada por convite/candidatura aprovada, nunca
+// auto-cadastro. Usado no cabeçalho (App.tsx) pra saber se mostra "Meu
+// Painel" (link pra /parceiro) em vez de "Entrar".
+export function isPartnerUser(user: { app_metadata?: Record<string, unknown> } | null | undefined): boolean {
+  return user?.app_metadata?.role === "partner";
+}
