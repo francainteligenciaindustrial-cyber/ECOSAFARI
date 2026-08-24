@@ -159,7 +159,7 @@ class SupabaseRateLimitStore {
 }
 
 // Shared across every admin- and partner-authenticated route in the app
-// (requireAdmin, requireAdminOrPartner, requirePartnerAccess,
+// (requireAdmin, requireAnyUploader, requirePartnerAccess,
 // /api/my-partner-profile) — not just a login attempt. There's no separate
 // password-exchange endpoint in this Express app to protect (that happens
 // client-side directly against Supabase Auth), so this limiter's real job
@@ -266,13 +266,16 @@ const requireAdmin: express.RequestHandler[] = [
   },
 ];
 
-// Any authenticated admin OR partner (of any type/record) — used for routes
-// like image upload that don't belong to a specific resource yet, so there's
-// nothing to scope ownership against. The real authorization boundary is
-// still enforced downstream: an uploaded image is just a URL sitting in
-// storage until it's attached to a record via a PUT that goes through
-// requirePartnerAccess, which *does* check ownership.
-const requireAdminOrPartner: express.RequestHandler[] = [
+// Any authenticated admin, partner OR tourist — used for routes like image
+// upload that don't belong to a specific resource yet, so there's nothing to
+// scope ownership against. The real authorization boundary is still enforced
+// downstream: an uploaded image is just a URL sitting in storage until it's
+// attached to a record via a PUT that goes through requirePartnerAccess
+// (partner-owned records) or PUT /api/turista/me (own tourist profile photo),
+// both of which *do* check ownership. Tourist accounts are self-service
+// (zero vetting, unlike invite-only admin/partner) — authLimiter is the
+// abuse guard for that wider pool of callers.
+const requireAnyUploader: express.RequestHandler[] = [
   authLimiter,
   async (req, res, next) => {
     const authHeader = req.headers.authorization || "";
@@ -283,8 +286,8 @@ const requireAdminOrPartner: express.RequestHandler[] = [
     try {
       const { data, error } = await supabase.auth.getUser(token);
       const role = data.user?.app_metadata?.role;
-      if (error || !data.user || (!isAdminUser(data.user) && role !== "partner")) {
-        return res.status(403).json({ error: "Acesso restrito a administradores ou parceiros." });
+      if (error || !data.user || (!isAdminUser(data.user) && role !== "partner" && !isTouristUser(data.user))) {
+        return res.status(403).json({ error: "Acesso restrito a administradores, parceiros ou turistas com perfil." });
       }
       next();
     } catch (err) {
@@ -940,7 +943,7 @@ async function moderateText(text: string): Promise<{ ok: boolean; reason?: strin
   }
 }
 
-app.post("/api/upload-image", requireAdminOrPartner, (req, res) => {
+app.post("/api/upload-image", requireAnyUploader, (req, res) => {
   upload.single("file")(req, res, async (err: any) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
@@ -2240,10 +2243,13 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
     return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
   }
   const interests = sanitizeTouristInterests(req.body.interests);
+  // Opcional — só é enviado quando a pessoa troca a foto (ver ImageUploadButton
+  // em TuristaProfileView.tsx); omitido, o UPDATE simplesmente não mexe nela.
+  const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl.trim() : undefined;
 
   const { data, error } = await supabase
     .from("turistas")
-    .update({ name, whatsapp, country, language, age, preferences, interests })
+    .update({ name, whatsapp, country, language, age, preferences, interests, ...(photoUrl !== undefined ? { photoUrl } : {}) })
     .eq("id", userId)
     .select()
     .maybeSingle();

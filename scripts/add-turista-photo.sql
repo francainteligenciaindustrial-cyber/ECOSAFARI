@@ -1,0 +1,3 @@
+-- ECOSAFARI BRASIL: FOTO DE PERFIL DO TURISTA
+-- Rode isso no SQL Editor do Supabase.
+ALTER TABLE turistas ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;

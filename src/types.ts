@@ -196,6 +196,7 @@ export interface Turista {
   // no próprio perfil — alimenta o cruzamento feito pela IA no chat (guia,
   // pousada, roteiro) com o que a pessoa realmente quer ver/fazer.
   interests?: string[];
+  photoUrl?: string;
 }
 
 // Pousada que um turista logado marcou como "gostei" — alimenta o widget de

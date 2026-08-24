@@ -8,6 +8,7 @@ import { adminFetch } from "../lib/adminFetch";
 import { navigate } from "../lib/router";
 import { TOURIST_INTEREST_GROUPS } from "../lib/touristInterests";
 import { Pousada, Resgate, Turista } from "../types";
+import ImageUploadButton from "./ImageUploadButton";
 
 interface VisitedPousada {
   pousadaId: string;
@@ -28,6 +29,11 @@ function initials(name: string): string {
 // alimentam o cruzamento que a IA do chat faz para sugerir guia/pousada.
 export default function TuristaProfileView() {
   const { profile, supabase } = useTouristSession();
+  // Espelho local do perfil, atualizado a cada salvamento bem-sucedido — o
+  // hook useTouristSession só busca /api/turista/me uma vez quando a sessão
+  // vira "turista"; sem isso, editar o perfil e sair do modo de edição
+  // continuaria mostrando os dados antigos até recarregar a página.
+  const [localProfile, setLocalProfile] = useState<Turista | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: "", whatsapp: "", country: "", language: "", age: "", preferences: "" });
@@ -36,6 +42,7 @@ export default function TuristaProfileView() {
   const [saveError, setSaveError] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);
   const [togglingInterest, setTogglingInterest] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState("");
 
   const [favoritos, setFavoritos] = useState<Pousada[] | null>(null);
   const [visitados, setVisitados] = useState<VisitedPousada[] | null>(null);
@@ -44,6 +51,7 @@ export default function TuristaProfileView() {
 
   useEffect(() => {
     if (!profile) return;
+    setLocalProfile(profile);
     setForm({
       name: profile.name || "",
       whatsapp: profile.whatsapp || "",
@@ -67,7 +75,7 @@ export default function TuristaProfileView() {
     });
   }, []);
 
-  const saveProfile = async (overrides?: Partial<{ interests: string[] }>): Promise<Turista | null> => {
+  const saveProfile = async (overrides?: Partial<{ interests: string[]; photoUrl: string }>): Promise<Turista | null> => {
     const body = {
       name: form.name,
       whatsapp: form.whatsapp,
@@ -76,6 +84,7 @@ export default function TuristaProfileView() {
       age: Number(form.age),
       preferences: form.preferences,
       interests: overrides?.interests ?? interests,
+      ...(overrides?.photoUrl !== undefined ? { photoUrl: overrides.photoUrl } : {}),
     };
     const res = await adminFetch("/api/turista/me", {
       method: "PUT",
@@ -83,7 +92,15 @@ export default function TuristaProfileView() {
       body: JSON.stringify(body),
     });
     if (!res.ok) return null;
-    return res.json();
+    const updated = await res.json();
+    setLocalProfile(updated);
+    return updated;
+  };
+
+  const handlePhotoUploaded = async (url: string) => {
+    setPhotoError("");
+    const updated = await saveProfile({ photoUrl: url });
+    if (!updated) setPhotoError("Erro ao salvar sua foto. Tente novamente.");
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -136,7 +153,7 @@ export default function TuristaProfileView() {
     navigate("/");
   };
 
-  if (!profile) {
+  if (!localProfile) {
     return (
       <div className="flex items-center justify-center py-24">
         <LoaderCircle className="h-6 w-6 text-editorial-primary animate-spin" />
@@ -149,21 +166,29 @@ export default function TuristaProfileView() {
       {/* Header do perfil */}
       <div className="bg-white border border-editorial-border rounded-lg p-6 md:p-8 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-          <span className="w-20 h-20 rounded-full bg-editorial-primary text-white text-2xl font-serif font-bold flex items-center justify-center flex-shrink-0">
-            {initials(profile.name)}
-          </span>
+          <div className="flex flex-col items-center gap-2 flex-shrink-0">
+            {localProfile.photoUrl ? (
+              <img src={localProfile.photoUrl} alt={localProfile.name} className="w-20 h-20 rounded-full object-cover border border-editorial-border" />
+            ) : (
+              <span className="w-20 h-20 rounded-full bg-editorial-primary text-white text-2xl font-serif font-bold flex items-center justify-center">
+                {initials(localProfile.name)}
+              </span>
+            )}
+            <ImageUploadButton label={localProfile.photoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={handlePhotoUploaded} />
+          </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-serif font-bold text-editorial-text">{profile.name}</h1>
-            <p className="text-editorial-muted text-xs">{profile.email}</p>
+            <h1 className="text-2xl font-serif font-bold text-editorial-text">{localProfile.name}</h1>
+            <p className="text-editorial-muted text-xs">{localProfile.email}</p>
+            {photoError && <p className="text-red-600 text-[11px] font-medium mt-1">{photoError}</p>}
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-editorial-muted">
-              {profile.country && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {profile.country}</span>}
-              {profile.language && <span className="flex items-center gap-1"><Languages className="h-3 w-3" /> {profile.language}</span>}
-              {typeof profile.age === "number" && <span>{profile.age} anos</span>}
+              {localProfile.country && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {localProfile.country}</span>}
+              {localProfile.language && <span className="flex items-center gap-1"><Languages className="h-3 w-3" /> {localProfile.language}</span>}
+              {typeof localProfile.age === "number" && <span>{localProfile.age} anos</span>}
             </div>
           </div>
           <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-2">
             <span className="flex items-center gap-1.5 bg-editorial-primary/5 border border-editorial-primary/15 text-editorial-primary font-bold text-sm px-3 py-1.5 rounded-full">
-              <Coins className="h-4 w-4" /> {profile.coins ?? 0} Coins
+              <Coins className="h-4 w-4" /> {localProfile.coins ?? 0} Coins
             </span>
             <button
               onClick={handleLogout}
@@ -245,11 +270,11 @@ export default function TuristaProfileView() {
           </form>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <p><span className="text-editorial-muted text-xs block">WhatsApp</span> {profile.whatsapp}</p>
-            <p><span className="text-editorial-muted text-xs block">País</span> {profile.country}</p>
-            <p><span className="text-editorial-muted text-xs block">Idioma</span> {profile.language || "—"}</p>
-            <p><span className="text-editorial-muted text-xs block">Idade</span> {profile.age}</p>
-            <p className="sm:col-span-2"><span className="text-editorial-muted text-xs block">Preferências</span> {profile.preferences}</p>
+            <p><span className="text-editorial-muted text-xs block">WhatsApp</span> {localProfile.whatsapp}</p>
+            <p><span className="text-editorial-muted text-xs block">País</span> {localProfile.country}</p>
+            <p><span className="text-editorial-muted text-xs block">Idioma</span> {localProfile.language || "—"}</p>
+            <p><span className="text-editorial-muted text-xs block">Idade</span> {localProfile.age}</p>
+            <p className="sm:col-span-2"><span className="text-editorial-muted text-xs block">Preferências</span> {localProfile.preferences}</p>
           </div>
         )}
       </div>
