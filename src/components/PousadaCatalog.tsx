@@ -7,7 +7,7 @@ import LanguageFlag from "./LanguageFlag";
 import { adminFetch } from "../lib/adminFetch";
 import { useTouristSession } from "../lib/useTouristSession";
 import { isCompletePousadaProfile } from "../lib/pousadaCompleteness";
-import { filterAndSortPousadas, SortOption } from "../lib/catalogFilters";
+import { filterAndSortPousadas, extractLocationRegions, SortOption } from "../lib/catalogFilters";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -213,10 +213,14 @@ export default function PousadaCatalog({
     }
   }, [pousadas, selectedPousadaForReview]);
 
-  // Por enquanto, exibimos só o filtro de Mato Grosso (demais biomas ocultos temporariamente).
-  const uniqueLocations = ["Mato Grosso"];
-
   const completePousadas = pousadas.filter(isCompletePousadaProfile);
+
+  // Regiões (estado/cidade/bioma) extraídas do texto livre que o admin
+  // digitou em cada pousada.location (ex: "Pantanal Norte, Mato Grosso") —
+  // dinâmico, cresce sozinho conforme mais pousadas de outras regiões entram
+  // no catálogo, sem precisar editar código nem mexer no formulário do admin.
+  const uniqueLocations = extractLocationRegions(completePousadas);
+
   const filteredPousadas = filterAndSortPousadas(completePousadas, {
     location: filterLocation,
     search: searchQuery,
@@ -299,32 +303,49 @@ export default function PousadaCatalog({
             <p className="text-editorial-muted text-xs mt-2 max-w-xl">Hospedagens selecionadas que respeitam o meio ambiente e promovem a conservação local.</p>
           </div>
 
-          {/* Location Filters */}
-          <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold">
-            <button
-              onClick={() => setFilterLocation("all")}
-              className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
-                filterLocation === "all"
-                  ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
-                  : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
-              }`}
-            >
-              Todos os Biomas
-            </button>
-            {uniqueLocations.map((loc, idx) => (
+          {/* Location Filters — biomas mostrados como atalhos rápidos
+              (chips) quando são poucos; a partir de um certo número vira um
+              dropdown "Região" pra não estourar a linha (estado/cidade
+              tendem a crescer conforme mais pousadas entram no catálogo). */}
+          {uniqueLocations.length <= 6 ? (
+            <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold">
               <button
-                key={idx}
-                onClick={() => setFilterLocation(loc)}
+                onClick={() => setFilterLocation("all")}
                 className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
-                  filterLocation === loc
+                  filterLocation === "all"
                     ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
                     : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
                 }`}
               >
-                {loc}
+                Todas as Regiões
               </button>
-            ))}
-          </div>
+              {uniqueLocations.map((loc, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setFilterLocation(loc)}
+                  className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
+                    filterLocation === loc
+                      ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
+                      : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
+                  }`}
+                >
+                  {loc}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <select
+              value={filterLocation}
+              onChange={e => setFilterLocation(e.target.value)}
+              aria-label="Filtrar por estado, cidade ou região"
+              className="px-4 py-2.5 text-[10px] uppercase tracking-widest font-bold border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary cursor-pointer"
+            >
+              <option value="all">Todas as Regiões</option>
+              {uniqueLocations.map((loc, idx) => (
+                <option key={idx} value={loc}>{loc}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Search / price range / sort — o coração de uma plataforma de
