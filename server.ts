@@ -589,6 +589,15 @@ function parseJSONSafe(val: any) {
   return val;
 }
 
+// PostgREST's .or() filter string uses a mini-language where comma separates
+// conditions and parentheses group them — passing a visitor-typed search term
+// straight in would let those characters distort the filter's structure
+// instead of being treated as literal text. Not a SQL-injection risk
+// (PostgREST parameterizes the actual values), just filter-grammar breakage.
+function sanitizeIlikeTerm(term: string): string {
+  return term.replace(/[,()]/g, " ").trim();
+}
+
 // Coerces a value that's supposed to represent a list of strings (guides'
 // languages/specialty, stored as a TEXT column holding either a JSON array
 // string or, if a row was ever written a different way, a raw Postgres
@@ -744,10 +753,78 @@ function mapPousadaRow(p: any): Pousada {
 // ----------------------------------------------------
 
 // POUSADAS CRUD
+//
+// Sem ?page=: devolve o array completo, como sempre — usado pelo fluxo
+// central de dados do App.tsx (deep-link /pousadas/:id, "onde avistar esta
+// espécie", MobileSimulator), que precisa da lista inteira pra funcionar.
+// Com ?page=: devolve uma página filtrada/ordenada NO SERVIDOR
+// ({items, total, page, pageSize}) — usada pela grade de busca do catálogo
+// (PousadaCatalog.tsx), que antes carregava o catálogo inteiro pro navegador
+// e filtrava em JS ali, algo que deixa de escalar conforme o catálogo cresce
+// (é exatamente o oposto de como Booking/Airbnb fazem busca).
+//
+// Busca/filtro cobrem name, location e faixa de preço — ficaram de fora
+// comodidades/atividades (features/activities), porque essas colunas
+// passaram por uma migração pra jsonb (scripts/upgrade-schema.sql) cujo
+// estado real em produção não dá pra confirmar só lendo o código; um filtro
+// .ilike() nelas quebraria a rota inteira com 500 se o tipo não for texto.
+// Mesmo raciocínio pra não excluir pousada sem nenhuma imagem do "perfil
+// completo" aqui — os outros campos (descrição/localização/preço/
+// capacidade) já cobrem o caso real que isCompletePousadaProfile existe pra
+// evitar (cadastro vazio recém-criado).
 app.get("/api/pousadas", async (req, res) => {
-  const { data, error } = await supabase.from("pousadas").select("*");
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=300");
+
+  if (!req.query.page) {
+    const { data, error } = await supabase.from("pousadas").select("*");
+    if (error) return res.status(500).json({ error: "Erro ao buscar pousadas" });
+    return res.json((data || []).map(mapPousadaRow));
+  }
+
+  const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+  const pageSize = Math.min(48, Math.max(1, parseInt(String(req.query.pageSize), 10) || 12));
+  const location = typeof req.query.location === "string" ? req.query.location : "all";
+  const search = typeof req.query.search === "string" ? sanitizeIlikeTerm(req.query.search) : "";
+  const priceMin = req.query.priceMin ? Number(req.query.priceMin) : undefined;
+  const priceMax = req.query.priceMax ? Number(req.query.priceMax) : undefined;
+  const sortBy = typeof req.query.sortBy === "string" ? req.query.sortBy : "relevance";
+
+  let query = supabase
+    .from("pousadas")
+    .select("*", { count: "exact" })
+    .not("description", "is", null).neq("description", "")
+    .not("location", "is", null).neq("location", "")
+    .gt("pricePerNight", 0)
+    .gt("capacity", 0);
+
+  if (location !== "all") {
+    query = query.ilike("location", `%${sanitizeIlikeTerm(location)}%`);
+  }
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,location.ilike.%${search}%`);
+  }
+  if (typeof priceMin === "number" && !Number.isNaN(priceMin)) query = query.gte("pricePerNight", priceMin);
+  if (typeof priceMax === "number" && !Number.isNaN(priceMax)) query = query.lte("pricePerNight", priceMax);
+
+  if (sortBy === "price-asc") query = query.order("pricePerNight", { ascending: true });
+  else if (sortBy === "price-desc") query = query.order("pricePerNight", { ascending: false });
+  else if (sortBy === "rating-desc") query = query.order("rating", { ascending: false });
+  // Tiebreaker sempre presente — sem uma ordem determinística, .range() em
+  // páginas sucessivas pode repetir ou pular linhas se o Postgres escolher
+  // uma ordem física diferente entre uma requisição e outra.
+  query = query.order("id", { ascending: true });
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { data, error, count } = await query.range(from, to);
   if (error) return res.status(500).json({ error: "Erro ao buscar pousadas" });
-  res.json((data || []).map(mapPousadaRow));
+
+  res.json({
+    items: (data || []).map(mapPousadaRow),
+    total: count || 0,
+    page,
+    pageSize,
+  });
 });
 
 app.get("/api/pousadas/:id", async (req, res) => {
@@ -981,6 +1058,7 @@ app.get("/api/guides", requireAdmin, async (req, res) => {
 // the ordering since none of these paths overlap (GET /api/guides vs.
 // GET /api/guides/public[/:id]).
 app.get("/api/guides/public", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=300");
   const { data, error } = await supabase.from("guides").select("*");
   if (error) return res.status(500).json({ error: "Erro ao buscar guias" });
   res.json((data || []).map(mapGuideRow).map(toPublicGuide));
@@ -1048,6 +1126,7 @@ function mapAtracaoRow(a: any): Atracao {
 const ATRACAO_FIELDS = ["type", "name", "description", "location", "images", "menu", "availability"] as const;
 
 app.get("/api/atracoes", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=300");
   const { data, error } = await supabase.from("atracoes").select("*");
   if (error) return res.status(500).json({ error: "Erro ao buscar atrações" });
   res.json((data || []).map(mapAtracaoRow));
@@ -1845,6 +1924,7 @@ app.post("/api/sightings/:id/like", publicFormLimiter, async (req, res) => {
 // fora de propósito: é o id interno (Supabase Auth) de quem avaliou, sem uso
 // nenhum no front-end, e não deveria vazar numa rota sem autenticação.
 app.get("/api/reviews", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=120");
   const { data, error } = await supabase
     .from("reviews")
     .select("id,pousadaId,atracaoId,guideId,userName,rating,comment,date,photoUrl");
@@ -1933,6 +2013,7 @@ app.post("/api/notifications/:id/read", requireAdmin, async (req, res) => {
 
 // SPECIES CRUD
 app.get("/api/species", async (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
   const { data, error } = await supabase.from("species").select("*");
   if (error) return res.status(500).json({ error: "Erro ao buscar espécies" });
   res.json(data);

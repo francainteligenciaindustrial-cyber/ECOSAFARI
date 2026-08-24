@@ -7,7 +7,7 @@ import LanguageFlag from "./LanguageFlag";
 import { adminFetch } from "../lib/adminFetch";
 import { useTouristSession } from "../lib/useTouristSession";
 import { isCompletePousadaProfile } from "../lib/pousadaCompleteness";
-import { filterAndSortPousadas, extractLocationRegions, SortOption } from "../lib/catalogFilters";
+import { extractLocationRegions, SortOption } from "../lib/catalogFilters";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -221,13 +221,58 @@ export default function PousadaCatalog({
   // no catálogo, sem precisar editar código nem mexer no formulário do admin.
   const uniqueLocations = extractLocationRegions(completePousadas);
 
-  const filteredPousadas = filterAndSortPousadas(completePousadas, {
-    location: filterLocation,
-    search: searchQuery,
-    priceMin: priceMin === "" ? undefined : Number(priceMin),
-    priceMax: priceMax === "" ? undefined : Number(priceMax),
-    sortBy,
-  });
+  // Grade do catálogo: busca/filtro/ordenação/paginação rodam no SERVIDOR
+  // (GET /api/pousadas?page=...) em vez de carregar tudo pro navegador e
+  // filtrar em JS — o array `pousadas` (prop, carregado inteiro por
+  // App.tsx) continua existindo só pra alimentar o carrossel de espécies e
+  // o seletor "qual pousada você visitou" da avaliação mais abaixo, que
+  // precisam mesmo da lista inteira.
+  const CATALOG_PAGE_SIZE = 12;
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogItems, setCatalogItems] = useState<Pousada[]>([]);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
+  // Debounce da busca — evita disparar uma requisição a cada tecla digitada.
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Qualquer mudança de filtro/ordenação volta pra primeira página — senão
+  // dá pra ficar "preso" numa página 3 que não existe mais pro filtro novo.
+  useEffect(() => {
+    setCatalogPage(1);
+  }, [debouncedSearch, filterLocation, priceMin, priceMax, sortBy]);
+
+  useEffect(() => {
+    setCatalogLoading(true);
+    const params = new URLSearchParams({ page: String(catalogPage), pageSize: String(CATALOG_PAGE_SIZE), sortBy });
+    if (filterLocation !== "all") params.set("location", filterLocation);
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+    if (priceMin !== "") params.set("priceMin", priceMin);
+    if (priceMax !== "") params.set("priceMax", priceMax);
+
+    let cancelled = false;
+    fetch(`/api/pousadas?${params.toString()}`)
+      .then(res => res.json())
+      .then((body: { items: Pousada[]; total: number }) => {
+        if (cancelled) return;
+        setCatalogItems(body.items || []);
+        setCatalogTotal(body.total || 0);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCatalogItems([]);
+          setCatalogTotal(0);
+        }
+      })
+      .finally(() => { if (!cancelled) setCatalogLoading(false); });
+    return () => { cancelled = true; };
+  }, [catalogPage, debouncedSearch, filterLocation, priceMin, priceMax, sortBy]);
+
+  const catalogTotalPages = Math.max(1, Math.ceil(catalogTotal / CATALOG_PAGE_SIZE));
   const hasActiveFilters = searchQuery.trim() !== "" || priceMin !== "" || priceMax !== "" || sortBy !== "relevance" || filterLocation !== "all";
 
   const handleSubmitReview = async (e: React.FormEvent) => {
@@ -404,8 +449,8 @@ export default function PousadaCatalog({
         </div>
 
         {/* Catalog Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredPousadas.map((pousada) => (
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-opacity duration-200 ${catalogLoading ? "opacity-50" : "opacity-100"}`}>
+          {catalogItems.map((pousada) => (
             <div
               key={pousada.id}
               onClick={() => onSelectPousada(pousada)}
@@ -499,7 +544,7 @@ export default function PousadaCatalog({
         {/* Empty state — a freshly launched site (or a location filter with
             no matches yet) shouldn't just render a blank grid, which reads
             as broken rather than "nothing here yet". */}
-        {filteredPousadas.length === 0 && (
+        {!catalogLoading && catalogItems.length === 0 && (
           <div className="text-center py-20 border border-dashed border-editorial-border bg-white/40">
             <Compass className="h-8 w-8 text-editorial-muted mx-auto mb-3" />
             <p className="text-editorial-text font-serif text-lg font-bold mb-1">
@@ -510,6 +555,33 @@ export default function PousadaCatalog({
                 ? "Estamos selecionando as melhores pousadas do Pantanal para você. Volte em breve para conferir o catálogo completo."
                 : "Tente ajustar a busca, o preço ou a localização — ou fale com a gente pelo WhatsApp para indicações personalizadas."}
             </p>
+          </div>
+        )}
+
+        {/* Paginação — a grade é buscada/ordenada/paginada no servidor
+            (GET /api/pousadas?page=), então "próxima página" é sempre uma
+            nova requisição, não um corte de um array já carregado. */}
+        {catalogTotalPages > 1 && (
+          <div className="flex items-center justify-between gap-3 mt-8 pt-6 border-t border-editorial-border text-[11px] uppercase tracking-widest font-bold text-editorial-muted">
+            <span>Página {catalogPage} de {catalogTotalPages} · {catalogTotal} {catalogTotal === 1 ? "pousada" : "pousadas"}</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={catalogPage <= 1 || catalogLoading}
+                onClick={() => { setCatalogPage(p => Math.max(1, p - 1)); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                className="flex items-center gap-1 border border-editorial-border rounded-full px-4 py-2 hover:bg-editorial-secondary disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+              </button>
+              <button
+                type="button"
+                disabled={catalogPage >= catalogTotalPages || catalogLoading}
+                onClick={() => { setCatalogPage(p => Math.min(catalogTotalPages, p + 1)); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                className="flex items-center gap-1 border border-editorial-border rounded-full px-4 py-2 hover:bg-editorial-secondary disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
+              >
+                Próxima <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </section>
