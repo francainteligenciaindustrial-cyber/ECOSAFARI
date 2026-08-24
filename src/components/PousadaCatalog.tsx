@@ -303,7 +303,7 @@ export default function PousadaCatalog({
           <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold">
             <button
               onClick={() => setFilterLocation("all")}
-              className={`px-4 py-2 rounded-none transition duration-200 border cursor-pointer ${
+              className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
                 filterLocation === "all"
                   ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
                   : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
@@ -315,7 +315,7 @@ export default function PousadaCatalog({
               <button
                 key={idx}
                 onClick={() => setFilterLocation(loc)}
-                className={`px-4 py-2 rounded-none transition duration-200 border cursor-pointer ${
+                className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
                   filterLocation === loc
                     ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
                     : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
@@ -339,7 +339,7 @@ export default function PousadaCatalog({
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Buscar por nome, localização ou comodidade..."
               aria-label="Buscar por nome, localização ou comodidade"
-              className="w-full pl-9 pr-3 py-2.5 text-xs border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              className="w-full pl-9 pr-3 py-2.5 text-xs border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary"
             />
           </div>
 
@@ -348,14 +348,14 @@ export default function PousadaCatalog({
               type="number" min={0} inputMode="numeric" placeholder="R$ mín."
               aria-label="Preço mínimo por noite"
               value={priceMin} onChange={e => setPriceMin(e.target.value)}
-              className="w-24 px-2.5 py-2.5 border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              className="w-24 px-3 py-2.5 border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary"
             />
             <span className="text-editorial-muted">–</span>
             <input
               type="number" min={0} inputMode="numeric" placeholder="R$ máx."
               aria-label="Preço máximo por noite"
               value={priceMax} onChange={e => setPriceMax(e.target.value)}
-              className="w-24 px-2.5 py-2.5 border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+              className="w-24 px-3 py-2.5 border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary"
             />
           </div>
 
@@ -363,7 +363,7 @@ export default function PousadaCatalog({
             value={sortBy}
             onChange={e => setSortBy(e.target.value as SortOption)}
             aria-label="Ordenar por"
-            className="px-3 py-2.5 text-xs uppercase tracking-widest font-bold border border-editorial-border bg-white rounded-none focus:outline-none focus:ring-1 focus:ring-editorial-primary cursor-pointer"
+            className="px-4 py-2.5 text-xs uppercase tracking-widest font-bold border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary cursor-pointer"
           >
             <option value="relevance">Mais relevantes</option>
             <option value="price-asc">Menor preço</option>
@@ -387,7 +387,8 @@ export default function PousadaCatalog({
           {filteredPousadas.map((pousada) => (
             <div
               key={pousada.id}
-              className="bg-white border border-editorial-border overflow-hidden hover:shadow-sm transition duration-300 flex flex-col group h-full"
+              onClick={() => onSelectPousada(pousada)}
+              className="bg-white border border-editorial-border overflow-hidden hover:shadow-sm transition duration-300 flex flex-col group h-full cursor-pointer"
             >
               {/* Image Container with Tag */}
               <div className="relative h-64 overflow-hidden">
@@ -455,14 +456,14 @@ export default function PousadaCatalog({
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => onSelectVideo(pousada)}
+                      onClick={(e) => { e.stopPropagation(); onSelectVideo(pousada); }}
                       className="bg-editorial-beige hover:bg-editorial-border/60 text-editorial-primary p-2.5 rounded-none border border-editorial-border transition flex items-center gap-1 cursor-pointer"
                       title="Saiba Mais (Vídeo do Safári)"
                     >
                       <PlayCircle className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => onSelectPousada(pousada)}
+                      onClick={(e) => { e.stopPropagation(); onSelectPousada(pousada); }}
                       className="bg-editorial-primary hover:bg-editorial-primary/90 text-white px-4 py-2.5 rounded-none text-xs uppercase tracking-wider font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
                     >
                       Detalhes <ChevronRight className="h-3 w-3" />
