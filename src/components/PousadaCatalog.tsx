@@ -8,6 +8,9 @@ import { adminFetch } from "../lib/adminFetch";
 import { useTouristSession } from "../lib/useTouristSession";
 import { isCompletePousadaProfile } from "../lib/pousadaCompleteness";
 import { extractLocationRegions, SortOption } from "../lib/catalogFilters";
+import { useToast } from "../lib/ToastProvider";
+import ErrorBoundary from "./ErrorBoundary";
+import { SkeletonPousadaGrid } from "./Skeleton";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -146,6 +149,7 @@ export default function PousadaCatalog({
         };
       });
   const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
+  const { showToast } = useToast();
   const [filterLocation, setFilterLocation] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("relevance");
@@ -340,6 +344,7 @@ export default function PousadaCatalog({
       </section>
 
       {/* Catalog Filters and Section */}
+      <ErrorBoundary variant="section" sectionLabel="o catálogo de pousadas">
       <section id="catalogo" className="max-w-7xl mx-auto px-6 py-16 scroll-mt-10">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-6 gap-6">
           <div>
@@ -448,7 +453,12 @@ export default function PousadaCatalog({
           )}
         </div>
 
-        {/* Catalog Grid */}
+        {/* Catalog Grid — skeleton só na primeira carga (nada na tela
+            ainda); uma nova busca/filtro com resultado já visível só
+            escurece um pouco em vez de trocar tudo por skeleton de novo. */}
+        {catalogLoading && catalogItems.length === 0 ? (
+          <SkeletonPousadaGrid />
+        ) : (
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 transition-opacity duration-200 ${catalogLoading ? "opacity-50" : "opacity-100"}`}>
           {catalogItems.map((pousada) => (
             <div
@@ -540,6 +550,7 @@ export default function PousadaCatalog({
             </div>
           ))}
         </div>
+        )}
 
         {/* Empty state — a freshly launched site (or a location filter with
             no matches yet) shouldn't just render a blank grid, which reads
@@ -585,12 +596,14 @@ export default function PousadaCatalog({
           </div>
         )}
       </section>
+      </ErrorBoundary>
 
       {/* Atrações Parceiras & Nossos Guias — public discovery for the other
           two partner types in the ecossistema, each with its own profile
           page at /atracoes/:id and /guias/:id (see AtracaoDetailsView and
           GuiaDetailsView). Only rendered once there's something to show. */}
       {(atracoes.length > 0 || guiasPublicos.length > 0) && (
+        <ErrorBoundary variant="section" sectionLabel="atrações e guias">
         <section className="max-w-7xl mx-auto px-6 py-16 border-t border-editorial-border space-y-16">
           {atracoes.length > 0 && (
             <div>
@@ -680,9 +693,11 @@ export default function PousadaCatalog({
             </div>
           )}
         </section>
+        </ErrorBoundary>
       )}
 
       {/* Wildlife Species Showcase (O que avistar) Section */}
+      <ErrorBoundary variant="section" sectionLabel="a vitrine de espécies">
       <section className="bg-[#121613] text-[#FDFCF8] py-24 border-t border-editorial-border/10 relative overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-editorial-primary/10 rounded-full blur-[150px] pointer-events-none"></div>
@@ -786,6 +801,7 @@ export default function PousadaCatalog({
 
         </div>
       </section>
+      </ErrorBoundary>
 
       {/* App Promotion & Interactive Simulator Section */}
       <section className="bg-gradient-to-br from-[#0e120f] via-[#161d18] to-[#0e120f] text-white py-20 border-t border-white/5 relative overflow-hidden">
@@ -837,10 +853,10 @@ export default function PousadaCatalog({
             {/* App Store / Google Play Badges & Action */}
             <div className="flex flex-wrap items-center gap-4">
               <a 
-                href="#download-ios" 
+                href="#download-ios"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert("Simulação de download iniciada! O arquivo .IPA do EcoSafari Go seria baixado no seu iPhone.");
+                  showToast("Simulação de download iniciada! O arquivo .IPA do EcoSafari Go seria baixado no seu iPhone.", "info");
                 }}
                 className="flex items-center gap-3 bg-black hover:bg-zinc-900 border border-white/10 px-5 py-2.5 rounded-xl transition shadow-lg group shrink-0"
               >
@@ -854,10 +870,10 @@ export default function PousadaCatalog({
               </a>
 
               <a 
-                href="#download-android" 
+                href="#download-android"
                 onClick={(e) => {
                   e.preventDefault();
-                  alert("Simulação de download iniciada! O arquivo .APK do EcoSafari Go para Android foi gerado com sucesso.");
+                  showToast("Simulação de download iniciada! O arquivo .APK do EcoSafari Go para Android foi gerado com sucesso.", "info");
                 }}
                 className="flex items-center gap-3 bg-black hover:bg-zinc-900 border border-white/10 px-5 py-2.5 rounded-xl transition shadow-lg group shrink-0"
               >
@@ -1024,6 +1040,7 @@ export default function PousadaCatalog({
       )}
 
       {/* Reviews Section */}
+      <ErrorBoundary variant="section" sectionLabel="as avaliações">
       <section className="bg-editorial-primary text-white py-20 border-t border-editorial-border">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12">
           
@@ -1202,6 +1219,7 @@ export default function PousadaCatalog({
 
         </div>
       </section>
+      </ErrorBoundary>
 
       {/* FAQ Section */}
       <section id="faq" className="bg-white py-20 border-t border-editorial-border">

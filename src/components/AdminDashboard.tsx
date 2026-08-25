@@ -50,6 +50,7 @@ import LanguagesEditor, { LEVEL_LABELS } from "./LanguagesEditor";
 import ImageListEditor from "./ImageListEditor";
 import Pagination from "./Pagination";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
+import NewBookingForm from "./NewBookingForm";
 import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
@@ -160,6 +161,7 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState<AdminTab>("bookings");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddPousada, setShowAddPousada] = useState(false);
+  const [showNewBooking, setShowNewBooking] = useState(false);
   const [showAddGuide, setShowAddGuide] = useState(false);
   const [googleCalendarStatus, setGoogleCalendarStatus] = useState<{ connected: boolean; email: string | null }>({ connected: false, email: null });
 
@@ -1101,8 +1103,24 @@ export default function AdminDashboard({
                   className="w-full bg-zinc-50 border border-zinc-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
-              <span className="text-zinc-500 text-xs font-semibold">{filteredBookings.length} reservas filtradas</span>
+              <div className="flex items-center gap-4">
+                <span className="text-zinc-500 text-xs font-semibold whitespace-nowrap">{filteredBookings.length} reservas filtradas</span>
+                <button
+                  onClick={() => setShowNewBooking(v => !v)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                >
+                  <Plus className="h-4 w-4" /> Nova Reserva
+                </button>
+              </div>
             </div>
+
+            {showNewBooking && (
+              <NewBookingForm
+                pousadas={pousadas}
+                onClose={() => setShowNewBooking(false)}
+                onCreated={() => { fetchBookings(); onRefreshData(); }}
+              />
+            )}
 
             {/* List of active bookings */}
             <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">

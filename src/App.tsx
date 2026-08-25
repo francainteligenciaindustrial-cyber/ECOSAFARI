@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from "react";
-import { Compass, ShieldAlert, Monitor, CheckCircle, Smartphone, HelpCircle, Mail, MessageSquare, Instagram, LogOut, User } from "lucide-react";
+import { Compass, ShieldAlert, Monitor, CheckCircle, Smartphone, HelpCircle, Mail, MessageSquare, Instagram, LogOut, User, Menu, X } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import PousadaCatalog from "./components/PousadaCatalog";
 import PousadaDetailsView from "./components/PousadaDetailsView";
@@ -12,6 +12,7 @@ import GuiaDetailsView from "./components/GuiaDetailsView";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import TouristProfileWidget from "./components/TouristProfileWidget";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { isAdminUser, isTouristUser, isPartnerUser } from "./lib/authRoles";
 import { useRoute, navigate } from "./lib/router";
@@ -76,6 +77,7 @@ export default function App() {
   const path = useRoute();
   const [currentModule, setCurrentModule] = useState<"portal" | "admin">("portal");
   const [isMobileNative, setIsMobileNative] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const StandalonePage = STANDALONE_ROUTES[path];
   const pousadaRouteMatch = path.match(/^\/pousadas\/(.+)$/);
@@ -330,8 +332,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* Global Module Navigation Switches styled as elegant editorial tabs */}
-        <div className="flex items-center gap-6 md:gap-8 text-[11px] uppercase tracking-[0.2em] font-semibold text-editorial-muted">
+        {/* Global Module Navigation Switches styled as elegant editorial tabs
+            — escondido no mobile (vira o menu hambúrguer abaixo), porque
+            espremido entre a logo e os ícones da direita ficava sem espaço
+            de verdade numa tela estreita. */}
+        <div className="hidden md:flex items-center gap-6 md:gap-8 text-[11px] uppercase tracking-[0.2em] font-semibold text-editorial-muted">
           <button
             onClick={() => {
               setCurrentModule("portal");
@@ -339,8 +344,8 @@ export default function App() {
               navigate("/");
             }}
             className={`transition duration-200 pb-1 border-b-2 flex items-center gap-1.5 cursor-pointer ${
-              currentModule === "portal" 
-                ? "text-editorial-text border-editorial-primary" 
+              currentModule === "portal"
+                ? "text-editorial-text border-editorial-primary"
                 : "border-transparent hover:text-editorial-text"
             }`}
           >
@@ -362,10 +367,23 @@ export default function App() {
 
         <div className="flex items-center gap-4">
           {/* Subtle site-wide translation switcher */}
-          <LanguageSwitcher />
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
 
           {/* Tourist account menu — Coins, favoritos, histórico */}
           <TouristProfileWidget />
+
+          {/* Hambúrguer — só mobile, abre o painel com Portal/Gestão e o
+              seletor de idioma que ficam escondidos nessa largura. */}
+          <button
+            onClick={() => setShowMobileMenu(v => !v)}
+            className="md:hidden text-editorial-muted hover:text-editorial-text transition cursor-pointer"
+            aria-label={showMobileMenu ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={showMobileMenu}
+          >
+            {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
 
           {/* Ponto único de entrada: admin logado vê "Sair"; parceiro
               logado (sem ser admin) vê um atalho pro próprio painel; todo
@@ -406,6 +424,35 @@ export default function App() {
         </div>
       </header>
 
+      {/* Painel mobile — Portal/Gestão + idioma, escondidos do cabeçalho
+          nessa largura. */}
+      {showMobileMenu && (
+        <div className="md:hidden bg-white border-b border-editorial-border px-6 py-4 flex flex-col gap-3 animate-fadeIn">
+          <button
+            onClick={() => {
+              setCurrentModule("portal");
+              setPortalView("catalog");
+              navigate("/");
+              setShowMobileMenu(false);
+            }}
+            className={`text-left text-xs uppercase tracking-widest font-bold cursor-pointer ${currentModule === "portal" ? "text-editorial-primary" : "text-editorial-muted"}`}
+          >
+            Portal
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentModule("admin"); setShowMobileMenu(false); }}
+              className={`text-left text-xs uppercase tracking-widest font-bold cursor-pointer ${currentModule === "admin" ? "text-editorial-primary" : "text-editorial-muted"}`}
+            >
+              Gestão
+            </button>
+          )}
+          <div className="pt-2 border-t border-editorial-border">
+            <LanguageSwitcher />
+          </div>
+        </div>
+      )}
+
       {/* MAIN LAYOUT */}
       <main className="flex-1 bg-editorial-secondary">
         {loading ? (
@@ -417,6 +464,7 @@ export default function App() {
           <>
             {/* 1. CUSTOMER PORTAL */}
             {currentModule === "portal" && (
+              <ErrorBoundary variant="section" sectionLabel="esta página">
               <>                 {portalView === "catalog" && (
                   <PousadaCatalog
                     pousadas={pousadas}
@@ -463,10 +511,12 @@ export default function App() {
                   <WhatsAppChatbot onOpen={() => openWhatsAppGate()} />
                 )}
               </>
+              </ErrorBoundary>
             )}
 
             {/* 2. ADMIN PANEL (restricted to authenticated admins) */}
             {currentModule === "admin" && isAdmin && (
+              <ErrorBoundary variant="section" sectionLabel="o painel de Gestão">
               <Suspense fallback={<LazyFallback />}>
                 <AdminDashboard
                   pousadas={pousadas}
@@ -474,6 +524,7 @@ export default function App() {
                   onRefreshData={fetchData}
                 />
               </Suspense>
+              </ErrorBoundary>
             )}
           </>
         )}

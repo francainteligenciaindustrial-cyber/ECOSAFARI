@@ -1198,13 +1198,25 @@ app.get("/api/bookings/public-confirmed", async (req, res) => {
 });
 
 // Simulate creating booking (e.g. from WhatsApp Bot or Landing Page Wizard)
+// NOTA (concorrência): esta rota ainda faz "checar disponibilidade" e
+// "gravar" como dois passos separados — duas chamadas simultâneas pra
+// mesma pousada/quarto/data poderiam, em teoria, passar as duas na checagem
+// antes de qualquer uma gravar. Deixei de propósito sem um lock de
+// transação no Postgres agora: hoje esta rota é requireAdmin (só a equipe,
+// sem UI de auto-atendimento chamando em paralelo) e eu não tenho acesso ao
+// banco de produção real pra validar uma função SQL com
+// pg_advisory_xact_lock antes de publicar — prefiro isso a arriscar quebrar
+// toda criação de reserva com uma função não testada. Se esse endpoint um
+// dia virar self-service (ver conversa sobre escala), esse é o primeiro
+// lugar a reforçar antes de abrir pro público.
 app.post("/api/bookings", requireAdmin, async (req, res) => {
-  const { pousadaId, checkIn, checkOut, adults, children } = req.body;
+  const { pousadaId, checkIn, checkOut, adults, children, roomType } = req.body;
   const { data: pousadaRow, error: pErr } = await supabase.from("pousadas").select("*").eq("id", pousadaId).maybeSingle();
   if (pErr || !pousadaRow) {
     return res.status(404).json({ error: "Pousada não encontrada" });
   }
   const targetPousada = mapPousadaRow(pousadaRow);
+  const newGuests = (adults || 1) + (children || 0);
 
   // Double Check Availability (Mock Calendar check) — count current
   // bookings in that date range for this pousada
@@ -1218,20 +1230,44 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
     b.checkIn <= checkOut && b.checkOut >= checkIn
   );
 
-  const totalGuestsAlready = overlappingBookings.reduce((acc, curr) => acc + curr.adults + curr.children, 0);
-  const newGuests = (adults || 1) + (children || 0);
-
-  if (totalGuestsAlready + newGuests > targetPousada.capacity) {
-    // Over capacity, suggest alternative dates
-    const altCheckIn = new Date(new Date(checkIn).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    const altCheckOut = new Date(new Date(checkOut).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-    return res.status(400).json({
-      error: "Indisponível para estas datas por atingir capacidade máxima.",
-      available: false,
-      suggestions: [
-        { checkIn: altCheckIn, checkOut: altCheckOut, note: "Uma semana mais tarde" }
-      ]
-    });
+  if (roomType) {
+    // Disponibilidade POR UNIDADE de um tipo de quarto específico — sem
+    // isso, duas reservas que juntas cabem na capacidade agregada da
+    // pousada podiam pedir o MESMO quarto físico ao mesmo tempo (rooms[]
+    // existia no cadastro mas nunca era consultado aqui).
+    const room = (targetPousada.rooms || []).find(r => r.type === roomType);
+    if (!room) {
+      return res.status(400).json({ error: `Tipo de quarto "${roomType}" não encontrado nesta pousada.` });
+    }
+    if (newGuests > room.capacity) {
+      return res.status(400).json({ error: `O quarto "${roomType}" acomoda no máximo ${room.capacity} hóspedes.`, available: false });
+    }
+    const overlappingSameRoom = overlappingBookings.filter(b => b.roomType === roomType).length;
+    if (overlappingSameRoom >= room.quantity) {
+      const altCheckIn = new Date(new Date(checkIn).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const altCheckOut = new Date(new Date(checkOut).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      return res.status(400).json({
+        error: `Sem unidades disponíveis do quarto "${roomType}" para estas datas (${room.quantity} no total).`,
+        available: false,
+        suggestions: [{ checkIn: altCheckIn, checkOut: altCheckOut, note: "Uma semana mais tarde" }],
+      });
+    }
+  } else {
+    // Sem tipo de quarto informado — cai no comportamento anterior
+    // (capacidade agregada da pousada), mantido pra pousadas sem "rooms"
+    // cadastrado ou fluxos que ainda não passam essa informação.
+    const totalGuestsAlready = overlappingBookings.reduce((acc, curr) => acc + curr.adults + curr.children, 0);
+    if (totalGuestsAlready + newGuests > targetPousada.capacity) {
+      const altCheckIn = new Date(new Date(checkIn).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const altCheckOut = new Date(new Date(checkOut).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      return res.status(400).json({
+        error: "Indisponível para estas datas por atingir capacidade máxima.",
+        available: false,
+        suggestions: [
+          { checkIn: altCheckIn, checkOut: altCheckOut, note: "Uma semana mais tarde" }
+        ]
+      });
+    }
   }
 
   // Create booking
@@ -1263,7 +1299,8 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
     experienceType: req.body.experienceType || "Padrão",
     totalPrice,
     status: req.body.status || "pendente_pagamento",
-    dateCreated: new Date().toISOString()
+    dateCreated: new Date().toISOString(),
+    roomType: roomType || undefined,
   };
 
   const { error } = await supabase.from("bookings").insert(newBooking);

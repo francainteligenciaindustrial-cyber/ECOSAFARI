@@ -126,6 +126,11 @@ export interface Booking {
   guideName?: string;
   dateCreated: string;
   googleCalendarEventId?: string;
+  // Deve bater com um Pousada.rooms[].type — quando informado, a
+  // disponibilidade é checada por unidade daquele tipo de quarto (não só
+  // contra a capacidade agregada da pousada). Opcional pra manter
+  // compatibilidade com reservas antigas/pousadas sem "rooms" cadastrado.
+  roomType?: string;
 }
 
 // Stripped-down booking shape with zero customer PII (no name/email/phone),
