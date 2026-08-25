@@ -13,10 +13,57 @@ import { Resend } from "resend";
 import PDFDocument from "pdfkit";
 import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource, Atracao, PartnerType, Recompensa, Resgate } from "./src/types.js";
 import { slugify } from "./src/lib/slug.js";
+import { AsyncLocalStorage } from "async_hooks";
 
 dotenv.config();
 
 const app = express();
+
+// Log estruturado (JSON) com um requestId correlacionando toda linha
+// gerada durante a mesma requisição — antes cada log.error/warn/log era uma
+// linha solta, sem como saber quais pertenciam à mesma chamada numa
+// função serverless da Vercel, o que torna investigar um incidente real em
+// produção bem mais difícil do que precisa ser.
+//
+// AsyncLocalStorage propaga o requestId por baixo dos panos através de
+// await/promises — por isso log.error(msg, ...) não precisa receber `req`
+// como parâmetro em cada uma das dezenas de chamadas espalhadas pelo
+// arquivo, só funciona automaticamente pra qualquer código executado a
+// partir do middleware abaixo.
+const requestContext = new AsyncLocalStorage<{ requestId: string }>();
+
+function currentRequestId(): string | undefined {
+  return requestContext.getStore()?.requestId;
+}
+
+function structuredLog(level: "info" | "warn" | "error", message: unknown, ...details: unknown[]) {
+  const entry = {
+    level,
+    message: message instanceof Error ? message.message : message,
+    requestId: currentRequestId(),
+    timestamp: new Date().toISOString(),
+    ...(details.length ? { details: details.map(d => (d instanceof Error ? { error: d.message, stack: d.stack } : d)) } : {}),
+  };
+  const sink = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
+  sink(JSON.stringify(entry));
+}
+
+const log = {
+  info: (message: unknown, ...details: unknown[]) => structuredLog("info", message, ...details),
+  warn: (message: unknown, ...details: unknown[]) => structuredLog("warn", message, ...details),
+  error: (message: unknown, ...details: unknown[]) => structuredLog("error", message, ...details),
+};
+
+// Gera o requestId e propaga pelo resto da cadeia de middlewares/handlers
+// desta requisição — registrado logo no início, antes de qualquer outra
+// coisa, pra cobrir o máximo de código possível. Também devolvido no
+// header de resposta: dá pra pedir pro cliente "me manda o X-Request-Id que
+// apareceu" na hora de investigar um bug relatado por alguém.
+app.use((req, res, next) => {
+  const requestId = randomUUID();
+  res.setHeader("X-Request-Id", requestId);
+  requestContext.run({ requestId }, next);
+});
 
 // Stripe requires the raw, untouched request body to verify the webhook
 // signature, so this route (and its express.raw() body parser) must be
@@ -97,9 +144,9 @@ const supabase = SUPABASE_SERVICE_ROLE_KEY
   : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 if (SUPABASE_SERVICE_ROLE_KEY) {
-  console.log("Supabase: usando service_role key (RLS bypassada para o backend confiável).");
+  log.info("Supabase: usando service_role key (RLS bypassada para o backend confiável).");
 } else {
-  console.warn("Supabase: SUPABASE_SERVICE_ROLE_KEY não configurada — usando anon key. Tabelas com RLS restrita ficarão inacessíveis ao backend até essa chave ser definida.");
+  log.warn("Supabase: SUPABASE_SERVICE_ROLE_KEY não configurada — usando anon key. Tabelas com RLS restrita ficarão inacessíveis ao backend até essa chave ser definida.");
 }
 
 // Separate client for admin-account management (Supabase Auth Admin API),
@@ -236,6 +283,34 @@ function isTouristUser(user: { app_metadata?: Record<string, unknown> } | null |
   return user?.app_metadata?.isTourist === true || user?.app_metadata?.role === "tourist";
 }
 
+// Lê o claim "aal" (Authenticator Assurance Level) de dentro de um JWT já
+// validado pelo Supabase — decodifica só o payload (base64url), sem
+// reverificar assinatura, porque quem chama isso só faz depois de
+// supabase.auth.getUser(token) já ter confirmado que o token é autêntico.
+// aal1 = só senha; aal2 = senha + segundo fator (TOTP) verificado nesta
+// sessão. Precisa disso pra impedir que uma senha vazada sozinha (sem o
+// código do autenticador) ainda funcione contra a API pra contas com 2FA
+// ativado — ver AdminMfaSettings.tsx/AdminLoginPanel.tsx pro lado do cliente.
+function getTokenAal(token: string): string | null {
+  try {
+    const payload = token.split(".")[1];
+    const json = Buffer.from(payload, "base64url").toString("utf8");
+    return JSON.parse(json).aal || null;
+  } catch {
+    return null;
+  }
+}
+
+// true quando a conta tem um fator de MFA verificado mas a sessão atual
+// (token) ainda está em aal1 — ou seja, entrou com a senha mas não
+// completou o segundo fator. Contas sem MFA cadastrado nunca caem aqui
+// (mantém compatibilidade com todo admin que ainda não ativou 2FA).
+function hasUnsatisfiedMfaRequirement(user: { factors?: { status?: string }[] | null }, token: string): boolean {
+  const hasMfaEnrolled = (user.factors || []).some(f => f.status === "verified");
+  if (!hasMfaEnrolled) return false;
+  return getTokenAal(token) !== "aal2";
+}
+
 // Verifies the caller is an authenticated admin (Supabase Auth JWT with
 // app_metadata.isAdmin === true) before allowing access to admin-only routes.
 // The Gestão tab hides itself client-side for non-admins, but that's cosmetic —
@@ -254,6 +329,9 @@ const requireAdmin: express.RequestHandler[] = [
       const { data, error } = await supabase.auth.getUser(token);
       if (error || !data.user || !isAdminUser(data.user)) {
         return res.status(403).json({ error: "Acesso restrito a administradores." });
+      }
+      if (hasUnsatisfiedMfaRequirement(data.user, token)) {
+        return res.status(401).json({ error: "Complete a verificação em duas etapas para continuar.", mfaRequired: true });
       }
       // Stashed for routes that need to know which admin is calling — e.g.
       // preventing an admin from revoking their own access below, or
@@ -445,9 +523,9 @@ async function logAdminAction(
       resource_id: resourceId,
       resource_label: resourceLabel,
     });
-    if (error) console.warn("Erro ao registrar log de auditoria:", error.message);
+    if (error) log.warn("Erro ao registrar log de auditoria:", error.message);
   } catch (err: any) {
-    console.warn("Erro ao registrar log de auditoria:", err.message);
+    log.warn("Erro ao registrar log de auditoria:", err.message);
   }
 }
 
@@ -489,7 +567,7 @@ async function verifyRecaptcha(token: unknown): Promise<boolean> {
     const data: any = await resp.json();
     return data.success === true && (typeof data.score !== "number" || data.score >= 0.5);
   } catch (err) {
-    console.warn("Falha ao verificar reCAPTCHA (permitindo o envio):", err);
+    log.warn("Falha ao verificar reCAPTCHA (permitindo o envio):", err);
     return true;
   }
 }
@@ -507,11 +585,23 @@ if (GEMINI_API_KEY && GEMINI_API_KEY !== "MY_GEMINI_API_KEY") {
         }
       }
     });
-    console.log("Gemini API initialized successfully.");
+    log.info("Gemini API initialized successfully.");
   } catch (err) {
-    console.error("Failed to initialize Gemini client:", err);
+    log.error("Failed to initialize Gemini client:", err);
   }
 }
+
+// Vercel define VERCEL_ENV sozinho ("production"|"preview"|"development") em
+// todo deploy — sem nenhuma configuração nossa. Serviços com efeito colateral
+// real pro mundo (cobrar cartão de verdade, mandar email de verdade) só ficam
+// ativos em produção ou fora da Vercel (self-host/local, onde a própria
+// pessoa controla o .env de propósito). Sem essa trava, testar um preview
+// deploy com as mesmas chaves configuradas em produção pode virar uma
+// cobrança real no Stripe ou um email real pro cliente. ALLOW_LIVE_INTEGRATIONS_IN_PREVIEW=true
+// é a válvula de escape pra quem quer testar de propósito com chaves de teste.
+const VERCEL_ENV = process.env.VERCEL_ENV;
+const isSafeEnvironmentForLiveIntegrations =
+  !VERCEL_ENV || VERCEL_ENV === "production" || process.env.ALLOW_LIVE_INTEGRATIONS_IN_PREVIEW === "true";
 
 // Initialize Stripe safely — checkout falls back to the payment simulation
 // button in the chatbot until a real key is provided.
@@ -519,15 +609,19 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 let stripe: Stripe | null = null;
 if (STRIPE_SECRET_KEY && STRIPE_SECRET_KEY !== "MY_STRIPE_SECRET_KEY") {
-  try {
-    stripe = new Stripe(STRIPE_SECRET_KEY);
-    console.log("Stripe initialized successfully.");
-  } catch (err) {
-    console.error("Failed to initialize Stripe client:", err);
+  if (isSafeEnvironmentForLiveIntegrations) {
+    try {
+      stripe = new Stripe(STRIPE_SECRET_KEY);
+      log.info("Stripe initialized successfully.");
+    } catch (err) {
+      log.error("Failed to initialize Stripe client:", err);
+    }
+  } else {
+    log.warn(`Stripe desativado neste deploy (VERCEL_ENV=${VERCEL_ENV}) — checkout cai na simulação de pagamento. Defina ALLOW_LIVE_INTEGRATIONS_IN_PREVIEW=true pra testar de propósito com uma chave de teste.`);
   }
 }
 if (stripe && !STRIPE_WEBHOOK_SECRET) {
-  console.warn("STRIPE_WEBHOOK_SECRET não configurada — o webhook /api/stripe/webhook ficará inativo e a confirmação de pagamento dependerá só do retorno do navegador.");
+  log.warn("STRIPE_WEBHOOK_SECRET não configurada — o webhook /api/stripe/webhook ficará inativo e a confirmação de pagamento dependerá só do retorno do navegador.");
 }
 
 // Initialize Resend safely — booking confirmation emails are skipped
@@ -535,11 +629,15 @@ if (stripe && !STRIPE_WEBHOOK_SECRET) {
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 let resend: Resend | null = null;
 if (RESEND_API_KEY && RESEND_API_KEY !== "MY_RESEND_API_KEY") {
-  try {
-    resend = new Resend(RESEND_API_KEY);
-    console.log("Resend initialized successfully.");
-  } catch (err) {
-    console.error("Failed to initialize Resend client:", err);
+  if (isSafeEnvironmentForLiveIntegrations) {
+    try {
+      resend = new Resend(RESEND_API_KEY);
+      log.info("Resend initialized successfully.");
+    } catch (err) {
+      log.error("Failed to initialize Resend client:", err);
+    }
+  } else {
+    log.warn(`Resend desativado neste deploy (VERCEL_ENV=${VERCEL_ENV}) — nenhum email real será enviado. Defina ALLOW_LIVE_INTEGRATIONS_IN_PREVIEW=true pra testar de propósito.`);
   }
 }
 
@@ -556,7 +654,7 @@ function addNotification(target: 'admin' | 'guide' | 'pousada', message: string,
   };
   // Fire-and-forget — notifications are best-effort, callers don't await this
   supabase.from("notifications").insert(newNotif).then(({ error }) => {
-    if (error) console.warn("Erro ao salvar notificação no Supabase:", error.message);
+    if (error) log.warn("Erro ao salvar notificação no Supabase:", error.message);
   });
 }
 
@@ -599,6 +697,26 @@ function parseJSONSafe(val: any) {
 // (PostgREST parameterizes the actual values), just filter-grammar breakage.
 function sanitizeIlikeTerm(term: string): string {
   return term.replace(/[,()]/g, " ").trim();
+}
+
+// Bloqueia as senhas mais óbvias que "8 caracteres" sozinho deixa passar —
+// não é uma lista exaustiva (isso é trabalho pra um serviço como
+// haveibeenpwned), só barra o caso mais comum de conta comprometida por
+// força bruta trivial num cadastro de autoatendimento (turista, sem
+// nenhuma vetting humana no meio).
+const COMMON_WEAK_PASSWORDS = new Set([
+  "12345678", "123456789", "1234567890", "password", "password1", "password123",
+  "qwertyui", "qwerty123", "senha123", "senha1234", "abcd1234", "12345678a",
+  "letmein1", "iloveyou", "admin123", "welcome1", "changeme", "00000000",
+  "11111111", "88888888",
+]);
+
+function isWeakPassword(password: string): boolean {
+  if (COMMON_WEAK_PASSWORDS.has(password.toLowerCase())) return true;
+  // Exige pelo menos uma letra e um número — barra "aaaaaaaa"/"12345678"
+  // (já coberto acima, mas também variações fora da lista fixa).
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) return true;
+  return false;
 }
 
 // Coerces a value that's supposed to represent a list of strings (guides'
@@ -844,7 +962,7 @@ app.post("/api/pousadas/:id/view", viewLimiter, async (req, res) => {
   const viewCount = (current.viewCount || 0) + 1;
   const { error } = await supabase.from("pousadas").update({ viewCount }).eq("id", id);
   if (error) {
-    console.warn("Erro ao atualizar contador de visualizações no Supabase:", error.message);
+    log.warn("Erro ao atualizar contador de visualizações no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao atualizar visualizações" });
   }
   res.json({ viewCount });
@@ -914,7 +1032,7 @@ async function moderateImage(buffer: Buffer, mimeType: string): Promise<{ ok: bo
     }
     return { ok: true };
   } catch (err) {
-    console.warn("Erro na moderação de imagem via Gemini:", err);
+    log.warn("Erro na moderação de imagem via Gemini:", err);
     return { ok: true };
   }
 }
@@ -938,7 +1056,7 @@ async function moderateText(text: string): Promise<{ ok: boolean; reason?: strin
     }
     return { ok: true };
   } catch (err) {
-    console.warn("Erro na moderação de texto via Gemini:", err);
+    log.warn("Erro na moderação de texto via Gemini:", err);
     return { ok: true };
   }
 }
@@ -965,7 +1083,7 @@ app.post("/api/upload-image", requireAnyUploader, (req, res) => {
       .upload(objectPath, req.file.buffer, { contentType: detected.contentType, upsert: false });
 
     if (error) {
-      console.error("Erro ao subir imagem para o Supabase Storage:", error.message);
+      log.error("Erro ao subir imagem para o Supabase Storage:", error.message);
       return res.status(500).json({ error: "Falha ao enviar imagem" });
     }
 
@@ -987,7 +1105,7 @@ app.post("/api/pousadas", requireAdmin, async (req, res) => {
   } as Pousada;
   const { error } = await supabase.from("pousadas").insert(newPousada);
   if (error) {
-    console.error("Erro ao salvar pousada no Supabase:", error.message);
+    log.error("Erro ao salvar pousada no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar pousada" });
   }
   await logAdminAction(res.locals.adminUser, "create", "pousada", newPousada.id, newPousada.name);
@@ -1012,7 +1130,7 @@ app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
   const { data: existing } = await supabase.from("pousadas").select("name").eq("id", id).maybeSingle();
   const { error } = await supabase.from("pousadas").delete().eq("id", id);
   if (error) {
-    console.error("Erro ao excluir pousada no Supabase:", error.message);
+    log.error("Erro ao excluir pousada no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao excluir pousada" });
   }
   await logAdminAction(res.locals.adminUser, "delete", "pousada", id, existing?.name || id);
@@ -1082,7 +1200,7 @@ app.post("/api/guides", requireAdmin, async (req, res) => {
   } as Guide;
   const { error } = await supabase.from("guides").insert(newGuide);
   if (error) {
-    console.error("Erro ao salvar guia no Supabase:", error.message);
+    log.error("Erro ao salvar guia no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar guia" });
   }
   await logAdminAction(res.locals.adminUser, "create", "guide", newGuide.id, newGuide.name);
@@ -1151,7 +1269,7 @@ app.post("/api/atracoes", requireAdmin, async (req, res) => {
   } as Atracao;
   const { error } = await supabase.from("atracoes").insert(newAtracao);
   if (error) {
-    console.error("Erro ao salvar atração no Supabase:", error.message);
+    log.error("Erro ao salvar atração no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar atração" });
   }
   await logAdminAction(res.locals.adminUser, "create", "atracao", newAtracao.id, newAtracao.name);
@@ -1305,7 +1423,7 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
 
   const { error } = await supabase.from("bookings").insert(newBooking);
   if (error) {
-    console.error("Erro ao salvar reserva no Supabase:", error.message);
+    log.error("Erro ao salvar reserva no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao criar reserva" });
   }
 
@@ -1342,14 +1460,14 @@ async function saveTokens(tokens: any): Promise<void> {
   const { error } = await supabase
     .from("app_secrets")
     .upsert({ key: GOOGLE_TOKENS_KEY, value: tokens, updated_at: new Date().toISOString() });
-  if (error) console.error("Erro ao salvar tokens do Google Calendar no Supabase:", error.message);
-  else console.log("Tokens do Google Calendar salvos com sucesso.");
+  if (error) log.error("Erro ao salvar tokens do Google Calendar no Supabase:", error.message);
+  else log.info("Tokens do Google Calendar salvos com sucesso.");
 }
 
 async function deleteTokens(): Promise<void> {
   const { error } = await supabase.from("app_secrets").delete().eq("key", GOOGLE_TOKENS_KEY);
-  if (error) console.error("Erro ao excluir tokens do Google Calendar no Supabase:", error.message);
-  else console.log("Tokens do Google Calendar excluídos.");
+  if (error) log.error("Erro ao excluir tokens do Google Calendar no Supabase:", error.message);
+  else log.info("Tokens do Google Calendar excluídos.");
 }
 
 // OAuth "state" anti-CSRF pattern: /api/auth/google/callback is a plain,
@@ -1400,12 +1518,12 @@ function getOAuthClient(req: express.Request) {
 async function createCalendarEvent(booking: Booking, req: express.Request) {
   const tokens = await loadStoredTokens();
   if (!tokens) {
-    console.log("Sem tokens salvos do Google Calendar. Pulando sincronização.");
+    log.info("Sem tokens salvos do Google Calendar. Pulando sincronização.");
     return null;
   }
 
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-    console.log("GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não configurados.");
+    log.info("GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET não configurados.");
     return null;
   }
 
@@ -1418,7 +1536,7 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
         const currentTokens = (await loadStoredTokens()) || {};
         const merged = { ...currentTokens, ...newTokens };
         await saveTokens(merged);
-      })().catch(err => console.error("Erro ao persistir tokens renovados do Google Calendar:", err));
+      })().catch(err => log.error("Erro ao persistir tokens renovados do Google Calendar:", err));
     });
 
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
@@ -1456,10 +1574,10 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
       }
     });
 
-    console.log("Evento no Google Calendar criado com sucesso:", response.data.id);
+    log.info("Evento no Google Calendar criado com sucesso:", response.data.id);
     return response.data.id;
   } catch (err) {
-    console.error("Erro ao criar evento no Google Calendar:", err);
+    log.error("Erro ao criar evento no Google Calendar:", err);
     return null;
   }
 }
@@ -1485,7 +1603,7 @@ app.get("/api/auth/google/status", requireAdmin, async (req, res) => {
     const userInfo = await oauth2.userinfo.get();
     return res.json({ connected: true, email: userInfo.data.email });
   } catch (err) {
-    console.error("Erro ao obter info do usuário Google:", err);
+    log.error("Erro ao obter info do usuário Google:", err);
     return res.json({ connected: true, email: "Conectado" });
   }
 });
@@ -1542,7 +1660,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
     res.redirect("/?google_cal_success=true");
   } catch (err) {
-    console.error("Erro ao trocar código por tokens:", err);
+    log.error("Erro ao trocar código por tokens:", err);
     res.status(500).send(`Erro na autenticação: ${err instanceof Error ? err.message : String(err)}`);
   }
 });
@@ -1631,17 +1749,17 @@ async function applyBookingStatusUpdate(id: string, body: Partial<Booking>, req:
         updated.googleCalendarEventId = `gc_${Math.random().toString(36).substr(2, 9)}`;
       }
     } catch (calErr) {
-      console.error("Erro na integração do Google Calendar:", calErr);
+      log.error("Erro na integração do Google Calendar:", calErr);
       updated.googleCalendarEventId = `gc_${Math.random().toString(36).substr(2, 9)}`;
     }
   }
 
   const { data: savedBooking, error } = await supabase.from("bookings").update(updated).eq("id", id).select().single();
-  if (error) console.warn("Erro ao atualizar reserva no Supabase:", error.message);
+  if (error) log.warn("Erro ao atualizar reserva no Supabase:", error.message);
 
   // Email confirmation with PDF voucher (only sends if RESEND_API_KEY is configured)
   if (status === "pago" && oldBooking.status !== "pago") {
-    sendBookingConfirmationEmail(updated).catch(err => console.warn("Erro ao enviar email de confirmação:", err.message));
+    sendBookingConfirmationEmail(updated).catch(err => log.warn("Erro ao enviar email de confirmação:", err.message));
   }
 
   return (savedBooking as Booking) || updated;
@@ -1698,7 +1816,7 @@ app.post("/api/create-checkout-session", checkoutLimiter, async (req, res) => {
     });
     res.json({ url: session.url });
   } catch (err: any) {
-    console.error("Erro ao criar sessão de checkout Stripe:", err.message);
+    log.error("Erro ao criar sessão de checkout Stripe:", err.message);
     res.status(500).json({ error: "Erro ao criar sessão de pagamento" });
   }
 });
@@ -1718,7 +1836,7 @@ async function handleStripeWebhook(req: express.Request, res: express.Response) 
   try {
     event = stripe.webhooks.constructEvent(req.body, signature as string, STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
-    console.error("Assinatura do webhook Stripe inválida:", err.message);
+    log.error("Assinatura do webhook Stripe inválida:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -1729,7 +1847,7 @@ async function handleStripeWebhook(req: express.Request, res: express.Response) 
       try {
         await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
       } catch (err: any) {
-        console.error("Erro ao confirmar reserva via webhook Stripe:", err.message);
+        log.error("Erro ao confirmar reserva via webhook Stripe:", err.message);
       }
     }
   }
@@ -1761,7 +1879,7 @@ app.get("/api/payments/confirm", checkoutLimiter, async (req, res) => {
     }
     res.json({ booking: updated });
   } catch (err: any) {
-    console.error("Erro ao confirmar pagamento Stripe:", err.message);
+    log.error("Erro ao confirmar pagamento Stripe:", err.message);
     res.status(500).json({ error: "Erro ao confirmar pagamento" });
   }
 });
@@ -1897,7 +2015,7 @@ app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {
     res.setHeader("Content-Disposition", `inline; filename="voucher-${booking.id}.pdf"`);
     res.send(buffer);
   } catch (err: any) {
-    console.error("Erro ao gerar voucher PDF:", err.message);
+    log.error("Erro ao gerar voucher PDF:", err.message);
     res.status(500).json({ error: "Erro ao gerar voucher" });
   }
 });
@@ -1939,7 +2057,7 @@ app.post("/api/sightings", publicFormLimiter, async (req, res) => {
 
   const { error } = await supabase.from("sightings").insert(newSighting);
   if (error) {
-    console.error("Erro ao salvar avistamento no Supabase:", error.message);
+    log.error("Erro ao salvar avistamento no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar avistamento" });
   }
 
@@ -2022,7 +2140,7 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
 
   const { error } = await supabase.from("reviews").insert(newReview);
   if (error) {
-    console.error("Erro ao salvar avaliação no Supabase:", error.message);
+    log.error("Erro ao salvar avaliação no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar avaliação" });
   }
 
@@ -2031,7 +2149,7 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
   if (targetReviews && targetReviews.length > 0) {
     const avg = Number((targetReviews.reduce((sum, r) => sum + r.rating, 0) / targetReviews.length).toFixed(1));
     const { error: ratingErr } = await supabase.from(table).update({ rating: avg }).eq("id", targetId);
-    if (ratingErr) console.warn(`Erro ao atualizar nota (${table}) no Supabase:`, ratingErr.message);
+    if (ratingErr) log.warn(`Erro ao atualizar nota (${table}) no Supabase:`, ratingErr.message);
   }
 
   res.status(201).json(newReview);
@@ -2066,7 +2184,7 @@ app.post("/api/species", requireAdmin, async (req, res) => {
   } as Species;
   const { error } = await supabase.from("species").insert(newSpecie);
   if (error) {
-    console.error("Erro ao salvar espécie no Supabase:", error.message);
+    log.error("Erro ao salvar espécie no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar espécie" });
   }
   await logAdminAction(res.locals.adminUser, "create", "species", newSpecie.id, (newSpecie as any).name || newSpecie.id);
@@ -2108,7 +2226,7 @@ app.post("/api/turistas", requireAdmin, async (req, res) => {
   const newTurista: Turista = { ...pickFields<Turista>(req.body, TURISTA_FIELDS), id: `t_${randomUUID()}` } as Turista;
   const { error } = await supabase.from("turistas").insert(newTurista);
   if (error) {
-    console.error("Erro ao salvar turista no Supabase:", error.message);
+    log.error("Erro ao salvar turista no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar turista" });
   }
   await logAdminAction(res.locals.adminUser, "create", "turista", newTurista.id, newTurista.name);
@@ -2178,6 +2296,9 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   if (password.length < 8) {
     return res.status(400).json({ error: "A senha precisa ter pelo menos 8 caracteres." });
   }
+  if (isWeakPassword(password)) {
+    return res.status(400).json({ error: "Essa senha é fácil demais de adivinhar. Use uma combinação de letras e números que não seja óbvia." });
+  }
   if (password !== confirmPassword) {
     return res.status(400).json({ error: "As senhas não coincidem." });
   }
@@ -2210,7 +2331,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     // Don't leave a bare auth account behind with no profile row — it would
     // pass requireTourist's role check but have nothing for a review to use.
     await supabaseAdminAuth.auth.admin.deleteUser(created.user.id).catch(() => {});
-    console.error("Erro ao salvar perfil de turista no Supabase:", insertErr.message);
+    log.error("Erro ao salvar perfil de turista no Supabase:", insertErr.message);
     return res.status(500).json({ error: "Erro ao criar seu perfil." });
   }
 
@@ -2231,7 +2352,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     options: { redirectTo: `${SITE_URL}/turista` },
   });
   if (linkErr || !linkData?.properties?.action_link) {
-    console.warn("Turista criado, mas falha ao gerar link de confirmação:", linkErr?.message);
+    log.warn("Turista criado, mas falha ao gerar link de confirmação:", linkErr?.message);
     return res.status(201).json({ success: true, emailConfirmationSent: false });
   }
 
@@ -2251,7 +2372,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     });
     res.status(201).json({ success: true, emailConfirmationSent: true });
   } catch (err: any) {
-    console.warn("Turista criado, mas falha ao enviar email de confirmação via Resend:", err.message);
+    log.warn("Turista criado, mas falha ao enviar email de confirmação via Resend:", err.message);
     res.status(201).json({ success: true, emailConfirmationSent: false });
   }
 });
@@ -2294,6 +2415,59 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
   res.json(data as Turista);
 });
 
+// Direito de acesso/portabilidade (LGPD art. 18, incisos I/V) — um dump de
+// tudo que está vinculado a este turista, pra ele baixar sozinho sem
+// precisar pedir pra equipe. Junta os mesmos dados que já existem
+// espalhados em /favoritos, /visitados, /resgates, num JSON só.
+app.get("/api/turista/me/export", requireTourist, async (req, res) => {
+  const user = res.locals.touristUser as { id: string; email?: string };
+  const [profileRes, favoritosRes, resgatesRes, reviewsRes, bookingsRes] = await Promise.all([
+    supabase.from("turistas").select("*").eq("id", user.id).maybeSingle(),
+    supabase.from("turista_favoritos").select("pousadaId").eq("turistaId", user.id),
+    supabase.from("turista_resgates").select("*").eq("turistaId", user.id),
+    supabase.from("reviews").select("id,pousadaId,atracaoId,guideId,rating,comment,date,photoUrl").eq("turistaId", user.id),
+    user.email
+      ? supabase.from("bookings").select("id,pousadaName,checkIn,checkOut,status,totalPrice").eq("customerEmail", user.email)
+      : Promise.resolve({ data: [] as unknown[] }),
+  ]);
+
+  res.setHeader("Content-Disposition", `attachment; filename="ecosafari-meus-dados-${new Date().toISOString().slice(0, 10)}.json"`);
+  res.json({
+    exportedAt: new Date().toISOString(),
+    perfil: profileRes.data,
+    favoritos: favoritosRes.data || [],
+    resgates: resgatesRes.data || [],
+    avaliacoes: reviewsRes.data || [],
+    reservas: bookingsRes.data || [],
+  });
+});
+
+// Direito de eliminação (LGPD art. 18, inciso VI) — apaga o perfil e os
+// dados diretamente pessoais (favoritos), remove a conta de autenticação, e
+// ANONIMIZA (não apaga) as avaliações já publicadas: o nome vira "Usuário
+// removido", mas a nota/comentário continua valendo pro histórico da
+// pousada/guia avaliado — mesma lógica de qualquer loja que mantém reviews
+// depois que o autor fecha a conta. Resgates não são tocados: são registro
+// de uma transação já concluída com o parceiro (código já usado/pendente),
+// não dado pessoal solto.
+app.delete("/api/turista/me", requireTourist, async (req, res) => {
+  const user = res.locals.touristUser as { id: string };
+  if (!supabaseAdminAuth) {
+    return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — não é possível excluir a conta agora." });
+  }
+
+  await supabase.from("reviews").update({ userName: "Usuário removido", photoUrl: null }).eq("turistaId", user.id);
+  await supabase.from("turista_favoritos").delete().eq("turistaId", user.id);
+  await supabase.from("turistas").delete().eq("id", user.id);
+  const { error: deleteAuthErr } = await supabaseAdminAuth.auth.admin.deleteUser(user.id);
+  if (deleteAuthErr) {
+    log.error("Erro ao excluir conta de autenticação do turista:", deleteAuthErr.message);
+    return res.status(500).json({ error: "Seu perfil foi removido, mas houve um erro ao excluir a conta de login. Fale com a equipe pra concluir." });
+  }
+
+  res.json({ success: true });
+});
+
 // Deixa uma conta já autenticada (admin, parceiro...) virar turista também,
 // SEM criar uma segunda conta desconectada — só acrescenta isTourist=true ao
 // app_metadata que a conta já tem (nunca mexe em role/isAdmin/partnerType já
@@ -2330,7 +2504,7 @@ app.post("/api/turista/upgrade", requireAnyAuth, async (req, res) => {
     // Desfaz o isTourist se não conseguiu criar o perfil — não deixa a conta
     // passando no requireTourist sem ter uma linha em "turistas" pra usar.
     await supabaseAdminAuth.auth.admin.updateUserById(user.id, { app_metadata: user.app_metadata || {} }).catch(() => {});
-    console.error("Erro ao salvar perfil de turista no Supabase:", insertErr.message);
+    log.error("Erro ao salvar perfil de turista no Supabase:", insertErr.message);
     return res.status(500).json({ error: "Erro ao criar seu perfil de turista." });
   }
 
@@ -2588,7 +2762,7 @@ app.post("/api/roteiros", requireAdmin, async (req, res) => {
   const newRoteiro: Roteiro = { ...pickFields<Roteiro>(req.body, ROTEIRO_FIELDS), id: `rt_${randomUUID()}` } as Roteiro;
   const { error } = await supabase.from("roteiros").insert(newRoteiro);
   if (error) {
-    console.error("Erro ao salvar roteiro no Supabase:", error.message);
+    log.error("Erro ao salvar roteiro no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar roteiro" });
   }
   await logAdminAction(res.locals.adminUser, "create", "roteiro", newRoteiro.id, newRoteiro.name);
@@ -2624,7 +2798,7 @@ app.post("/api/reservas", requireAdmin, async (req, res) => {
   const newReserva: Reserva = { ...pickFields<Reserva>(req.body, RESERVA_FIELDS), id: `rv_${randomUUID()}` } as Reserva;
   const { error } = await supabase.from("reservas").insert(newReserva);
   if (error) {
-    console.error("Erro ao salvar reserva no Supabase:", error.message);
+    log.error("Erro ao salvar reserva no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar reserva" });
   }
   await logAdminAction(res.locals.adminUser, "create", "reserva_roteiro", newReserva.id, `roteiro ${newReserva.roteiroId} — turista ${newReserva.turistaId}`);
@@ -2659,7 +2833,7 @@ app.post("/api/pagamentos", requireAdmin, async (req, res) => {
   const newPagamento: Pagamento = { ...pickFields<Pagamento>(req.body, PAGAMENTO_FIELDS), id: `pg_${randomUUID()}` } as Pagamento;
   const { error } = await supabase.from("pagamentos").insert(newPagamento);
   if (error) {
-    console.error("Erro ao salvar pagamento no Supabase:", error.message);
+    log.error("Erro ao salvar pagamento no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar pagamento" });
   }
   await logAdminAction(res.locals.adminUser, "create", "pagamento", newPagamento.id, `R$ ${newPagamento.amount} — reserva ${newPagamento.reservaId}`);
@@ -2694,7 +2868,7 @@ app.post("/api/guias", requireAdmin, async (req, res) => {
   const newGuia: GuiaTuristico = { ...pickFields<GuiaTuristico>(req.body, GUIA_TURISTICO_FIELDS), id: `gt_${randomUUID()}` } as GuiaTuristico;
   const { error } = await supabase.from("guias").insert(newGuia);
   if (error) {
-    console.error("Erro ao salvar guia no Supabase:", error.message);
+    log.error("Erro ao salvar guia no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar guia" });
   }
   await logAdminAction(res.locals.adminUser, "create", "guia_turistico", newGuia.id, newGuia.name);
@@ -2778,7 +2952,7 @@ app.post("/api/candidaturas", publicFormLimiter, async (req, res) => {
     ({ error } = await supabase.from("candidaturas").insert(withoutToken));
   }
   if (error) {
-    console.error("Erro ao salvar candidatura no Supabase:", error.message);
+    log.error("Erro ao salvar candidatura no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar candidatura" });
   }
 
@@ -2829,9 +3003,9 @@ app.post("/api/referral-sources", publicFormLimiter, async (req, res) => {
   // degrades gracefully instead of erroring if the table isn't there.
   try {
     const { error } = await supabase.from("referral_sources").insert(newSource);
-    if (error) console.warn("Erro ao salvar origem do visitante no Supabase:", error.message);
+    if (error) log.warn("Erro ao salvar origem do visitante no Supabase:", error.message);
   } catch (err: any) {
-    console.warn("Erro ao salvar origem do visitante no Supabase:", err.message);
+    log.warn("Erro ao salvar origem do visitante no Supabase:", err.message);
   }
   res.status(201).json(newSource);
 });
@@ -2913,7 +3087,7 @@ async function finalizeGrantAdmin(email: string): Promise<{ ok: boolean; message
     email,
     options: { redirectTo: `${SITE_URL}/parceiro` },
   });
-  if (linkErr) console.warn(`Admin ${email} criado/promovido, mas falha ao gerar link de acesso:`, linkErr.message);
+  if (linkErr) log.warn(`Admin ${email} criado/promovido, mas falha ao gerar link de acesso:`, linkErr.message);
   return { ok: true, actionLink: linkData?.properties?.action_link || null };
 }
 
@@ -3248,7 +3422,7 @@ async function provisionPartnerLogin(
     email,
     options: { redirectTo: `${SITE_URL}/parceiro` },
   });
-  if (linkErr) console.warn("Acesso criado, mas falha ao gerar link de apoio:", linkErr.message);
+  if (linkErr) log.warn("Acesso criado, mas falha ao gerar link de apoio:", linkErr.message);
   const actionLink = linkData?.properties?.action_link || null;
 
   // Send the link ourselves via Resend (already configured for booking
@@ -3274,7 +3448,7 @@ async function provisionPartnerLogin(
       });
       emailSent = true;
     } catch (err: any) {
-      console.warn("Acesso criado, mas falha ao enviar email via Resend:", err.message);
+      log.warn("Acesso criado, mas falha ao enviar email via Resend:", err.message);
     }
   }
 
@@ -3383,7 +3557,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
 
   const { error: insertErr } = await supabase.from(table).insert(newRecord);
   if (insertErr) {
-    console.error(`Erro ao criar parceiro (${table}) a partir da candidatura:`, insertErr.message);
+    log.error(`Erro ao criar parceiro (${table}) a partir da candidatura:`, insertErr.message);
     return res.status(500).json({ error: "Erro ao criar o registro do parceiro." });
   }
 
@@ -3392,7 +3566,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
   // failure, since an admin can still invite access manually from the new
   // record's own "Acesso de parceiro" panel.
   const loginResult = await provisionPartnerLogin(email, { role: "partner", partnerType, partnerId: newRecord.id });
-  if (loginResult.error) console.warn("Registro do parceiro criado, mas falha ao criar login:", loginResult.error);
+  if (loginResult.error) log.warn("Registro do parceiro criado, mas falha ao criar login:", loginResult.error);
 
   const { data: updatedCandidatura, error: updateErr } = await supabase
     .from("candidaturas")
@@ -3400,7 +3574,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
     .eq("id", id)
     .select()
     .single();
-  if (updateErr) console.warn("Parceiro criado, mas falha ao marcar candidatura como aprovada:", updateErr.message);
+  if (updateErr) log.warn("Parceiro criado, mas falha ao marcar candidatura como aprovada:", updateErr.message);
 
   await logAdminAction(res.locals.adminUser, "approve", "candidatura", id, `${candidatura.name} → ${partnerType} ${newRecord.id}`);
 
@@ -3473,6 +3647,29 @@ app.get("/api/my-partner-profile", authLimiter, async (req, res) => {
 // so the frontend can initialize its own Supabase Auth client.
 app.get("/api/config", (req, res) => {
   res.json({ supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY });
+});
+
+// Health-check público e leve — sem autenticação (monitor de uptime não
+// consegue autenticar) e sem vazar nada sensível (ao contrário de
+// /api/supabase/status, que é admin-only e detalha tabela por tabela).
+// Faz uma query real e barata pra confirmar que a conexão com o Supabase
+// está de pé, não só que o processo Node respondeu. Sem isso não tem como
+// nenhuma ferramenta de monitoramento (UptimeRobot, Better Stack etc.)
+// vigiar o site de verdade nem disparar alerta automático quando cair.
+app.get("/api/health", async (req, res) => {
+  const startedAt = Date.now();
+  try {
+    const { error } = await supabase.from("pousadas").select("id").limit(1);
+    const databaseOk = !error;
+    res.status(databaseOk ? 200 : 503).json({
+      status: databaseOk ? "ok" : "degraded",
+      database: databaseOk ? "ok" : "error",
+      responseTimeMs: Date.now() - startedAt,
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    res.status(503).json({ status: "degraded", database: "error", timestamp: new Date().toISOString() });
+  }
 });
 
 app.get("/api/supabase/status", requireAdmin, async (req, res) => {
@@ -4025,7 +4222,7 @@ Regras importantes:
       return res.json({ reply: replyText });
 
     } catch (err) {
-      console.error("Gemini invocation failed, using fallback:", err);
+      log.error("Gemini invocation failed, using fallback:", err);
     }
   }
 
@@ -4136,7 +4333,7 @@ app.get('/site/:slug', async (req, res, next) => {
 // registered with all 4 params — that arity is how Express recognizes an
 // error handler instead of regular middleware.
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("Erro não tratado:", err);
+  log.error("Erro não tratado:", err);
   reportServerError(err);
   if (res.headersSent) return next(err);
   res.status(500).json({ error: "Erro interno do servidor" });
@@ -4162,7 +4359,7 @@ async function startLocalServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+    log.info(`Server running on port ${PORT}`);
   });
 }
 

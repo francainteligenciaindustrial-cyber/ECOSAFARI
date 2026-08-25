@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { isChiefUser } from "../lib/authRoles";
 import { adminFetch } from "../lib/adminFetch";
+import AdminMfaSettings from "./AdminMfaSettings";
 
 interface AdminUser {
   id: string;
@@ -196,6 +197,8 @@ export default function AdminUsersPanel() {
 
   return (
     <div className="space-y-6">
+      <AdminMfaSettings />
+
       <form onSubmit={handlePropose} className="bg-white border border-editorial-border p-6 space-y-3">
         <h3 className="font-bold text-sm text-editorial-text flex items-center gap-2">
           <UserPlus className="h-4 w-4 text-editorial-primary" /> Propor novo administrador

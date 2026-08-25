@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   User, MapPin, Languages, Coins, Heart, Ticket, Check, Copy, LoaderCircle,
-  Pencil, X, Sparkles, Compass,
+  Pencil, X, Sparkles, Compass, Download, Trash2, ShieldAlert,
 } from "lucide-react";
 import { useTouristSession } from "../lib/useTouristSession";
 import { adminFetch } from "../lib/adminFetch";
@@ -48,6 +48,11 @@ export default function TuristaProfileView() {
   const [visitados, setVisitados] = useState<VisitedPousada[] | null>(null);
   const [resgates, setResgates] = useState<Resgate[] | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const [exporting, setExporting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -151,6 +156,45 @@ export default function TuristaProfileView() {
   const handleLogout = async () => {
     if (supabase) await supabase.auth.signOut();
     navigate("/");
+  };
+
+  // Direito de acesso/portabilidade (LGPD) — baixa tudo que está vinculado
+  // a esta conta num arquivo só, sem precisar pedir pra equipe.
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const res = await adminFetch("/api/turista/me/export");
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ecosafari-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Direito de eliminação (LGPD) — irreversível, por isso exige digitar
+  // "EXCLUIR" antes do botão de fato liberar, em vez de um simples clique.
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toUpperCase() !== "EXCLUIR" || deletingAccount) return;
+    setDeletingAccount(true);
+    try {
+      const res = await adminFetch("/api/turista/me", { method: "DELETE" });
+      if (!res.ok) {
+        setDeletingAccount(false);
+        return;
+      }
+      if (supabase) await supabase.auth.signOut();
+      navigate("/");
+    } catch {
+      setDeletingAccount(false);
+    }
   };
 
   if (!localProfile) {
@@ -401,6 +445,73 @@ export default function TuristaProfileView() {
             </ul>
           )}
         </div>
+      </div>
+
+      {/* Privacidade e dados — direitos de acesso/portabilidade e
+          eliminação da LGPD, disponíveis pra pessoa exercer sozinha em vez
+          de precisar pedir pra equipe. */}
+      <div className="bg-white border border-editorial-border rounded-lg p-6 md:p-8 mt-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary flex items-center gap-2 mb-4">
+          <ShieldAlert className="h-4 w-4" /> Privacidade e dados
+        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-editorial-border">
+          <div>
+            <p className="text-editorial-text text-sm font-semibold">Baixar meus dados</p>
+            <p className="text-editorial-muted text-xs">Um arquivo com tudo que temos vinculado à sua conta: perfil, favoritos, avaliações, resgates e reservas.</p>
+          </div>
+          <button
+            onClick={handleExportData}
+            disabled={exporting}
+            className="flex items-center gap-1.5 border border-editorial-border text-editorial-text text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md hover:bg-editorial-secondary transition cursor-pointer disabled:opacity-60 flex-shrink-0"
+          >
+            {exporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Exportar
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-editorial-text text-sm font-semibold">Excluir minha conta</p>
+            <p className="text-editorial-muted text-xs">Remove seu perfil e login permanentemente. Avaliações já publicadas ficam anônimas em vez de apagadas.</p>
+          </div>
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-1.5 border border-red-200 text-red-600 text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md hover:bg-red-50 transition cursor-pointer flex-shrink-0"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Excluir conta
+            </button>
+          ) : null}
+        </div>
+
+        {showDeleteConfirm && (
+          <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="text-red-800 text-xs font-semibold mb-1">Essa ação não pode ser desfeita.</p>
+            <p className="text-red-700 text-xs mb-3">Digite <span className="font-mono font-bold">EXCLUIR</span> abaixo para confirmar.</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="EXCLUIR"
+                className="flex-1 border border-red-300 bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText.trim().toUpperCase() !== "EXCLUIR" || deletingAccount}
+                className="bg-red-600 hover:bg-red-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 flex-shrink-0"
+              >
+                {deletingAccount ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : "Confirmar exclusão"}
+              </button>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+                className="text-editorial-muted hover:text-editorial-text text-[11px] uppercase tracking-widest font-bold px-2 transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
