@@ -1196,10 +1196,11 @@ export default function AdminDashboard({
                               </button>
                             </div>
                           )}
-                          {b.status === "pago" && (
+                          {(b.status === "pago" || b.status === "confirmado_guia") && (
                             <div className="flex justify-end gap-1.5">
                               <button
                                 onClick={() => handleConfirmPousada(b.id)}
+                                title={b.status === "confirmado_guia" ? "O guia já foi vinculado sem esse passo — aprovar agora fecha a confirmação total e sincroniza o calendário." : undefined}
                                 className="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold px-2.5 py-1.5 rounded transition text-[10px]"
                               >
                                 Aprovar Quarto Pousada

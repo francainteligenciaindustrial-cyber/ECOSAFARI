@@ -2272,7 +2272,10 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
 
 // NOTIFICATIONS
 app.get("/api/notifications", requireAdmin, async (req, res) => {
-  const { data, error } = await supabase.from("notifications").select("*");
+  // Sem order(), o Postgres devolve na ordem física de armazenamento — que
+  // por acaso tende a parecer "mais antiga primeiro", o oposto do que faz
+  // sentido num feed de notificação.
+  const { data, error } = await supabase.from("notifications").select("*").order("timestamp", { ascending: false });
   if (error) return res.status(500).json({ error: "Erro ao buscar notificações" });
   res.json(data);
 });
