@@ -814,7 +814,13 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
 const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms"] as const;
-const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified"] as const;
+// googleCalendarId fica de fora de POUSADA_CREATE_FIELDS de propósito — é
+// um detalhe de organização interna da agência (qual calendário Google essa
+// pousada usa), não algo que o parceiro deveria poder mexer autoeditando o
+// próprio cadastro. Normalmente preenchido via POST
+// /api/pousadas/:id/google-calendar (cria um calendário novo), mas também
+// editável aqui à mão se o admin preferir apontar pra um que já existe.
+const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified", "googleCalendarId"] as const;
 const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images", "unavailableDates"] as const;
 const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "language", "age", "preferences"] as const;
@@ -865,7 +871,8 @@ function mapPousadaRow(p: any): Pousada {
     teamSectionTitle: p.teamSectionTitle || "",
     teamSectionText: p.teamSectionText || "",
     officialSiteImages: parseJSONSafe(p.officialSiteImages) || [],
-    rooms: parseJSONSafe(p.rooms) || []
+    rooms: parseJSONSafe(p.rooms) || [],
+    googleCalendarId: p.googleCalendarId || undefined,
   };
 }
 
@@ -1527,6 +1534,12 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
     return null;
   }
 
+  // Calendário dedicado desta pousada (dentro da MESMA conta já conectada),
+  // se ela tiver um configurado — senão cai no calendário "primary" da
+  // conta, comportamento de sempre. Ver POST /api/pousadas/:id/google-calendar.
+  const { data: pousadaRow } = await supabase.from("pousadas").select("googleCalendarId").eq("id", booking.pousadaId).maybeSingle();
+  const calendarId = pousadaRow?.googleCalendarId || "primary";
+
   try {
     const oauth2Client = getOAuthClient(req);
     oauth2Client.setCredentials(tokens);
@@ -1555,7 +1568,7 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
       `👨‍✈️ Guia: ${booking.guideName || 'A definir'}`;
 
     const response = await calendar.events.insert({
-      calendarId: "primary",
+      calendarId,
       requestBody: {
         summary,
         description,
@@ -1581,6 +1594,53 @@ async function createCalendarEvent(booking: Booking, req: express.Request) {
     return null;
   }
 }
+
+// Cria um Google Calendar dedicado pra uma pousada, DENTRO da mesma conta
+// já conectada (não é uma segunda conexão OAuth por pousada — ver POST
+// /api/auth/google acima). A partir daí, reservas dessa pousada passam a
+// sincronizar nesse calendário específico em vez do "primary" da conta
+// (ver createCalendarEvent). Também dá pra apontar pra um calendário que já
+// existe direto pelo PUT /api/pousadas/:id (campo googleCalendarId),
+// caso o admin prefira criar manualmente no próprio Google Calendar.
+app.post("/api/pousadas/:id/google-calendar", requireAdmin, async (req, res) => {
+  const tokens = await loadStoredTokens();
+  if (!tokens) {
+    return res.status(400).json({ error: "Conecte o Google Calendar primeiro em Gestão → Agenda Integrada." });
+  }
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res.status(503).json({ error: "Google OAuth Client ID ou Client Secret não estão configurados." });
+  }
+
+  const { data: pousadaRow, error: pErr } = await supabase.from("pousadas").select("id,name").eq("id", req.params.id).maybeSingle();
+  if (pErr || !pousadaRow) {
+    return res.status(404).json({ error: "Pousada não encontrada." });
+  }
+
+  try {
+    const oauth2Client = getOAuthClient(req);
+    oauth2Client.setCredentials(tokens);
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+    const created = await calendar.calendars.insert({
+      requestBody: { summary: `EcoSafari — ${pousadaRow.name}`, timeZone: "America/Cuiaba" },
+    });
+    const googleCalendarId = created.data.id;
+    if (!googleCalendarId) {
+      return res.status(500).json({ error: "O Google não retornou um ID de calendário." });
+    }
+
+    const { error: updateErr } = await supabase.from("pousadas").update({ googleCalendarId }).eq("id", pousadaRow.id);
+    if (updateErr) {
+      return res.status(500).json({ error: "O calendário foi criado no Google, mas houve erro ao salvar no cadastro da pousada." });
+    }
+
+    await logAdminAction(res.locals.adminUser, "update", "pousada", pousadaRow.id, `Calendário Google dedicado criado (${googleCalendarId})`);
+    res.json({ googleCalendarId });
+  } catch (err) {
+    log.error("Erro ao criar Google Calendar dedicado pra pousada:", err);
+    res.status(500).json({ error: "Erro ao criar o calendário no Google." });
+  }
+});
 
 // ----------------------------------------------------
 // GOOGLE CALENDAR OAUTH ENDPOINTS

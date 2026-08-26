@@ -51,6 +51,7 @@ import ImageListEditor from "./ImageListEditor";
 import Pagination from "./Pagination";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import NewBookingForm from "./NewBookingForm";
+import PousadaCalendarsPanel from "./PousadaCalendarsPanel";
 import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
@@ -484,6 +485,24 @@ export default function AdminDashboard({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "confirmado_guia", guideId })
+      });
+      if (response.ok) { onRefreshData(); fetchBookings(); }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Marca uma reserva como paga sem passar pelo Stripe — pra fechamentos
+  // combinados fora do checkout (Pix, transferência, dinheiro na recepção,
+  // reserva por telefone/WhatsApp) e pra testar o resto do fluxo de
+  // confirmação (aprovar quarto → vincular guia → sincronizar agenda) sem
+  // precisar de um pagamento real configurado.
+  const handleMarkAsPaid = async (bookingId: string) => {
+    try {
+      const response = await adminFetch(`/api/bookings/${bookingId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "pago" })
       });
       if (response.ok) { onRefreshData(); fetchBookings(); }
     } catch (err) {
@@ -1165,6 +1184,17 @@ export default function AdminDashboard({
                         </td>
                         <td className="p-4 text-right space-y-1.5">
                           {/* Admin interaction tools */}
+                          {b.status === "pendente_pagamento" && (
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => handleMarkAsPaid(b.id)}
+                                title="Pra fechamentos fora do Stripe (Pix, transferência, dinheiro) ou pra testar o fluxo de confirmação"
+                                className="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold px-2.5 py-1.5 rounded transition text-[10px]"
+                              >
+                                Marcar como Paga
+                              </button>
+                            </div>
+                          )}
                           {b.status === "pago" && (
                             <div className="flex justify-end gap-1.5">
                               <button
@@ -1841,6 +1871,8 @@ export default function AdminDashboard({
                 )}
               </div>
             </div>
+
+            <PousadaCalendarsPanel pousadas={pousadas} connected={googleCalendarStatus.connected} onRefreshData={onRefreshData} />
 
             <div className="border border-zinc-200 rounded-xl overflow-hidden divide-y divide-zinc-200">
               {bookings.filter(b => b.status !== "cancelado").map((b, idx) => (

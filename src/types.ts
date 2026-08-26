@@ -32,6 +32,11 @@ export interface Pousada {
   // hóspede quer ver: quantos quartos existem e quantas pessoas cabem em
   // cada um.
   rooms?: { type: string; capacity: number; quantity: number }[];
+  // Calendário Google dedicado desta pousada (dentro da conta única já
+  // conectada em Gestão → Agenda Integrada) — quando ausente, os eventos de
+  // reserva confirmada caem no calendário "primary" da conta, como sempre
+  // aconteceu. Ver POST /api/pousadas/:id/google-calendar.
+  googleCalendarId?: string;
 }
 
 // Avaliação (antes chamada de "comentário") — unificada para os três tipos
