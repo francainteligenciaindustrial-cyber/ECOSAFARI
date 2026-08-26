@@ -52,6 +52,7 @@ import Pagination from "./Pagination";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import NewBookingForm from "./NewBookingForm";
 import PousadaCalendarsPanel from "./PousadaCalendarsPanel";
+import EcosystemAvailabilityPanel from "./EcosystemAvailabilityPanel";
 import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
@@ -1871,6 +1872,8 @@ export default function AdminDashboard({
                 )}
               </div>
             </div>
+
+            <EcosystemAvailabilityPanel />
 
             <PousadaCalendarsPanel pousadas={pousadas} connected={googleCalendarStatus.connected} onRefreshData={onRefreshData} />
 

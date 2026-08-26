@@ -1311,6 +1311,61 @@ app.get("/api/bookings", requireAdmin, async (req, res) => {
   res.json(data);
 });
 
+// Disponibilidade consolidada de pousadas + guias + atrações num período —
+// antes disso, saber "o que está livre" exigia cruzar reservas, guias e
+// atrações manualmente em telas separadas. Reaproveita a mesma lógica de
+// checagem por tipo de quarto usada em POST /api/bookings, só que em modo
+// leitura/agregado em vez de "posso criar esta reserva?". Desenhada pra
+// também alimentar a IA quando ela passar a montar roteiro personalizado —
+// mesma resposta, só que consumida por código em vez de olhos humanos.
+app.get("/api/gestao/agenda", requireAdmin, async (req, res) => {
+  const startDate = String(req.query.startDate || "");
+  const endDate = String(req.query.endDate || startDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return res.status(400).json({ error: "Informe startDate (e opcionalmente endDate) no formato YYYY-MM-DD." });
+  }
+
+  const [pousadasRes, guidesRes, atracoesRes, bookingsRes] = await Promise.all([
+    supabase.from("pousadas").select("*"),
+    supabase.from("guides").select("*"),
+    supabase.from("atracoes").select("*"),
+    supabase.from("bookings").select("pousadaId,roomType,checkIn,checkOut,adults,children,status").neq("status", "cancelado"),
+  ]);
+
+  const pousadaRows = (pousadasRes.data || []).map(mapPousadaRow);
+  const guideRows = (guidesRes.data || []).map(mapGuideRow);
+  const atracaoRows = (atracoesRes.data || []).map(mapAtracaoRow);
+  const overlappingBookings = (bookingsRes.data || []).filter((b: any) => b.checkIn <= endDate && b.checkOut >= startDate);
+
+  const pousadas = pousadaRows.map(p => {
+    const theseBookings = overlappingBookings.filter((b: any) => b.pousadaId === p.id);
+    if (p.rooms && p.rooms.length > 0) {
+      const rooms = p.rooms.map(r => {
+        const bookedUnits = theseBookings.filter((b: any) => b.roomType === r.type).length;
+        return { type: r.type, capacity: r.capacity, quantity: r.quantity, availableUnits: Math.max(0, r.quantity - bookedUnits) };
+      });
+      return { id: p.id, name: p.name, location: p.location, rooms, hasAvailability: rooms.some(r => r.availableUnits > 0) };
+    }
+    const guestsBooked = theseBookings.reduce((sum: number, b: any) => sum + (b.adults || 0) + (b.children || 0), 0);
+    return { id: p.id, name: p.name, location: p.location, capacity: p.capacity, guestsBooked, hasAvailability: guestsBooked < p.capacity };
+  });
+
+  const guides = guideRows.map(g => {
+    const blockedDatesInRange = (g.unavailableDates || []).filter(d => d >= startDate && d <= endDate);
+    return {
+      id: g.id, name: g.name, specialty: g.specialty, languages: g.languages, status: g.status,
+      blockedDatesInRange,
+      hasAvailability: g.status === "disponivel" && blockedDatesInRange.length === 0,
+    };
+  });
+
+  const atracoes = atracaoRows.map(a => ({
+    id: a.id, name: a.name, type: a.type, location: a.location, availability: a.availability || "",
+  }));
+
+  res.json({ startDate, endDate, pousadas, guides, atracoes });
+});
+
 // Public, PII-free summary for the mobile app check-in demo: only pousada
 // name, dates and status — never customer name/email/phone.
 app.get("/api/bookings/public-confirmed", async (req, res) => {
