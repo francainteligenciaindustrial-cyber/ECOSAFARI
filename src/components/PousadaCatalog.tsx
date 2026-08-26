@@ -323,7 +323,7 @@ export default function PousadaCatalog({
       {/* Hero Section */}
       <section className="relative h-[550px] flex items-center justify-center bg-editorial-primary text-white overflow-hidden">
         {/* Ambient video-like image background with darker overlay */}
-        <div className="absolute inset-0 opacity-25 bg-[url('https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center"></div>
+        <div className="absolute inset-0 opacity-25 bg-[url('/hero-pantanal-fauna.jpg')] bg-cover bg-center"></div>
         
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-editorial-primary/45"></div>
