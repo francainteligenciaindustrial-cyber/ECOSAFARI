@@ -32,7 +32,7 @@
     "react-dom": "^19.0.1",
     "resend": "^6.18.0",
     "stripe": "^22.3.2",
-    "vite": "^6.2.3"
+    "vite": "^8.2.2"
   },
   "overrides": {
     "brace-expansion": "^5.0.8"
@@ -49,7 +49,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3",
+    "vite": "^8.2.2",
     "vitest": "^3.2.4"
   }
 }
