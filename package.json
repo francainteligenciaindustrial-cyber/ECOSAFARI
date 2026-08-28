@@ -17,7 +17,7 @@
     "@sentry/react": "^10.68.0",
     "@supabase/supabase-js": "^2.110.6",
     "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
+    "@vitejs/plugin-react": "^6.1.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "express-rate-limit": "^7.4.1",
