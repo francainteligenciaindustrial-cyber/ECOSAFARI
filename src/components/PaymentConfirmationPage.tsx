@@ -6,7 +6,7 @@ import { navigate } from "../lib/router";
 const WHATSAPP_NUMBER = "5565999868334";
 
 export default function PaymentConfirmationPage() {
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "success-consumo" | "error">("loading");
   const [booking, setBooking] = useState<Booking | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [sessionId, setSessionId] = useState("");
@@ -25,6 +25,10 @@ export default function PaymentConfirmationPage() {
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Erro ao confirmar pagamento");
+        if (data.consumo) {
+          setStatus("success-consumo");
+          return;
+        }
         setBooking(data.booking);
         setStatus("success");
       })
@@ -60,6 +64,19 @@ export default function PaymentConfirmationPage() {
             <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h1 className="text-xl font-serif font-bold text-editorial-primary mb-2">Não foi possível confirmar</h1>
             <p className="text-editorial-muted text-sm mb-6">{errorMsg}</p>
+            <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-editorial-primary hover:opacity-80 transition cursor-pointer">
+              <ArrowLeft className="h-4 w-4" /> Voltar ao site
+            </a>
+          </div>
+        )}
+
+        {status === "success-consumo" && (
+          <div className="bg-white border border-editorial-border p-10 rounded-lg">
+            <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
+            <h1 className="text-2xl font-serif font-bold text-editorial-primary mb-2">Pagamento confirmado!</h1>
+            <p className="text-editorial-muted text-sm mb-6">
+              Seu consumo na pousada foi pago com sucesso.
+            </p>
             <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-editorial-primary hover:opacity-80 transition cursor-pointer">
               <ArrowLeft className="h-4 w-4" /> Voltar ao site
             </a>

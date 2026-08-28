@@ -13,6 +13,9 @@
     { "source": "/site/:slug", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
+  "crons": [
+    { "path": "/api/cron/lembretes-cancelamento", "schedule": "0 12 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

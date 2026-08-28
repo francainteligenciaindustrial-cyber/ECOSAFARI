@@ -14,6 +14,9 @@ import ToggleSwitch from "./ToggleSwitch";
 import LanguagesEditor from "./LanguagesEditor";
 import LanguageFlag from "./LanguageFlag";
 import PousadaRecompensasManager from "./PousadaRecompensasManager";
+import PousadaProdutosManager from "./PousadaProdutosManager";
+import PousadaConsumoManager from "./PousadaConsumoManager";
+import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import PartnerLoginPanel from "./PartnerLoginPanel";
 
@@ -524,8 +527,17 @@ export default function PartnerPortalPage() {
         ) : null}
 
         {profile.partnerType === "pousada" && (
-          <div className="mt-8">
+          <div className="mt-8 space-y-8">
+            <PartnerBookingsCalendar partnerType="pousada" partnerId={profile.partnerId} />
             <PousadaRecompensasManager pousadaId={profile.partnerId} />
+            <PousadaProdutosManager pousadaId={profile.partnerId} />
+            <PousadaConsumoManager pousadaId={profile.partnerId} />
+          </div>
+        )}
+
+        {profile.partnerType === "guia" && (
+          <div className="mt-8">
+            <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { ScrollText, LoaderCircle, RefreshCw, Search } from "lucide-react";
+import { ScrollText, LoaderCircle, RefreshCw, Search, Download } from "lucide-react";
 import { adminFetch } from "../lib/adminFetch";
 
 interface AuditLogEntry {
@@ -99,6 +99,33 @@ export default function AdminAuditLogPanel() {
     );
   }, [entries, search]);
 
+  // Baixa exatamente o que está na tela (respeitando o filtro de busca
+  // ativo) — gera o CSV no navegador, sem precisar de mais uma rota no
+  // servidor só pra isso.
+  const handleDownloadCsv = () => {
+    const header = ["Quando", "Admin", "Ação", "Tipo de registro", "Registro"];
+    const rows = filtered.map(e => [
+      new Date(e.created_at).toLocaleString("pt-BR"),
+      e.actor_email,
+      ACTION_LABELS[e.action] || e.action,
+      RESOURCE_LABELS[e.resource_type] || e.resource_type,
+      e.resource_label || e.resource_id || "",
+    ]);
+    const csv = [header, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+    // BOM (﻿) pra Excel abrir acentuação em UTF-8 corretamente.
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `log-auditoria-ecosafari-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-editorial-muted gap-2">
@@ -124,6 +151,14 @@ export default function AdminAuditLogPanel() {
               className="pl-8 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-500 w-full sm:w-72"
             />
           </div>
+          <button
+            onClick={handleDownloadCsv}
+            disabled={filtered.length === 0}
+            className="flex-shrink-0 flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-zinc-500 hover:text-editorial-primary transition cursor-pointer disabled:opacity-40 border border-zinc-200 rounded-lg px-3 py-2"
+            title="Baixar CSV"
+          >
+            <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">CSV</span>
+          </button>
           <button
             onClick={() => fetchLog(true)}
             disabled={refreshing}

@@ -243,6 +243,53 @@ export interface Resgate {
   usedAt?: string;
 }
 
+// Item vendável pela pousada (frigobar, vestuário, brinde...) — cadastrado
+// pelo próprio parceiro. Cada produto tem um QR code fixo (gerado a partir
+// do id) que a recepção escaneia pra registrar consumo (ver Consumo abaixo).
+export interface Produto {
+  id: string;
+  pousadaId: string;
+  name: string;
+  description?: string;
+  category: 'frigobar' | 'vestuario' | 'brinde' | 'outro';
+  price: number;
+  active: boolean;
+  createdAt: string;
+}
+
+// Um item consumido por um hóspede durante a estadia — registrado ao
+// escanear o QR code do produto e escolher a reserva. Vira cobrança real
+// (status "pago" só depois de cobrado, via Stripe ou marcado manualmente
+// pela recepção — mesmo padrão de "Marcar como Paga" já usado em Booking).
+export interface Consumo {
+  id: string;
+  bookingId: string;
+  pousadaId: string;
+  produtoId: string;
+  produtoName: string; // snapshot do nome no momento do consumo — sobrevive a produto renomeado/excluído depois
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  status: 'pendente' | 'pago';
+  createdAt: string;
+}
+
+// Penalidade por cancelar uma reserva já confirmada fora do prazo mínimo de
+// 45 dias. "estrelasPerdidas" é um selo de confiabilidade visível só no
+// painel de Gestão — nunca mexe na nota pública de avaliação (essa
+// continua vindo só de avaliação real de hóspede).
+export interface PrestadorPenalidade {
+  id: string;
+  prestadorType: 'pousada' | 'guia';
+  prestadorId: string;
+  bookingId: string;
+  motivo: string;
+  diasAntecedencia: number;
+  valorPenalidade: number;
+  estrelasPerdidas: number;
+  createdAt: string;
+}
+
 export interface Roteiro {
   id: string;
   name: string;

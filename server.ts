@@ -11,7 +11,8 @@ import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { Resend } from "resend";
 import PDFDocument from "pdfkit";
-import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource, Atracao, PartnerType, Recompensa, Resgate } from "./src/types.js";
+import { Pousada, Guide, Booking, Sighting, Review, Notification, Species, Turista, Roteiro, Reserva, Pagamento, GuiaTuristico, Candidatura, ReferralSource, Atracao, PartnerType, Recompensa, Resgate, Produto, Consumo } from "./src/types.js";
+import QRCode from "qrcode";
 import { slugify } from "./src/lib/slug.js";
 import { AsyncLocalStorage } from "async_hooks";
 
@@ -1890,6 +1891,260 @@ app.put("/api/bookings/:id/status", requireAdmin, async (req, res) => {
 });
 
 // ----------------------------------------------------
+// AGENDA SELF-SERVICE DO PARCEIRO (pousada/guia) — confirmar/cancelar a
+// própria reserva direto do próprio portal, sem depender do admin fazer
+// isso por eles. Cancelar uma reserva já confirmada fora do prazo mínimo de
+// 45 dias aciona a política de penalidade abaixo.
+// ----------------------------------------------------
+
+const CONFIRMED_BOOKING_STATUSES = ["confirmado_pousada", "confirmado_guia", "confirmado_total"];
+
+// Limites da política de cancelamento — ajustáveis aqui, num lugar só.
+// >= 45 dias: cancelamento livre (o prazo mínimo pedido). Entre 20 e 44:
+// só perde estrela de confiabilidade (selo interno, não a nota pública).
+// Entre 5 e 19: só penalidade em dinheiro. Menos de 5: as duas coisas,
+// maiores.
+const PENALTY_MIN_NOTICE_DAYS = 45;
+const PENALTY_MONEY_TIER_DAYS = 20;
+const PENALTY_SEVERE_TIER_DAYS = 5;
+const PENALTY_MONEY_PERCENT_TIER = 0.2;
+const PENALTY_MONEY_PERCENT_SEVERE = 0.5;
+const PENALTY_STARS_TIER = 0.5;
+const PENALTY_STARS_SEVERE = 1.5;
+
+function diasAteData(dataISO: string): number {
+  const hoje = new Date(new Date().toISOString().slice(0, 10));
+  const alvo = new Date(dataISO);
+  return Math.round((alvo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function calcularPenalidadeCancelamento(totalPrice: number, diasAntecedencia: number): { valorPenalidade: number; estrelasPerdidas: number; motivo: string } {
+  if (diasAntecedencia >= PENALTY_MIN_NOTICE_DAYS) {
+    return { valorPenalidade: 0, estrelasPerdidas: 0, motivo: `Cancelado com ${diasAntecedencia} dias de antecedência — dentro do prazo mínimo de ${PENALTY_MIN_NOTICE_DAYS} dias, sem penalidade.` };
+  }
+  if (diasAntecedencia >= PENALTY_MONEY_TIER_DAYS) {
+    return { valorPenalidade: 0, estrelasPerdidas: PENALTY_STARS_TIER, motivo: `Cancelado com ${diasAntecedencia} dias de antecedência (abaixo do mínimo de ${PENALTY_MIN_NOTICE_DAYS}) — perda de estrelas de confiabilidade.` };
+  }
+  if (diasAntecedencia >= PENALTY_SEVERE_TIER_DAYS) {
+    return { valorPenalidade: Math.round(totalPrice * PENALTY_MONEY_PERCENT_TIER * 100) / 100, estrelasPerdidas: 0, motivo: `Cancelado com ${diasAntecedencia} dias de antecedência — penalidade monetária.` };
+  }
+  return {
+    valorPenalidade: Math.round(totalPrice * PENALTY_MONEY_PERCENT_SEVERE * 100) / 100,
+    estrelasPerdidas: PENALTY_STARS_SEVERE,
+    motivo: `Cancelado com apenas ${Math.max(0, diasAntecedencia)} dia(s) de antecedência — penalidade máxima (dinheiro + estrelas).`,
+  };
+}
+
+async function registrarPenalidadeCancelamento(prestadorType: "pousada" | "guia", prestadorId: string, booking: Booking) {
+  const diasAntecedencia = diasAteData(booking.checkIn);
+  const { valorPenalidade, estrelasPerdidas, motivo } = calcularPenalidadeCancelamento(booking.totalPrice, diasAntecedencia);
+  if (valorPenalidade === 0 && estrelasPerdidas === 0) return;
+  const penalidade = {
+    id: `pn_${randomUUID()}`,
+    prestadorType,
+    prestadorId,
+    bookingId: booking.id,
+    motivo,
+    diasAntecedencia,
+    valorPenalidade,
+    estrelasPerdidas,
+    createdAt: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("prestador_penalidades").insert(penalidade);
+  if (error) log.error("Erro ao registrar penalidade de cancelamento:", error.message);
+}
+
+app.get("/api/pousadas/:id/bookings", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data, error } = await supabase.from("bookings").select("*").eq("pousadaId", req.params.id).order("checkIn", { ascending: true });
+  if (error) return res.status(500).json({ error: "Erro ao buscar reservas." });
+  res.json(data);
+});
+
+app.put("/api/pousadas/:id/bookings/:bookingId/status", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data: booking } = await supabase.from("bookings").select("*").eq("id", req.params.bookingId).maybeSingle();
+  if (!booking || booking.pousadaId !== req.params.id) return res.status(404).json({ error: "Reserva não encontrada nesta pousada." });
+
+  const { status } = req.body;
+  if (status !== "confirmado_pousada" && status !== "cancelado") {
+    return res.status(400).json({ error: "A pousada só pode aprovar o quarto ou cancelar a própria reserva." });
+  }
+  if (status === "cancelado" && CONFIRMED_BOOKING_STATUSES.includes(booking.status)) {
+    await registrarPenalidadeCancelamento("pousada", req.params.id, booking as Booking);
+  }
+
+  const updated = await applyBookingStatusUpdate(req.params.bookingId, { status }, req);
+  if (!updated) return res.status(404).json({ error: "Reserva não encontrada." });
+  await logAdminAction(res.locals.actorUser, "update_status", "booking", updated.id, `${updated.customerName} — ${updated.status} (pousada)`);
+  res.json(updated);
+});
+
+app.get("/api/guides/:id/bookings", requirePartnerAccess("guia"), async (req, res) => {
+  const { data, error } = await supabase.from("bookings").select("*").eq("guideId", req.params.id).order("checkIn", { ascending: true });
+  if (error) return res.status(500).json({ error: "Erro ao buscar reservas." });
+  res.json(data);
+});
+
+app.put("/api/guides/:id/bookings/:bookingId/status", requirePartnerAccess("guia"), async (req, res) => {
+  const { data: booking } = await supabase.from("bookings").select("*").eq("id", req.params.bookingId).maybeSingle();
+  if (!booking || booking.guideId !== req.params.id) return res.status(404).json({ error: "Reserva não encontrada para este guia." });
+
+  const { status } = req.body;
+  if (status !== "confirmado_guia" && status !== "cancelado") {
+    return res.status(400).json({ error: "O guia só pode confirmar a própria participação ou cancelar." });
+  }
+
+  if (status === "cancelado") {
+    if (CONFIRMED_BOOKING_STATUSES.includes(booking.status)) {
+      await registrarPenalidadeCancelamento("guia", req.params.id, booking as Booking);
+    }
+    // Guia cancelar não cancela a reserva inteira (o quarto continua
+    // reservado) — só desvincula o guia, pra pousada buscar outro.
+    const revertStatus = booking.status === "confirmado_total" || booking.status === "confirmado_pousada" ? "confirmado_pousada" : "pago";
+    const { data: updated, error } = await supabase.from("bookings").update({ status: revertStatus, guideId: null, guideName: null }).eq("id", booking.id).select().single();
+    if (error) return res.status(500).json({ error: "Erro ao cancelar participação do guia." });
+    await logAdminAction(res.locals.actorUser, "update_status", "booking", booking.id, `Guia cancelou participação — reserva volta pra ${revertStatus}`);
+    return res.json(updated);
+  }
+
+  const updated = await applyBookingStatusUpdate(req.params.bookingId, { status, guideId: req.params.id }, req);
+  if (!updated) return res.status(404).json({ error: "Reserva não encontrada." });
+  await logAdminAction(res.locals.actorUser, "update_status", "booking", updated.id, `${updated.customerName} — ${updated.status} (guia)`);
+  res.json(updated);
+});
+
+// Visão de confiabilidade só-admin — soma penalidades por prestador. Nunca
+// mexe na nota pública de avaliação, é um selo interno separado.
+app.get("/api/gestao/confiabilidade", requireAdmin, async (req, res) => {
+  const { data: penalidades, error } = await supabase.from("prestador_penalidades").select("*").order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar penalidades." });
+
+  const [{ data: pousadaRows }, { data: guideRows }] = await Promise.all([
+    supabase.from("pousadas").select("id,name"),
+    supabase.from("guides").select("id,name"),
+  ]);
+  const nomes: Record<string, string> = {};
+  (pousadaRows || []).forEach((p: any) => { nomes[`pousada:${p.id}`] = p.name; });
+  (guideRows || []).forEach((g: any) => { nomes[`guia:${g.id}`] = g.name; });
+
+  const resumo: Record<string, { prestadorType: string; prestadorId: string; prestadorName: string; totalEstrelasPerdidas: number; totalDevido: number; qtdCancelamentos: number }> = {};
+  for (const p of penalidades || []) {
+    const key = `${p.prestadorType}:${p.prestadorId}`;
+    if (!resumo[key]) {
+      resumo[key] = { prestadorType: p.prestadorType, prestadorId: p.prestadorId, prestadorName: nomes[key] || "(removido)", totalEstrelasPerdidas: 0, totalDevido: 0, qtdCancelamentos: 0 };
+    }
+    resumo[key].totalEstrelasPerdidas += p.estrelasPerdidas;
+    resumo[key].totalDevido += p.valorPenalidade;
+    resumo[key].qtdCancelamentos += 1;
+  }
+
+  res.json({ penalidades, resumoPorPrestador: Object.values(resumo) });
+});
+
+// ----------------------------------------------------
+// LEMBRETES AUTOMÁTICOS DE CANCELAMENTO — roda uma vez por dia via Vercel
+// Cron (ver "crons" em vercel.json), avisando pousada/guia com reserva
+// confirmada nos marcos de 45/20/5 dias antes do check-in, reforçando o que
+// eles perdem se cancelarem a partir dali. Idempotente via
+// lembretes_enviados (não manda o mesmo aviso duas vezes).
+// ----------------------------------------------------
+
+const REMINDER_THRESHOLDS = [45, 20, 5] as const;
+const CRON_SECRET = process.env.CRON_SECRET;
+
+// Contas de parceiro não guardam email na própria tabela (pousadas/atracoes)
+// — só o guia tem email direto no cadastro. Pra pousada, o email de login
+// mora só no Supabase Auth, então precisa procurar pelo app_metadata.
+async function findPartnerEmail(partnerType: "pousada" | "guia", partnerId: string): Promise<string | null> {
+  if (partnerType === "guia") {
+    const { data } = await supabase.from("guides").select("email").eq("id", partnerId).maybeSingle();
+    return data?.email || null;
+  }
+  if (!supabaseAdminAuth) return null;
+  // Poucas dezenas de parceiros hoje — varrer algumas páginas da Auth Admin
+  // API é suficiente; se a base crescer muito, isso merece um índice próprio.
+  for (let page = 1; page <= 5; page++) {
+    // Sem desestruturar — o retorno é uma união discriminada por "error"
+    // ({data:{users:User[]}, error:null} | {data:{users:[]}, error:AuthError}),
+    // que se perde ao desestruturar data/error em variáveis separadas.
+    const result = await supabaseAdminAuth.auth.admin.listUsers({ page, perPage: 200 });
+    // TS não consegue carregar a união discriminada (error null vs
+    // AuthError) através do loop/await pra tipar result.data.users como
+    // User[] de verdade — já checamos result.error acima, então o cast é seguro.
+    const users = (result.error ? [] : result.data.users) as any[];
+    if (users.length === 0) break;
+    const match = users.find(u => u.app_metadata?.partnerType === partnerType && u.app_metadata?.partnerId === partnerId);
+    if (match?.email) return match.email as string;
+    if (users.length < 200) break;
+  }
+  return null;
+}
+
+async function enviarLembreteCancelamento(booking: Booking, dias: number) {
+  if (!resend) return;
+  const { valorPenalidade, estrelasPerdidas } = calcularPenalidadeCancelamento(booking.totalPrice, dias - 1);
+  const consequencia = estrelasPerdidas > 0 && valorPenalidade > 0
+    ? `perda de ${estrelasPerdidas} estrela(s) de confiabilidade e multa de R$ ${valorPenalidade.toLocaleString('pt-BR')}`
+    : estrelasPerdidas > 0
+      ? `perda de ${estrelasPerdidas} estrela(s) de confiabilidade`
+      : valorPenalidade > 0
+        ? `multa de R$ ${valorPenalidade.toLocaleString('pt-BR')}`
+        : "nenhuma penalidade (dentro do prazo mínimo)";
+
+  const destinatarios: { type: "pousada" | "guia"; id: string; name: string }[] = [
+    { type: "pousada", id: booking.pousadaId, name: booking.pousadaName },
+  ];
+  if (booking.guideId && booking.guideName) destinatarios.push({ type: "guia", id: booking.guideId, name: booking.guideName });
+
+  for (const dest of destinatarios) {
+    const email = await findPartnerEmail(dest.type, dest.id);
+    if (!email) continue;
+    try {
+      await resend.emails.send({
+        from: "EcoSafari Brasil <onboarding@resend.dev>",
+        to: email,
+        subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — EcoSafari`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #2D4635;">Sua expedição está chegando 🐆</h2>
+            <p>Olá, ${dest.name}! Faltam <strong>${dias} dias</strong> para a reserva de <strong>${booking.customerName}</strong> (${booking.checkIn} a ${booking.checkOut}).</p>
+            <p>Se precisar cancelar a partir de agora, a política de cancelamento se aplica: <strong>${consequencia}</strong>.</p>
+            <p style="color: #888; font-size: 12px;">Cancelamentos com 45 dias ou mais de antecedência não têm nenhuma penalidade.</p>
+          </div>
+        `,
+      });
+    } catch (err: any) {
+      log.warn(`Falha ao enviar lembrete de cancelamento pra ${dest.type} ${dest.id}:`, err.message);
+    }
+  }
+}
+
+app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
+  // Vercel Cron manda esse header automaticamente quando CRON_SECRET está
+  // definido — sem isso, qualquer um poderia disparar o job manualmente.
+  if (CRON_SECRET && req.headers.authorization !== `Bearer ${CRON_SECRET}`) {
+    return res.status(401).json({ error: "Não autorizado." });
+  }
+
+  const { data: bookings, error } = await supabase.from("bookings").select("*").in("status", CONFIRMED_BOOKING_STATUSES);
+  if (error) return res.status(500).json({ error: "Erro ao buscar reservas confirmadas." });
+
+  let sent = 0;
+  for (const booking of (bookings || []) as Booking[]) {
+    const dias = diasAteData(booking.checkIn);
+    if (!(REMINDER_THRESHOLDS as readonly number[]).includes(dias)) continue;
+
+    const { data: already } = await supabase.from("lembretes_enviados").select("id").eq("bookingId", booking.id).eq("threshold", dias).maybeSingle();
+    if (already) continue;
+
+    await enviarLembreteCancelamento(booking, dias);
+    const { error: logErr } = await supabase.from("lembretes_enviados").insert({ id: `lb_${randomUUID()}`, bookingId: booking.id, threshold: dias, sentAt: new Date().toISOString() });
+    if (!logErr) sent++;
+  }
+
+  res.json({ success: true, remindersSent: sent });
+});
+
+// ----------------------------------------------------
 // PAGAMENTO REAL (STRIPE) — ativa automaticamente quando STRIPE_SECRET_KEY
 // está configurado; enquanto isso, o chatbot usa o botão de simulação.
 // ----------------------------------------------------
@@ -1941,6 +2196,21 @@ app.post("/api/create-checkout-session", checkoutLimiter, async (req, res) => {
 // to /pagamento-confirmado. constructEvent() throws if the "stripe-signature"
 // header doesn't match STRIPE_WEBHOOK_SECRET, which is what stops anyone
 // from POSTing a fake "payment succeeded" event at this endpoint.
+// Marca os consumos de uma sessão de checkout de consumo (não de reserva)
+// como pagos — compartilhado entre o webhook e o retorno do navegador
+// (GET /api/payments/confirm), mesma dualidade já usada pra confirmação de
+// reserva via Stripe.
+async function applyConsumoPayment(session: Stripe.Checkout.Session) {
+  const consumoIds = session.metadata?.consumoIds?.split(",").filter(Boolean);
+  if (!consumoIds || consumoIds.length === 0) return false;
+  const { error } = await supabase.from("consumos").update({ status: "pago" }).in("id", consumoIds).eq("status", "pendente");
+  if (error) {
+    log.error("Erro ao marcar consumo como pago via Stripe:", error.message);
+    return false;
+  }
+  return true;
+}
+
 async function handleStripeWebhook(req: express.Request, res: express.Response) {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) {
     return res.status(503).send("Stripe webhook não configurado");
@@ -1957,12 +2227,16 @@ async function handleStripeWebhook(req: express.Request, res: express.Response) 
 
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const bookingId = session.metadata?.bookingId;
-    if (session.payment_status === "paid" && bookingId) {
+    if (session.payment_status === "paid") {
+      const bookingId = session.metadata?.bookingId;
       try {
-        await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
+        if (bookingId) {
+          await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
+        } else {
+          await applyConsumoPayment(session);
+        }
       } catch (err: any) {
-        log.error("Erro ao confirmar reserva via webhook Stripe:", err.message);
+        log.error("Erro ao confirmar pagamento via webhook Stripe:", err.message);
       }
     }
   }
@@ -1986,7 +2260,11 @@ app.get("/api/payments/confirm", checkoutLimiter, async (req, res) => {
     }
     const bookingId = session.metadata?.bookingId;
     if (!bookingId) {
-      return res.status(400).json({ error: "Reserva não identificada na sessão de pagamento" });
+      // Sem bookingId: é uma cobrança de consumo, não de reserva (ver
+      // POST /api/pousadas/:id/bookings/:bookingId/consumos/cobrar).
+      const settled = await applyConsumoPayment(session);
+      if (!settled) return res.status(400).json({ error: "Sessão de pagamento não identificada." });
+      return res.json({ consumo: true });
     }
     const updated = await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
     if (!updated) {
@@ -2825,6 +3103,180 @@ app.post("/api/pousadas/:id/resgates/:code/usar", requirePartnerAccess("pousada"
   if (error) return res.status(500).json({ error: "Erro ao confirmar resgate." });
   await logAdminAction(res.locals.actorUser, "redeem", "resgate", resgate.id, `código ${resgate.code}`);
   res.json(updated);
+});
+
+// ----------------------------------------------------
+// PRODUTOS & CONSUMO — catálogo de itens vendáveis (frigobar, vestuário,
+// brindes) por pousada, e o registro de consumo de cada hóspede durante a
+// estadia (a "comanda"). Cada produto tem um QR code fixo (gerado a partir
+// do próprio id — ver GET /api/produtos/:id/qrcode) que a recepção escaneia
+// pra lançar o consumo na reserva certa.
+// ----------------------------------------------------
+
+const PRODUTO_FIELDS = ["name", "description", "category", "price", "active"] as const;
+
+app.get("/api/pousadas/:id/produtos", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data, error } = await supabase.from("produtos").select("*").eq("pousadaId", req.params.id).order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar produtos." });
+  res.json(data);
+});
+
+app.post("/api/pousadas/:id/produtos", requirePartnerAccess("pousada"), async (req, res) => {
+  const price = Number(req.body.price);
+  if (!req.body.name || !Number.isFinite(price) || price <= 0) {
+    return res.status(400).json({ error: "Informe um nome e um preço válido (maior que zero)." });
+  }
+  const newProduto = {
+    ...pickFields<Produto>(req.body, PRODUTO_FIELDS),
+    id: `pr_${randomUUID()}`,
+    pousadaId: req.params.id,
+    price,
+    active: true,
+    createdAt: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("produtos").insert(newProduto);
+  if (error) return res.status(500).json({ error: "Erro ao criar produto." });
+  await logAdminAction(res.locals.actorUser, "create", "produto", newProduto.id, `${newProduto.name} — R$${price}`);
+  res.status(201).json(newProduto);
+});
+
+app.put("/api/pousadas/:id/produtos/:produtoId", requirePartnerAccess("pousada"), async (req, res) => {
+  const updates = pickFields<Produto>(req.body, PRODUTO_FIELDS);
+  const { data, error } = await supabase.from("produtos").update(updates).eq("id", req.params.produtoId).eq("pousadaId", req.params.id).select().single();
+  if (error || !data) return res.status(404).json({ error: "Produto não encontrado." });
+  res.json(data);
+});
+
+app.delete("/api/pousadas/:id/produtos/:produtoId", requirePartnerAccess("pousada"), async (req, res) => {
+  const { error } = await supabase.from("produtos").delete().eq("id", req.params.produtoId).eq("pousadaId", req.params.id);
+  if (error) return res.status(500).json({ error: "Erro ao excluir produto." });
+  res.json({ success: true });
+});
+
+// QR code de um produto — encodifica só o id (curto, sem informação
+// sensível) direto num PNG em data URL. Não precisa de coluna nem tabela
+// própria: o mesmo id do produto sempre gera o mesmo QR.
+app.get("/api/produtos/:id/qrcode", requirePartnerAccess("pousada"), async (req, res) => {
+  try {
+    const dataUrl = await QRCode.toDataURL(req.params.id, { width: 240, margin: 1 });
+    res.json({ qrcode: dataUrl });
+  } catch (err) {
+    log.error("Erro ao gerar QR code do produto:", err);
+    res.status(500).json({ error: "Erro ao gerar QR code." });
+  }
+});
+
+// Reservas ainda não encerradas desta pousada — pra escolher de quem é o
+// consumo ao escanear um produto (cobre quem já está hospedado e quem
+// ainda vai chegar, não só o dia exato do check-in).
+app.get("/api/pousadas/:id/hospedes-ativos", requirePartnerAccess("pousada"), async (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id,customerName,customerEmail,checkIn,checkOut,status")
+    .eq("pousadaId", req.params.id)
+    .in("status", ["confirmado_total", "confirmado_pousada", "confirmado_guia", "pago"])
+    .gte("checkOut", today)
+    .order("checkIn", { ascending: true });
+  if (error) return res.status(500).json({ error: "Erro ao buscar hóspedes ativos." });
+  res.json(data);
+});
+
+app.get("/api/pousadas/:id/bookings/:bookingId/consumos", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data: booking } = await supabase.from("bookings").select("id,pousadaId").eq("id", req.params.bookingId).maybeSingle();
+  if (!booking || booking.pousadaId !== req.params.id) return res.status(404).json({ error: "Reserva não encontrada nesta pousada." });
+  const { data, error } = await supabase.from("consumos").select("*").eq("bookingId", req.params.bookingId).order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar consumo." });
+  res.json(data);
+});
+
+app.post("/api/pousadas/:id/bookings/:bookingId/consumos", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data: booking } = await supabase.from("bookings").select("id,pousadaId").eq("id", req.params.bookingId).maybeSingle();
+  if (!booking || booking.pousadaId !== req.params.id) return res.status(404).json({ error: "Reserva não encontrada nesta pousada." });
+
+  const quantity = Math.max(1, Number(req.body.quantity) || 1);
+  const { data: produto } = await supabase.from("produtos").select("*").eq("id", req.body.produtoId).eq("pousadaId", req.params.id).maybeSingle();
+  if (!produto || !produto.active) return res.status(404).json({ error: "Produto não encontrado ou inativo." });
+
+  const totalPrice = produto.price * quantity;
+  const newConsumo = {
+    id: `cs_${randomUUID()}`,
+    bookingId: req.params.bookingId,
+    pousadaId: req.params.id,
+    produtoId: produto.id,
+    produtoName: produto.name,
+    quantity,
+    unitPrice: produto.price,
+    totalPrice,
+    status: "pendente",
+    createdAt: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("consumos").insert(newConsumo);
+  if (error) return res.status(500).json({ error: "Erro ao registrar consumo." });
+  await logAdminAction(res.locals.actorUser, "create", "consumo", newConsumo.id, `${quantity}x ${produto.name} — reserva #${req.params.bookingId}`);
+  res.status(201).json(newConsumo);
+});
+
+app.delete("/api/pousadas/:id/bookings/:bookingId/consumos/:consumoId", requirePartnerAccess("pousada"), async (req, res) => {
+  const { error } = await supabase.from("consumos").delete().eq("id", req.params.consumoId).eq("pousadaId", req.params.id).eq("status", "pendente");
+  if (error) return res.status(500).json({ error: "Erro ao remover consumo." });
+  res.json({ success: true });
+});
+
+// Marca todo o consumo pendente da reserva como pago sem passar pelo
+// Stripe — mesmo espírito do "Marcar como Paga" já usado em reservas, pra
+// fechamentos na recepção em dinheiro/Pix.
+app.post("/api/pousadas/:id/bookings/:bookingId/consumos/marcar-pago", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data: booking } = await supabase.from("bookings").select("id,pousadaId").eq("id", req.params.bookingId).maybeSingle();
+  if (!booking || booking.pousadaId !== req.params.id) return res.status(404).json({ error: "Reserva não encontrada nesta pousada." });
+  const { data, error } = await supabase
+    .from("consumos")
+    .update({ status: "pago" })
+    .eq("bookingId", req.params.bookingId)
+    .eq("status", "pendente")
+    .select();
+  if (error) return res.status(500).json({ error: "Erro ao marcar consumo como pago." });
+  await logAdminAction(res.locals.actorUser, "update", "consumo", req.params.bookingId, `${(data || []).length} lançamento(s) marcados como pagos`);
+  res.json({ success: true, updated: (data || []).length });
+});
+
+// Gera um link de pagamento Stripe pro consumo pendente da reserva —
+// mesmo padrão de checkout já usado pra reserva, só que como uma cobrança
+// separada (não altera o valor nem o status da reserva em si).
+app.post("/api/pousadas/:id/bookings/:bookingId/consumos/cobrar", requirePartnerAccess("pousada"), async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: "Stripe não configurado. Use 'Marcar como Pago' pra fechamentos fora do Stripe." });
+  const { data: booking } = await supabase.from("bookings").select("*").eq("id", req.params.bookingId).maybeSingle();
+  if (!booking || booking.pousadaId !== req.params.id) return res.status(404).json({ error: "Reserva não encontrada nesta pousada." });
+
+  const { data: pendentes } = await supabase.from("consumos").select("*").eq("bookingId", req.params.bookingId).eq("status", "pendente");
+  if (!pendentes || pendentes.length === 0) return res.status(400).json({ error: "Não há consumo pendente pra cobrar." });
+
+  const total = pendentes.reduce((sum: number, c: any) => sum + c.totalPrice, 0);
+  const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
+  const origin = `${protocol}://${req.get("host")}`;
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "brl",
+          product_data: { name: `Consumo — ${booking.pousadaName} (${pendentes.length} ${pendentes.length === 1 ? "item" : "itens"})` },
+          unit_amount: Math.round(total * 100),
+        },
+        quantity: 1,
+      }],
+      customer_email: booking.customerEmail || undefined,
+      metadata: { consumoBookingId: booking.id, consumoIds: pendentes.map((c: any) => c.id).join(",") },
+      success_url: `${origin}/pagamento-confirmado?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/?payment=cancelled`,
+    });
+    res.json({ url: session.url });
+  } catch (err: any) {
+    log.error("Erro ao criar sessão de checkout de consumo:", err.message);
+    res.status(500).json({ error: "Erro ao criar sessão de pagamento." });
+  }
 });
 
 // ----------------------------------------------------
