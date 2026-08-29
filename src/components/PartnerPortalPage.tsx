@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2 } from "lucide-react";
+import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
-import { PartnerProfileResponse } from "../types";
+import { PartnerProfileResponse, Pousada } from "../types";
 import { navigate } from "../lib/router";
 import ImageListEditor from "./ImageListEditor";
 import ImageUploadButton from "./ImageUploadButton";
@@ -19,6 +19,20 @@ import PousadaConsumoManager from "./PousadaConsumoManager";
 import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import PartnerLoginPanel from "./PartnerLoginPanel";
+import PousadaOfficialSite from "./PousadaOfficialSite";
+
+// Agrupa os campos do formulário em cartões com título em vez de uma pilha
+// só de inputs soltos — mesma ideia visual usada no resto do admin, só
+// aplicada aqui pra cortar a sensação de "parede de campos" do formulário de
+// perfil do parceiro.
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-editorial-border rounded-lg p-4 space-y-4">
+      <h3 className="text-[10px] uppercase tracking-[0.15em] font-bold text-editorial-primary">{title}</h3>
+      {children}
+    </div>
+  );
+}
 
 // Self-service portal for a partner (pousada/atração/guia) to edit only
 // their own profile — no access to bookings, other partners, or anything
@@ -263,6 +277,41 @@ export default function PartnerPortalPage() {
     }
   };
 
+  // Espelha em tempo real (a cada tecla) as edições ainda não salvas sobre o
+  // registro real, pro preview ao lado mostrar exatamente como a página vai
+  // ficar — mesma transformação de tipos usada no payload de handleSave
+  // acima, só que sem filtrar campos vazios "pela metade" (ex: uma imagem
+  // ainda sendo colada) pra não sumir com a seção enquanto a pessoa digita.
+  // experiences perde "description" no formulário (ExperienceDraft só tem
+  // title/price) — recupera do registro original combinando pelo título.
+  const previewPousada: Pousada | null =
+    profile?.partnerType === "pousada" && profile.pousada && form
+      ? {
+          ...profile.pousada,
+          description: form.description,
+          longDescription: form.longDescription,
+          images: form.images.filter((i: string) => i.trim()),
+          features: form.features,
+          activities: form.activities,
+          pricePerNight: Number(form.pricePerNight) || 0,
+          capacity: Number(form.capacity) || 0,
+          experiences: form.experiences
+            .filter((e: ExperienceDraft) => e.title.trim())
+            .map((e: ExperienceDraft) => ({
+              title: e.title,
+              price: e.price,
+              description: profile.pousada!.experiences.find(orig => orig.title === e.title)?.description || "",
+            })),
+          videoUrl: form.videoUrl.trim() || undefined,
+          officialSiteUrl: form.officialSiteUrl.trim() || undefined,
+          officialSiteImages: form.officialSiteImages.filter((i: string) => i.trim()),
+          teamPhotoUrl: form.teamPhotoUrl.trim() || undefined,
+          teamSectionTitle: form.teamSectionTitle.trim() || undefined,
+          teamSectionText: form.teamSectionText.trim() || undefined,
+          rooms: form.rooms.filter((r: RoomDraft) => r.type.trim()),
+        }
+      : null;
+
   if (checkingSession || !supabase) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-editorial-bg">
@@ -335,7 +384,7 @@ export default function PartnerPortalPage() {
   return (
     <div className="min-h-screen bg-editorial-bg font-sans">
       {header}
-      <div className="max-w-2xl mx-auto px-6 py-10">
+      <div className={`mx-auto px-6 py-10 ${previewPousada ? "max-w-7xl" : "max-w-2xl"}`}>
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-primary transition mb-6 cursor-pointer">
           <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao site
         </a>
@@ -351,68 +400,89 @@ export default function PartnerPortalPage() {
         ) : profileError ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3 rounded-lg">{profileError}</div>
         ) : profile && form ? (
+          <div className={previewPousada ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : ""}>
           <form onSubmit={handleSave} className="bg-white border border-editorial-border rounded-lg p-6 space-y-5">
             {profile.partnerType === "pousada" && (
               <>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Descrição Curta</label>
-                  <input type="text" value={form.description} onChange={e => setForm((p: any) => ({ ...p, description: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Descrição Completa</label>
-                  <textarea rows={4} value={form.longDescription} onChange={e => setForm((p: any) => ({ ...p, longDescription: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
+                <FormSection title="Sobre">
                   <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Diária (R$)</label>
-                    <input type="number" min={0} value={form.pricePerNight} onChange={e => setForm((p: any) => ({ ...p, pricePerNight: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    <label className="block text-editorial-text font-semibold mb-1.5">Descrição Curta</label>
+                    <input type="text" value={form.description} onChange={e => setForm((p: any) => ({ ...p, description: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                   </div>
                   <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Capacidade (hóspedes)</label>
-                    <input type="number" min={1} value={form.capacity} onChange={e => setForm((p: any) => ({ ...p, capacity: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    <label className="block text-editorial-text font-semibold mb-1.5">Descrição Completa</label>
+                    <textarea rows={4} value={form.longDescription} onChange={e => setForm((p: any) => ({ ...p, longDescription: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
                   </div>
-                </div>
-                <ImageListEditor label="Imagens (Catálogo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
-                <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens acima)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Estrutura & Comodidades</label>
-                  <TagInput value={form.features} onChange={features => setForm((p: any) => ({ ...p, features }))} placeholder="Digite e pressione Enter" />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Atividades</label>
-                  <TagInput value={form.activities} onChange={activities => setForm((p: any) => ({ ...p, activities }))} placeholder="Digite e pressione Enter" />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Experiências Pagas (cardápio de passeios)</label>
-                  <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Quartos</label>
-                  <RoomsEditor value={form.rooms} onChange={rooms => setForm((p: any) => ({ ...p, rooms }))} />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
-                  <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Link do Site/Rede Social Oficial (opcional)</label>
-                  <input type="text" value={form.officialSiteUrl} onChange={e => setForm((p: any) => ({ ...p, officialSiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                </div>
-                <div className="text-xs border-t border-editorial-border pt-4">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
-                  <div className="flex items-center gap-3 mb-2">
-                    {form.teamPhotoUrl && <img src={form.teamPhotoUrl} alt="Equipe" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
-                    <ImageUploadButton label={form.teamPhotoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={url => setForm((p: any) => ({ ...p, teamPhotoUrl: url }))} />
+                </FormSection>
+
+                <FormSection title="Preço & Capacidade">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Diária (R$)</label>
+                      <input type="number" min={0} value={form.pricePerNight} onChange={e => setForm((p: any) => ({ ...p, pricePerNight: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    </div>
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Capacidade (hóspedes)</label>
+                      <input type="number" min={1} value={form.capacity} onChange={e => setForm((p: any) => ({ ...p, capacity: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    </div>
                   </div>
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Título da Seção da Equipe (padrão: "Quem vai te receber")</label>
-                  <input type="text" value={form.teamSectionTitle} onChange={e => setForm((p: any) => ({ ...p, teamSectionTitle: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                </div>
-                <div className="text-xs">
-                  <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
-                  <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
-                </div>
+                </FormSection>
+
+                <FormSection title="Fotos">
+                  <ImageListEditor label="Imagens (Catálogo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
+                  <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens acima)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
+                </FormSection>
+
+                <FormSection title="Estrutura & Atividades">
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Estrutura & Comodidades</label>
+                    <TagInput value={form.features} onChange={features => setForm((p: any) => ({ ...p, features }))} placeholder="Digite e pressione Enter" />
+                  </div>
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Atividades</label>
+                    <TagInput value={form.activities} onChange={activities => setForm((p: any) => ({ ...p, activities }))} placeholder="Digite e pressione Enter" />
+                  </div>
+                </FormSection>
+
+                <FormSection title="Experiências & Quartos">
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Experiências Pagas (cardápio de passeios)</label>
+                    <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
+                  </div>
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Quartos</label>
+                    <RoomsEditor value={form.rooms} onChange={rooms => setForm((p: any) => ({ ...p, rooms }))} />
+                  </div>
+                </FormSection>
+
+                <FormSection title="Vídeo & Redes Sociais">
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
+                    <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                  </div>
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Link do Site/Rede Social Oficial (opcional)</label>
+                    <input type="text" value={form.officialSiteUrl} onChange={e => setForm((p: any) => ({ ...p, officialSiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                  </div>
+                </FormSection>
+
+                <FormSection title="Equipe">
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
+                    <div className="flex items-center gap-3 mb-2">
+                      {form.teamPhotoUrl && <img src={form.teamPhotoUrl} alt="Equipe" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
+                      <ImageUploadButton label={form.teamPhotoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={url => setForm((p: any) => ({ ...p, teamPhotoUrl: url }))} />
+                    </div>
+                  </div>
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Título da Seção da Equipe (padrão: "Quem vai te receber")</label>
+                    <input type="text" value={form.teamSectionTitle} onChange={e => setForm((p: any) => ({ ...p, teamSectionTitle: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                  </div>
+                  <div className="text-xs">
+                    <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
+                    <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
+                  </div>
+                </FormSection>
               </>
             )}
 
@@ -524,6 +594,21 @@ export default function PartnerPortalPage() {
               {saved && <span className="text-emerald-700 text-xs font-semibold flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
             </div>
           </form>
+
+          {previewPousada && (
+            <div className="hidden lg:block lg:sticky lg:top-6">
+              <div className="bg-white border border-editorial-border rounded-lg overflow-hidden shadow-sm">
+                <div className="bg-editorial-secondary/50 border-b border-editorial-border px-4 py-2.5 flex items-center gap-2">
+                  <Eye className="h-3.5 w-3.5 text-editorial-primary" />
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-editorial-primary">Pré-via ao vivo — como os visitantes vão ver</span>
+                </div>
+                <div className="h-[calc(100vh-160px)] overflow-y-auto">
+                  <PousadaOfficialSite previewPousada={previewPousada} />
+                </div>
+              </div>
+            </div>
+          )}
+          </div>
         ) : null}
 
         {profile.partnerType === "pousada" && (

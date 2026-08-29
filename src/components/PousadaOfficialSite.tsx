@@ -10,22 +10,29 @@ import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
 interface PousadaOfficialSiteProps {
-  slug: string;
+  slug?: string;
+  // Usado só pelo preview ao vivo do parceiro (PartnerPortalPage.tsx): quando
+  // presente, pula a busca por slug e renderiza esse objeto direto — inclui
+  // as edições ainda não salvas, atualizando a cada tecla digitada. A busca
+  // real por slug (rota pública /site/:slug) continua intocada.
+  previewPousada?: Pousada;
 }
 
-export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) {
-  const [pousada, setPousada] = useState<Pousada | null | undefined>(undefined); // undefined = loading
+export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOfficialSiteProps) {
+  const [fetchedPousada, setFetchedPousada] = useState<Pousada | null | undefined>(undefined); // undefined = loading
   const [reviews, setReviews] = useState<Review[]>([]);
+  const pousada = previewPousada ?? fetchedPousada;
 
   useEffect(() => {
+    if (previewPousada || !slug) return;
     fetch("/api/pousadas")
       .then(res => res.json())
       .then((all: Pousada[]) => {
         const found = all.find(p => slugify(p.name) === slug);
-        setPousada(found || null);
+        setFetchedPousada(found || null);
       })
-      .catch(() => setPousada(null));
-  }, [slug]);
+      .catch(() => setFetchedPousada(null));
+  }, [slug, previewPousada]);
 
   useEffect(() => {
     if (!pousada?.id) return;
@@ -73,7 +80,10 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
       <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white/70 backdrop-blur-sm sticky top-0 z-20">
         <span className="font-serif italic font-bold text-lg text-editorial-primary">{pousada.name}</span>
         <div className="flex items-center gap-3">
-          <LanguageSwitcher />
+          {/* Trocar idioma recarrega a página inteira (ver LanguageSwitcher.tsx)
+              — dentro do preview ao vivo do parceiro isso perderia as edições
+              ainda não salvas, então some por lá. */}
+          {!previewPousada && <LanguageSwitcher />}
           {pousada.officialSiteUrl && (
             <a
               href={pousada.officialSiteUrl}
@@ -308,9 +318,13 @@ export default function PousadaOfficialSite({ slug }: PousadaOfficialSiteProps) 
 
       {/* Footer */}
       <footer className="py-8 text-center text-editorial-muted text-[10px] uppercase tracking-widest font-bold">
-        <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="hover:text-editorial-primary transition cursor-pointer">
-          Listado no catálogo EcoSafari Brasil →
-        </a>
+        {previewPousada ? (
+          <span>Listado no catálogo EcoSafari Brasil</span>
+        ) : (
+          <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="hover:text-editorial-primary transition cursor-pointer">
+            Listado no catálogo EcoSafari Brasil →
+          </a>
+        )}
       </footer>
     </div>
   );
