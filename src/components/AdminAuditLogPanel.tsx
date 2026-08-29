@@ -72,6 +72,8 @@ export default function AdminAuditLogPanel() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState(""); // yyyy-mm-dd
+  const [dateTo, setDateTo] = useState("");
 
   const fetchLog = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -90,14 +92,25 @@ export default function AdminAuditLogPanel() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter(e =>
-      e.actor_email.toLowerCase().includes(q) ||
-      (e.resource_label || "").toLowerCase().includes(q) ||
-      (RESOURCE_LABELS[e.resource_type] || e.resource_type).toLowerCase().includes(q) ||
-      (ACTION_LABELS[e.action] || e.action).toLowerCase().includes(q)
-    );
-  }, [entries, search]);
+    return entries.filter(e => {
+      if (q) {
+        const matchesSearch =
+          e.actor_email.toLowerCase().includes(q) ||
+          (e.resource_label || "").toLowerCase().includes(q) ||
+          (RESOURCE_LABELS[e.resource_type] || e.resource_type).toLowerCase().includes(q) ||
+          (ACTION_LABELS[e.action] || e.action).toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+      // created_at é um timestamp completo — compara só a parte da data
+      // (yyyy-mm-dd) com os inputs type="date", que não têm hora.
+      const entryDate = e.created_at.slice(0, 10);
+      if (dateFrom && entryDate < dateFrom) return false;
+      if (dateTo && entryDate > dateTo) return false;
+      return true;
+    });
+  }, [entries, search, dateFrom, dateTo]);
+
+  const hasDateFilter = !!(dateFrom || dateTo);
 
   // Baixa exatamente o que está na tela (respeitando o filtro de busca
   // ativo) — gera o CSV no navegador, sem precisar de mais uma rota no
@@ -119,7 +132,10 @@ export default function AdminAuditLogPanel() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `log-auditoria-ecosafari-${new Date().toISOString().slice(0, 10)}.csv`;
+    // Nome do arquivo entrega o período filtrado quando há filtro de data
+    // ativo, pra ficar claro no download que não é o log inteiro.
+    const suffix = hasDateFilter ? `${dateFrom || "inicio"}_a_${dateTo || "hoje"}` : new Date().toISOString().slice(0, 10);
+    a.download = `log-auditoria-ecosafari-${suffix}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -141,7 +157,7 @@ export default function AdminAuditLogPanel() {
         <h3 className="font-bold text-sm text-editorial-text flex items-center gap-2">
           <ScrollText className="h-4 w-4 text-editorial-primary" /> Log de Auditoria
         </h3>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:flex-none">
             <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
@@ -151,6 +167,27 @@ export default function AdminAuditLogPanel() {
               className="pl-8 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-500 w-full sm:w-72"
             />
           </div>
+          <input
+            type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            max={dateTo || undefined}
+            title="De"
+            className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-emerald-500"
+          />
+          <span className="text-zinc-400 text-xs">até</span>
+          <input
+            type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            min={dateFrom || undefined}
+            title="Até"
+            className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-emerald-500"
+          />
+          {hasDateFilter && (
+            <button
+              onClick={() => { setDateFrom(""); setDateTo(""); }}
+              className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 hover:text-editorial-primary transition cursor-pointer"
+            >
+              limpar datas
+            </button>
+          )}
           <button
             onClick={handleDownloadCsv}
             disabled={filtered.length === 0}
