@@ -43,6 +43,7 @@ export default function TuristaProfileView() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [togglingInterest, setTogglingInterest] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState("");
+  const [removingPhoto, setRemovingPhoto] = useState(false);
 
   const [favoritos, setFavoritos] = useState<Pousada[] | null>(null);
   const [visitados, setVisitados] = useState<VisitedPousada[] | null>(null);
@@ -106,6 +107,18 @@ export default function TuristaProfileView() {
     setPhotoError("");
     const updated = await saveProfile({ photoUrl: url });
     if (!updated) setPhotoError("Erro ao salvar sua foto. Tente novamente.");
+  };
+
+  const handleRemovePhoto = async () => {
+    if (removingPhoto || !confirm("Remover sua foto de perfil?")) return;
+    setPhotoError("");
+    setRemovingPhoto(true);
+    try {
+      const updated = await saveProfile({ photoUrl: "" });
+      if (!updated) setPhotoError("Erro ao remover sua foto. Tente novamente.");
+    } finally {
+      setRemovingPhoto(false);
+    }
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -219,6 +232,16 @@ export default function TuristaProfileView() {
               </span>
             )}
             <ImageUploadButton label={localProfile.photoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={handlePhotoUploaded} />
+            {localProfile.photoUrl && (
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                disabled={removingPhoto}
+                className="text-red-600 hover:text-red-700 text-[10px] uppercase tracking-widest font-bold transition cursor-pointer disabled:opacity-60"
+              >
+                {removingPhoto ? "Removendo..." : "Remover foto"}
+              </button>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-serif font-bold text-editorial-text">{localProfile.name}</h1>
