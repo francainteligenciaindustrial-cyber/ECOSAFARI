@@ -620,7 +620,7 @@ export default function PartnerPortalPage() {
           </ErrorBoundary>
         ) : null}
 
-        {profile.partnerType === "pousada" && (
+        {profile?.partnerType === "pousada" && (
           <div className="mt-8 space-y-8">
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PartnerBookingsCalendar partnerType="pousada" partnerId={profile.partnerId} />
@@ -637,7 +637,7 @@ export default function PartnerPortalPage() {
           </div>
         )}
 
-        {profile.partnerType === "guia" && (
+        {profile?.partnerType === "guia" && (
           <div className="mt-8">
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
