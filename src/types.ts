@@ -37,6 +37,18 @@ export interface Pousada {
   // reserva confirmada caem no calendário "primary" da conta, como sempre
   // aconteceu. Ver POST /api/pousadas/:id/google-calendar.
   googleCalendarId?: string;
+  // Datas específicas em que a pousada não aceita reservas (manutenção,
+  // reforma, evento fechado etc) — mesmo padrão já usado em guides
+  // (unavailableDates), editável pela própria pousada no portal do parceiro.
+  // Informativo por enquanto (mostrado em Gestão → Agenda Integrada), não é
+  // uma trava dura em POST /api/bookings.
+  unavailableDates?: string[];
+  // Escolha do parceiro: "criar site manualmente" (usa o editor do portal +
+  // /site/:slug gerado pela EcoSafari) ou "já tenho meu próprio site" (o
+  // link em ownWebsiteUrl). Quando hasOwnWebsite é true, "Ver site oficial"
+  // no catálogo aponta pra ownWebsiteUrl em vez do /site/:slug gerado.
+  hasOwnWebsite?: boolean;
+  ownWebsiteUrl?: string;
 }
 
 // Avaliação (antes chamada de "comentário") — unificada para os três tipos

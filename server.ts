@@ -874,7 +874,7 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // "viewCount" are deliberately excluded from POUSADA_* — they're computed by
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
-const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms"] as const;
+const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl"] as const;
 // googleCalendarId fica de fora de POUSADA_CREATE_FIELDS de propósito — é
 // um detalhe de organização interna da agência (qual calendário Google essa
 // pousada usa), não algo que o parceiro deveria poder mexer autoeditando o
@@ -934,6 +934,9 @@ function mapPousadaRow(p: any): Pousada {
     officialSiteImages: parseJSONSafe(p.officialSiteImages) || [],
     rooms: parseJSONSafe(p.rooms) || [],
     googleCalendarId: p.googleCalendarId || undefined,
+    unavailableDates: toStringArray(p.unavailableDates),
+    hasOwnWebsite: typeof p.hasOwnWebsite === "boolean" ? p.hasOwnWebsite : false,
+    ownWebsiteUrl: p.ownWebsiteUrl || "",
   };
 }
 
@@ -1421,15 +1424,16 @@ app.get("/api/gestao/agenda", requireAdmin, async (req, res) => {
 
   const pousadas = pousadaRows.map(p => {
     const theseBookings = overlappingBookings.filter((b: any) => b.pousadaId === p.id);
+    const blockedDatesInRange = (p.unavailableDates || []).filter(d => d >= startDate && d <= endDate);
     if (p.rooms && p.rooms.length > 0) {
       const rooms = p.rooms.map(r => {
         const bookedUnits = theseBookings.filter((b: any) => b.roomType === r.type).length;
         return { type: r.type, capacity: r.capacity, quantity: r.quantity, availableUnits: Math.max(0, r.quantity - bookedUnits) };
       });
-      return { id: p.id, name: p.name, location: p.location, rooms, hasAvailability: rooms.some(r => r.availableUnits > 0) };
+      return { id: p.id, name: p.name, location: p.location, rooms, blockedDatesInRange, hasAvailability: blockedDatesInRange.length === 0 && rooms.some(r => r.availableUnits > 0) };
     }
     const guestsBooked = theseBookings.reduce((sum: number, b: any) => sum + (b.adults || 0) + (b.children || 0), 0);
-    return { id: p.id, name: p.name, location: p.location, capacity: p.capacity, guestsBooked, hasAvailability: guestsBooked < p.capacity };
+    return { id: p.id, name: p.name, location: p.location, capacity: p.capacity, guestsBooked, blockedDatesInRange, hasAvailability: blockedDatesInRange.length === 0 && guestsBooked < p.capacity };
   });
 
   const guides = guideRows.map(g => {

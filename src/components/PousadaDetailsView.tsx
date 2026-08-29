@@ -110,8 +110,11 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             </div>
             <h1 className="text-3xl md:text-5xl font-serif font-bold text-editorial-primary tracking-tight">{pousada.name}</h1>
             <div className="flex items-center gap-4 mt-2">
+              {/* Quando a pousada já tem site próprio (escolhido no portal do
+                  parceiro), aponta pra ele em vez do /site/:slug gerado pela
+                  EcoSafari — ver hasOwnWebsite/ownWebsiteUrl em types.ts. */}
               <a
-                href={`/site/${slugify(pousada.name)}`}
+                href={pousada.hasOwnWebsite && pousada.ownWebsiteUrl ? pousada.ownWebsiteUrl : `/site/${slugify(pousada.name)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-editorial-primary hover:underline cursor-pointer"
