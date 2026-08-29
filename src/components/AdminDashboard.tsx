@@ -55,6 +55,7 @@ import PousadaCalendarsPanel from "./PousadaCalendarsPanel";
 import EcosystemAvailabilityPanel from "./EcosystemAvailabilityPanel";
 import AdminConfiabilidadePanel from "./AdminConfiabilidadePanel";
 import AdminLixeiraPanel from "./AdminLixeiraPanel";
+import AdminYearCalendarPanel from "./AdminYearCalendarPanel";
 import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
@@ -1956,6 +1957,8 @@ export default function AdminDashboard({
                 )}
               </div>
             </div>
+
+            <AdminYearCalendarPanel bookings={bookings} />
 
             <EcosystemAvailabilityPanel />
 
