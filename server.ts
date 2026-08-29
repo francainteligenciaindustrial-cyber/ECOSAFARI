@@ -2933,16 +2933,36 @@ app.get("/api/turista/me", requireTourist, async (req, res) => {
 app.put("/api/turista/me", requireTourist, async (req, res) => {
   const userId = (res.locals.touristUser as { id: string }).id;
 
-  const name = String(req.body.name || "").trim();
-  const whatsapp = String(req.body.whatsapp || "").trim();
-  const country = String(req.body.country || "").trim();
-  const language = String(req.body.language || "").trim();
-  const age = Number(req.body.age);
-  const preferences = String(req.body.preferences || "").trim();
-  if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
+  // Esta mesma rota também é usada por ações rápidas que só mexem num campo
+  // — marcar/desmarcar um interesse, trocar a foto (ver handleToggleInterest/
+  // handlePhotoUploaded em TuristaProfileView.tsx) — sem passar pelo
+  // formulário completo de edição. Antes, exigir todos os campos (inclusive
+  // "idioma") preenchidos em TODA chamada quebrava essas ações pra quem
+  // ainda não tinha completado o perfil: o toggle de interesse "voltava"
+  // sozinho e o upload de foto caía direto no "Erro ao salvar". Agora só
+  // valida o que veio preenchido na requisição; o que não veio mantém o
+  // valor que já estava salvo.
+  const { data: current, error: currentError } = await supabase.from("turistas").select("*").eq("id", userId).maybeSingle();
+  if (currentError || !current) return res.status(404).json({ error: "Perfil não encontrado." });
+
+  const pick = (key: string, fallback: string) => {
+    const raw = req.body[key];
+    if (raw === undefined) return fallback;
+    const trimmed = String(raw).trim();
+    return trimmed || fallback;
+  };
+  const name = pick("name", current.name);
+  const whatsapp = pick("whatsapp", current.whatsapp);
+  const country = pick("country", current.country);
+  const language = pick("language", current.language);
+  const preferences = pick("preferences", current.preferences);
+  const age = req.body.age !== undefined && Number.isFinite(Number(req.body.age)) && Number(req.body.age) > 0
+    ? Number(req.body.age)
+    : current.age;
+  if (!name || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha ao menos nome e idade." });
   }
-  const interests = sanitizeTouristInterests(req.body.interests);
+  const interests = req.body.interests !== undefined ? sanitizeTouristInterests(req.body.interests) : current.interests;
   // Opcional — só é enviado quando a pessoa troca a foto (ver ImageUploadButton
   // em TuristaProfileView.tsx); omitido, o UPDATE simplesmente não mexe nela.
   const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl.trim() : undefined;
