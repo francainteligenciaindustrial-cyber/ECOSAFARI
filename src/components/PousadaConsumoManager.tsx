@@ -45,7 +45,11 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
     ])
       .then(([h, p]) => {
         setHospedes(h);
-        setProdutos((p as Produto[]).filter(prod => prod.active));
+        setProdutos((Array.isArray(p) ? p : []).filter((prod: Produto) => prod.active));
+      })
+      .catch(() => {
+        setHospedes([]);
+        setProdutos([]);
       })
       .finally(() => setLoading(false));
   }, [pousadaId]);

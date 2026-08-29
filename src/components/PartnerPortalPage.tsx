@@ -20,6 +20,7 @@ import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import PartnerLoginPanel from "./PartnerLoginPanel";
 import PousadaOfficialSite from "./PousadaOfficialSite";
+import ErrorBoundary from "./ErrorBoundary";
 
 // Agrupa os campos do formulário em cartões com título em vez de uma pilha
 // só de inputs soltos — mesma ideia visual usada no resto do admin, só
@@ -400,6 +401,7 @@ export default function PartnerPortalPage() {
         ) : profileError ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3 rounded-lg">{profileError}</div>
         ) : profile && form ? (
+          <ErrorBoundary variant="section" sectionLabel="seu perfil">
           <div className={previewPousada ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : ""}>
           <form onSubmit={handleSave} className="bg-white border border-editorial-border rounded-lg p-6 space-y-5">
             {profile.partnerType === "pousada" && (
@@ -602,27 +604,44 @@ export default function PartnerPortalPage() {
                   <Eye className="h-3.5 w-3.5 text-editorial-primary" />
                   <span className="text-[10px] uppercase tracking-widest font-bold text-editorial-primary">Pré-via ao vivo — como os visitantes vão ver</span>
                 </div>
+                {/* Isolado num boundary próprio: se algo no site oficial (galeria,
+                    vídeo, depoimentos) quebrar, o formulário de edição ao lado
+                    continua funcionando normalmente em vez de derrubar a
+                    página inteira. */}
                 <div className="h-[calc(100vh-160px)] overflow-y-auto">
-                  <PousadaOfficialSite previewPousada={previewPousada} />
+                  <ErrorBoundary variant="section" sectionLabel="a pré-via">
+                    <PousadaOfficialSite previewPousada={previewPousada} />
+                  </ErrorBoundary>
                 </div>
               </div>
             </div>
           )}
           </div>
+          </ErrorBoundary>
         ) : null}
 
         {profile.partnerType === "pousada" && (
           <div className="mt-8 space-y-8">
-            <PartnerBookingsCalendar partnerType="pousada" partnerId={profile.partnerId} />
-            <PousadaRecompensasManager pousadaId={profile.partnerId} />
-            <PousadaProdutosManager pousadaId={profile.partnerId} />
-            <PousadaConsumoManager pousadaId={profile.partnerId} />
+            <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
+              <PartnerBookingsCalendar partnerType="pousada" partnerId={profile.partnerId} />
+            </ErrorBoundary>
+            <ErrorBoundary variant="section" sectionLabel="as recompensas">
+              <PousadaRecompensasManager pousadaId={profile.partnerId} />
+            </ErrorBoundary>
+            <ErrorBoundary variant="section" sectionLabel="o catálogo de produtos">
+              <PousadaProdutosManager pousadaId={profile.partnerId} />
+            </ErrorBoundary>
+            <ErrorBoundary variant="section" sectionLabel="o consumo dos hóspedes">
+              <PousadaConsumoManager pousadaId={profile.partnerId} />
+            </ErrorBoundary>
           </div>
         )}
 
         {profile.partnerType === "guia" && (
           <div className="mt-8">
-            <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
+            <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
+              <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
+            </ErrorBoundary>
           </div>
         )}
 
