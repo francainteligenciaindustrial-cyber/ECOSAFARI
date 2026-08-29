@@ -1262,28 +1262,6 @@ export default function PousadaCatalog({
         </div>
       </section>
 
-      {/* Trust Badge Section */}
-      <section className="bg-editorial-secondary py-16 text-center text-editorial-primary border-t border-editorial-border">
-        <div className="max-w-4xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="flex flex-col items-center">
-            <span className="text-4xl font-serif font-bold text-editorial-primary block">4+</span>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-editorial-muted mt-2">Biomas Atendidos</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-4xl font-serif font-bold text-editorial-primary block">100%</span>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-editorial-muted mt-2">Sustentável</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-4xl font-serif font-bold text-editorial-primary block">24/7</span>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-editorial-muted mt-2">Bot WhatsApp API</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-4xl font-serif font-bold text-editorial-primary block">15+</span>
-            <span className="text-[9px] font-bold uppercase tracking-widest text-editorial-muted mt-2">Guias Biólogos</span>
-          </div>
-        </div>
-      </section>
-
     </div>
   );
 }
