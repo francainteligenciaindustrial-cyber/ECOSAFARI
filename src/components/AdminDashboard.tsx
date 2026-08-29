@@ -1958,7 +1958,7 @@ export default function AdminDashboard({
               </div>
             </div>
 
-            <AdminYearCalendarPanel bookings={bookings} />
+            <AdminYearCalendarPanel bookings={bookings} pousadas={pousadas} />
 
             <EcosystemAvailabilityPanel />
 

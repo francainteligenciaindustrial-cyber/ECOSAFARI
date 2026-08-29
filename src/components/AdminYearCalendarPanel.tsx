@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, X, Compass, ShieldCheck, MapPin, Mail, Phone, Users, DollarSign, UtensilsCrossed, HeartPulse, UserCheck } from "lucide-react";
-import { Booking } from "../types";
+import { Booking, Pousada } from "../types";
 
 interface Props {
   bookings: Booking[];
+  pousadas: Pousada[];
 }
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -103,11 +104,15 @@ function MiniMonth({
 // meses do ano numa tela só, em escala menor) — em vez de uma lista, mostra
 // os dias com reserva marcados direto na grade de cada mês. Clicar num dia
 // marcado abre o detalhe: quem, onde, com qual guia, qual status.
-export default function AdminYearCalendarPanel({ bookings }: Props) {
+export default function AdminYearCalendarPanel({ bookings, pousadas }: Props) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [pousadaFilter, setPousadaFilter] = useState(""); // "" = todas as pousadas
 
-  const activeBookings = useMemo(() => bookings.filter(b => b.status !== "cancelado"), [bookings]);
+  const activeBookings = useMemo(
+    () => bookings.filter(b => b.status !== "cancelado" && (!pousadaFilter || b.pousadaId === pousadaFilter)),
+    [bookings, pousadaFilter]
+  );
 
   const bookingsByDate = useMemo(() => {
     const map = new Map<string, Booking[]>();
@@ -128,17 +133,31 @@ export default function AdminYearCalendarPanel({ bookings }: Props) {
         <h3 className="font-bold text-base text-zinc-900 flex items-center gap-1.5">
           <CalendarDays className="h-5 w-5 text-emerald-600" /> Calendário Anual
         </h3>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setYear(y => y - 1); setSelectedDate(null); }} className="p-1.5 text-zinc-400 hover:text-editorial-primary transition cursor-pointer" aria-label="Ano anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-sm font-bold text-zinc-900 w-14 text-center">{year}</span>
-          <button onClick={() => { setYear(y => y + 1); setSelectedDate(null); }} className="p-1.5 text-zinc-400 hover:text-editorial-primary transition cursor-pointer" aria-label="Próximo ano">
-            <ChevronRight className="h-4 w-4" />
-          </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={pousadaFilter}
+            onChange={e => { setPousadaFilter(e.target.value); setSelectedDate(null); }}
+            className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-emerald-500 max-w-[200px]"
+          >
+            <option value="">Todas as pousadas</option>
+            {pousadas.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setYear(y => y - 1); setSelectedDate(null); }} className="p-1.5 text-zinc-400 hover:text-editorial-primary transition cursor-pointer" aria-label="Ano anterior">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-bold text-zinc-900 w-14 text-center">{year}</span>
+            <button onClick={() => { setYear(y => y + 1); setSelectedDate(null); }} className="p-1.5 text-zinc-400 hover:text-editorial-primary transition cursor-pointer" aria-label="Próximo ano">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
-      <p className="text-zinc-500 text-xs -mt-3">Dias com reserva ficam marcados em verde — clique num dia marcado pra ver quem, onde e com qual guia.</p>
+      <p className="text-zinc-500 text-xs -mt-3">
+        {pousadaFilter ? `Mostrando só ${pousadas.find(p => p.id === pousadaFilter)?.name || "a pousada selecionada"}.` : "Mostrando todas as pousadas."} Dias com reserva ficam marcados em verde — clique num dia marcado pra ver quem, onde e com qual guia.
+      </p>
 
       {selectedDate && (
         <div className="bg-editorial-secondary/40 border border-editorial-border rounded-xl p-4 space-y-3">
