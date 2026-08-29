@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, X, User, Compass, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, X, Compass, ShieldCheck, MapPin, Mail, Phone, Users, DollarSign, UtensilsCrossed, HeartPulse, UserCheck } from "lucide-react";
 import { Booking } from "../types";
 
 interface Props {
@@ -148,21 +148,31 @@ export default function AdminYearCalendarPanel({ bookings }: Props) {
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {selectedBookings.map(b => {
               const statusInfo = STATUS_LABELS[b.status];
               return (
-                <div key={b.id} className="bg-white border border-editorial-border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-zinc-900 flex items-center gap-1.5"><User className="h-3 w-3 text-zinc-400" /> {b.customerName}</p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">{b.pousadaName} · {b.checkIn} até {b.checkOut}</p>
-                    <p className="text-[11px] text-zinc-500 mt-0.5 flex items-center gap-1">
-                      <Compass className="h-3 w-3 text-zinc-400" /> {b.guideName ? `Guia: ${b.guideName}` : "Nenhum guia alocado"}
-                    </p>
+                <div key={b.id} className="bg-white border border-editorial-border rounded-lg p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2 pb-2 border-b border-editorial-border">
+                    <div>
+                      <p className="text-sm font-bold text-zinc-900">{b.customerName}</p>
+                      <p className="text-[11px] text-zinc-400">{b.checkIn} até {b.checkOut}</p>
+                    </div>
+                    <span className={`text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1 w-max ${statusInfo.className}`}>
+                      {b.status === "confirmado_total" && <ShieldCheck className="h-3 w-3" />} {statusInfo.label}
+                    </span>
                   </div>
-                  <span className={`text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1 w-max ${statusInfo.className}`}>
-                    {b.status === "confirmado_total" && <ShieldCheck className="h-3 w-3" />} {statusInfo.label}
-                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-zinc-700">
+                    <p className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> Pousada: <span className="font-semibold">{b.pousadaName}</span></p>
+                    <p className="flex items-center gap-1.5"><UserCheck className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> {b.guideName ? <>Guia: <span className="font-semibold">{b.guideName}</span></> : "Nenhum guia alocado"}</p>
+                    <p className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> <a href={`mailto:${b.customerEmail}`} className="hover:text-editorial-primary hover:underline truncate">{b.customerEmail}</a></p>
+                    <p className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> {b.customerPhone || "—"}</p>
+                    <p className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> {b.adults} adulto{b.adults !== 1 ? "s" : ""}, {b.children} criança{b.children !== 1 ? "s" : ""}{b.childAges ? ` (${b.childAges})` : ""}</p>
+                    <p className="flex items-center gap-1.5"><Compass className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> Experiência: <span className="font-semibold">{b.experienceType || "Padrão"}</span></p>
+                    <p className="flex items-center gap-1.5"><DollarSign className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> Valor total: <span className="font-semibold">R$ {b.totalPrice.toLocaleString("pt-BR")}</span></p>
+                    <p className="flex items-center gap-1.5"><UtensilsCrossed className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> Restrições: {b.dietaryRestrictions || "Nenhuma"}</p>
+                    <p className="flex items-center gap-1.5 sm:col-span-2"><HeartPulse className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0" /> Necessidades especiais: {b.specialNeeds || "Nenhuma"}</p>
+                  </div>
                 </div>
               );
             })}
