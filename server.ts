@@ -530,6 +530,66 @@ async function logAdminAction(
   }
 }
 
+// ----------------------------------------------------
+// LIXEIRA (backup de exclusão) — ver scripts/add-lixeira.sql
+//
+// Excluir uma pousada/guia/atração/turista/espécie pelo painel de admin
+// passou a ser recuperável: antes de apagar de verdade, guardamos uma cópia
+// completa da linha (e, no caso de pousada, dos produtos/consumos dela, que
+// têm ON DELETE CASCADE — ver scripts/add-produtos-consumo.sql — e por isso
+// desapareceriam junto sem esse cuidado) na tabela lixeira. O admin
+// restaura em até 30 dias pela aba "Lixeira"; passado isso, some de vez
+// (purgeLixeiraExpirada, chamado dentro do cron diário já existente).
+//
+// bookings/reviews/sightings continuam com ON DELETE SET NULL (decisão já
+// tomada em upgrade-schema.sql: apagar uma pousada não deve apagar o
+// histórico de reservas, só desvincular) — não precisam entrar aqui, eles
+// sobrevivem à exclusão por conta própria.
+const LIXEIRA_TABLE: Record<string, string> = {
+  pousada: "pousadas",
+  guide: "guides",
+  atracao: "atracoes",
+  turista: "turistas",
+  species: "species",
+};
+
+async function moverParaLixeira(
+  entityType: keyof typeof LIXEIRA_TABLE,
+  id: string,
+  actorEmail: string
+): Promise<any | null> {
+  const table = LIXEIRA_TABLE[entityType];
+  const { data: row } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+  if (!row) return null;
+
+  const data: Record<string, any> = { row };
+  if (entityType === "pousada") {
+    const [{ data: produtos }, { data: consumos }] = await Promise.all([
+      supabase.from("produtos").select("*").eq("pousadaId", id),
+      supabase.from("consumos").select("*").eq("pousadaId", id),
+    ]);
+    data.produtos = produtos || [];
+    data.consumos = consumos || [];
+  }
+
+  const label = row.name || id;
+  const { error } = await supabase.from("lixeira").insert({
+    id: `lx_${randomUUID()}`,
+    entityType,
+    entityId: id,
+    entityLabel: label,
+    data,
+    deletedBy: actorEmail,
+  });
+  if (error) throw new Error(error.message);
+  return row;
+}
+
+async function purgeLixeiraExpirada() {
+  const { error } = await supabase.from("lixeira").delete().lt("expiresAt", new Date().toISOString());
+  if (error) log.warn("Erro ao purgar lixeira expirada:", error.message);
+}
+
 // Optional Sentry error reporting — lazy-imported only when SENTRY_DSN is
 // set, so an unconfigured deployment doesn't pay for the dependency at
 // startup. Same graceful-degradation pattern as Stripe/Resend/Gemini above.
@@ -1135,14 +1195,21 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
 
 app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data: existing } = await supabase.from("pousadas").select("name").eq("id", id).maybeSingle();
+  let existing: any;
+  try {
+    existing = await moverParaLixeira("pousada", id, res.locals.adminUser?.email || "admin");
+  } catch (err: any) {
+    log.error("Erro ao mover pousada para a lixeira:", err.message);
+    return res.status(500).json({ error: "Erro ao excluir pousada" });
+  }
+  if (!existing) return res.status(404).json({ error: "Pousada não encontrada" });
   const { error } = await supabase.from("pousadas").delete().eq("id", id);
   if (error) {
     log.error("Erro ao excluir pousada no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao excluir pousada" });
   }
   await logAdminAction(res.locals.adminUser, "delete", "pousada", id, existing?.name || id);
-  res.json({ success: true, message: "Pousada excluída com sucesso" });
+  res.json({ success: true, message: "Pousada movida para a lixeira. Pode ser restaurada em até 30 dias." });
 });
 
 // GUIDES CRUD
@@ -1226,11 +1293,18 @@ app.put("/api/guides/:id", requirePartnerAccess("guia"), async (req, res) => {
 
 app.delete("/api/guides/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data: existing } = await supabase.from("guides").select("name").eq("id", id).maybeSingle();
+  let existing: any;
+  try {
+    existing = await moverParaLixeira("guide", id, res.locals.adminUser?.email || "admin");
+  } catch (err: any) {
+    log.error("Erro ao mover guia para a lixeira:", err.message);
+    return res.status(500).json({ error: "Erro ao excluir guia" });
+  }
+  if (!existing) return res.status(404).json({ error: "Guia não encontrado" });
   const { error } = await supabase.from("guides").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir guia" });
   await logAdminAction(res.locals.adminUser, "delete", "guide", id, existing?.name || id);
-  res.json({ success: true, message: "Guia excluído com sucesso" });
+  res.json({ success: true, message: "Guia movido para a lixeira. Pode ser restaurado em até 30 dias." });
 });
 
 // ATRAÇÕES CRUD — parceiro que não é uma hospedagem: "Parada Legal" (passeio,
@@ -1298,11 +1372,18 @@ app.put("/api/atracoes/:id", requirePartnerAccess("atracao"), async (req, res) =
 
 app.delete("/api/atracoes/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data: existing } = await supabase.from("atracoes").select("name").eq("id", id).maybeSingle();
+  let existing: any;
+  try {
+    existing = await moverParaLixeira("atracao", id, res.locals.adminUser?.email || "admin");
+  } catch (err: any) {
+    log.error("Erro ao mover atração para a lixeira:", err.message);
+    return res.status(500).json({ error: "Erro ao excluir atração" });
+  }
+  if (!existing) return res.status(404).json({ error: "Atração não encontrada" });
   const { error } = await supabase.from("atracoes").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir atração" });
   await logAdminAction(res.locals.adminUser, "delete", "atracao", id, existing?.name || id);
-  res.json({ success: true, message: "Atração excluída com sucesso" });
+  res.json({ success: true, message: "Atração movida para a lixeira. Pode ser restaurada em até 30 dias." });
 });
 
 // BOOKINGS CRUD & FLOWS
@@ -2141,6 +2222,11 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
     if (!logErr) sent++;
   }
 
+  // Mesmo job diário aproveita pra esvaziar a lixeira vencida (>30 dias) —
+  // ver moverParaLixeira/scripts/add-lixeira.sql. Não justifica um cron
+  // separado só pra isso.
+  await purgeLixeiraExpirada();
+
   res.json({ success: true, remindersSent: sent });
 });
 
@@ -2598,11 +2684,18 @@ app.put("/api/species/:id", requireAdmin, async (req, res) => {
 
 app.delete("/api/species/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data: existing } = await supabase.from("species").select("name").eq("id", id).maybeSingle();
+  let existing: any;
+  try {
+    existing = await moverParaLixeira("species", id, res.locals.adminUser?.email || "admin");
+  } catch (err: any) {
+    log.error("Erro ao mover espécie para a lixeira:", err.message);
+    return res.status(500).json({ error: "Erro ao excluir espécie" });
+  }
+  if (!existing) return res.status(404).json({ error: "Espécie não encontrada" });
   const { error } = await supabase.from("species").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir espécie" });
-  await logAdminAction(res.locals.adminUser, "delete", "species", id, (existing as any)?.name || id);
-  res.json({ success: true, message: "Espécie excluída com sucesso" });
+  await logAdminAction(res.locals.adminUser, "delete", "species", id, existing?.name || id);
+  res.json({ success: true, message: "Espécie movida para a lixeira. Pode ser restaurada em até 30 dias." });
 });
 
 // ----------------------------------------------------
@@ -2638,13 +2731,66 @@ app.put("/api/turistas/:id", requireAdmin, async (req, res) => {
   res.json(data);
 });
 
+// Só esta exclusão feita pelo admin passa pela lixeira. O hard-delete de
+// verdade em DELETE /api/turista/me (autoexclusão LGPD, mais abaixo) fica
+// como está — direito ao esquecimento não pode virar "recuperável em 30
+// dias" escondido do próprio titular dos dados.
 app.delete("/api/turistas/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { data: existing } = await supabase.from("turistas").select("name").eq("id", id).maybeSingle();
+  let existing: any;
+  try {
+    existing = await moverParaLixeira("turista", id, res.locals.adminUser?.email || "admin");
+  } catch (err: any) {
+    log.error("Erro ao mover turista para a lixeira:", err.message);
+    return res.status(500).json({ error: "Erro ao excluir turista" });
+  }
+  if (!existing) return res.status(404).json({ error: "Turista não encontrado" });
   const { error } = await supabase.from("turistas").delete().eq("id", id);
   if (error) return res.status(500).json({ error: "Erro ao excluir turista" });
   await logAdminAction(res.locals.adminUser, "delete", "turista", id, existing?.name || id);
-  res.json({ success: true, message: "Turista excluído com sucesso" });
+  res.json({ success: true, message: "Turista movido para a lixeira. Pode ser restaurado em até 30 dias." });
+});
+
+// LIXEIRA — listar, restaurar ou apagar de vez (ver moverParaLixeira acima)
+app.get("/api/lixeira", requireAdmin, async (req, res) => {
+  const { data, error } = await supabase.from("lixeira").select("*").order("deletedAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar lixeira" });
+  res.json(data);
+});
+
+app.post("/api/lixeira/:id/restaurar", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { data: entry, error } = await supabase.from("lixeira").select("*").eq("id", id).maybeSingle();
+  if (error || !entry) return res.status(404).json({ error: "Registro não encontrado na lixeira" });
+
+  const table = LIXEIRA_TABLE[entry.entityType as keyof typeof LIXEIRA_TABLE];
+  if (!table) return res.status(400).json({ error: "Tipo de registro desconhecido" });
+
+  const { error: insertError } = await supabase.from(table).insert(entry.data.row);
+  if (insertError) {
+    return res.status(500).json({ error: `Erro ao restaurar: ${insertError.message}` });
+  }
+
+  // Pousada: reinsere também os produtos/consumos que tinham sido levados
+  // junto pra lixeira (ON DELETE CASCADE — ver moverParaLixeira).
+  if (entry.entityType === "pousada") {
+    if (entry.data.produtos?.length) await supabase.from("produtos").insert(entry.data.produtos);
+    if (entry.data.consumos?.length) await supabase.from("consumos").insert(entry.data.consumos);
+  }
+
+  await supabase.from("lixeira").delete().eq("id", id);
+  await logAdminAction(res.locals.adminUser, "restore", entry.entityType, entry.entityId, entry.entityLabel);
+  res.json({ success: true, message: "Registro restaurado com sucesso." });
+});
+
+// Apagar de vez, antes dos 30 dias — sem volta a partir daqui.
+app.delete("/api/lixeira/:id", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { data: entry } = await supabase.from("lixeira").select("entityType, entityLabel").eq("id", id).maybeSingle();
+  const { error } = await supabase.from("lixeira").delete().eq("id", id);
+  if (error) return res.status(500).json({ error: "Erro ao excluir definitivamente" });
+  await logAdminAction(res.locals.adminUser, "purge", entry?.entityType || "lixeira", id, entry?.entityLabel || id);
+  res.json({ success: true, message: "Registro apagado definitivamente." });
 });
 
 // Categorias fixas de interesse (passeios/aventuras, fauna/flora) que o

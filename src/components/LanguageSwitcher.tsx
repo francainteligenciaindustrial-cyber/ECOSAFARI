@@ -58,6 +58,32 @@ function clearGoogTransCookie() {
   document.cookie = `googtrans=;path=/;domain=${window.location.hostname};expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
 
+// A construtora new google.translate.TranslateElement(...) retorna na hora,
+// mas o próprio <select class="goog-te-combo"> só é injetado no DOM um
+// tempinho depois (o widget ainda busca recursos e monta um iframe por trás
+// dos panos) — checar uma única vez logo após "pronto" (como o código fazia
+// antes) quase sempre encontra null e cai no reload, que também nem sempre
+// resolve. Isso fazia o app trocar o cookie/checkbox de idioma sem a
+// tradução de fato acontecer. Repetir a checagem por alguns segundos dá
+// tempo do select aparecer de verdade.
+function waitForTranslateSelect(onFound: (select: HTMLSelectElement) => void, onGiveUp: () => void) {
+  let attempts = 0;
+  const tick = () => {
+    const select = document.querySelector<HTMLSelectElement>("#google_translate_element select.goog-te-combo");
+    if (select) {
+      onFound(select);
+      return;
+    }
+    attempts++;
+    if (attempts >= 20) {
+      onGiveUp();
+      return;
+    }
+    setTimeout(tick, 250);
+  };
+  tick();
+}
+
 // Subtle "translate the whole site" switcher — machine translation via
 // Google's Website Translator, driven by our own minimal dropdown instead
 // of Google's default banner. Preference persists across pages via
@@ -75,9 +101,23 @@ export default function LanguageSwitcher() {
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (current !== "pt") {
-      loadGoogleTranslate(() => {});
-    }
+    if (current === "pt") return;
+    // O cookie googtrans já devia bastar pro widget se auto-aplicar ao
+    // carregar, mas na prática isso nem sempre acontece (daí o bug relatado:
+    // o dropdown mostrava o idioma marcado, mas a página continuava em
+    // português) — então reforça aqui, setando o <select> explicitamente
+    // assim que ele existir, igual ao clique manual faz.
+    loadGoogleTranslate(() => {
+      waitForTranslateSelect(
+        select => {
+          if (select.value !== current) {
+            select.value = current;
+            select.dispatchEvent(new Event("change"));
+          }
+        },
+        () => {}
+      );
+    });
   }, []);
 
   useEffect(() => {
@@ -105,13 +145,16 @@ export default function LanguageSwitcher() {
 
     setGoogTransCookie(lang);
     loadGoogleTranslate(() => {
-      const select = document.querySelector<HTMLSelectElement>("#google_translate_element select.goog-te-combo");
-      if (select) {
-        select.value = lang;
-        select.dispatchEvent(new Event("change"));
-      } else {
-        window.location.reload();
-      }
+      waitForTranslateSelect(
+        select => {
+          select.value = lang;
+          select.dispatchEvent(new Event("change"));
+        },
+        // Só o cookie foi setado até aqui — um reload deixa a aplicação da
+        // tradução por conta do próprio widget (que lê o googtrans ao
+        // montar, reforçado pelo useEffect acima).
+        () => window.location.reload()
+      );
     });
   };
 

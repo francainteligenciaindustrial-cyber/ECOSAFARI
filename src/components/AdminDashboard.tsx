@@ -54,6 +54,7 @@ import NewBookingForm from "./NewBookingForm";
 import PousadaCalendarsPanel from "./PousadaCalendarsPanel";
 import EcosystemAvailabilityPanel from "./EcosystemAvailabilityPanel";
 import AdminConfiabilidadePanel from "./AdminConfiabilidadePanel";
+import AdminLixeiraPanel from "./AdminLixeiraPanel";
 import { usePagination } from "../lib/usePagination";
 
 interface AdminDashboardProps {
@@ -62,7 +63,7 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog";
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
 // hand-written <button> per tab. Grouped into sections (rather than one flat
@@ -81,6 +82,7 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "turismo", icon: MapIcon, label: "Turistas & Roteiros", group: "Conteúdo" },
   { id: "admins", icon: Lock, label: "Administradores", group: "Sistema" },
   { id: "auditlog", icon: ScrollText, label: "Log de Auditoria", group: "Sistema" },
+  { id: "lixeira", icon: Trash2, label: "Lixeira", group: "Sistema" },
 ];
 const ADMIN_TAB_GROUPS = ["Operação", "Parceiros", "Conteúdo", "Sistema"] as const;
 
@@ -261,6 +263,16 @@ export default function AdminDashboard({
   const unreadNotifications = notifications.filter(n => !n.read);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const [notifReadFilter, setNotifReadFilter] = useState<"todas" | "nao_lidas" | "lidas">("todas");
+  const [notifSort, setNotifSort] = useState<"recentes" | "antigas">("recentes");
+  const [notifDateFilter, setNotifDateFilter] = useState(""); // yyyy-mm-dd, vazio = todas as datas
+  const visibleNotifications = notifications
+    .filter(n => notifReadFilter === "todas" ? true : notifReadFilter === "nao_lidas" ? !n.read : n.read)
+    .filter(n => !notifDateFilter || n.timestamp.slice(0, 10) === notifDateFilter)
+    .sort((a, b) => {
+      const diff = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      return notifSort === "recentes" ? diff : -diff;
+    });
 
   useEffect(() => {
     const onClickOutside = (e: MouseEvent) => {
@@ -605,7 +617,7 @@ export default function AdminDashboard({
   };
 
   const handleDeletePousada = async (id: string) => {
-    if (!window.confirm("Deseja realmente remover esta pousada parceira?")) return;
+    if (!window.confirm("Deseja realmente remover esta pousada parceira? Ela some do sistema, mas fica guardada na Lixeira (aba Sistema) por 30 dias caso precise restaurar.")) return;
     try {
       const response = await adminFetch(`/api/pousadas/${id}`, { method: "DELETE" });
       if (response.ok) onRefreshData();
@@ -643,7 +655,7 @@ export default function AdminDashboard({
   };
 
   const handleDeleteGuide = async (id: string) => {
-    if (!window.confirm("Deseja realmente remover este guia turístico?")) return;
+    if (!window.confirm("Deseja realmente remover este guia turístico? Ele some do sistema, mas fica guardado na Lixeira (aba Sistema) por 30 dias caso precise restaurar.")) return;
     try {
       const response = await adminFetch(`/api/guides/${id}`, { method: "DELETE" });
       if (response.ok) fetchGuides();
@@ -696,7 +708,7 @@ export default function AdminDashboard({
   };
 
   const handleDeleteSpecies = async (id: string) => {
-    if (!window.confirm("Deseja realmente remover esta espécie silvestre?")) return;
+    if (!window.confirm("Deseja realmente remover esta espécie silvestre? Ela some do sistema, mas fica guardada na Lixeira (aba Sistema) por 30 dias caso precise restaurar.")) return;
     try {
       const response = await adminFetch(`/api/species/${id}`, { method: "DELETE" });
       if (response.ok) onRefreshData();
@@ -972,11 +984,64 @@ export default function AdminDashboard({
                     </span>
                   )}
                 </div>
+
+                {/* Filtros: status de leitura, ordenação por data e uma data
+                    específica — tudo client-side, a lista completa já veio
+                    do /api/notifications. */}
+                <div className="px-5 py-2.5 border-b border-zinc-100 space-y-2">
+                  <div className="flex items-center gap-1">
+                    {([
+                      { id: "todas", label: "Todas" },
+                      { id: "nao_lidas", label: "Não lidas" },
+                      { id: "lidas", label: "Lidas" },
+                    ] as const).map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setNotifReadFilter(f.id)}
+                        className={`text-[10px] font-bold px-2 py-1 rounded-full border transition cursor-pointer ${
+                          notifReadFilter === f.id
+                            ? "bg-editorial-primary text-white border-editorial-primary"
+                            : "bg-white text-zinc-500 border-zinc-200 hover:border-zinc-300"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={notifSort}
+                      onChange={e => setNotifSort(e.target.value as "recentes" | "antigas")}
+                      className="text-[10px] font-semibold text-zinc-600 border border-zinc-200 rounded px-1.5 py-1 cursor-pointer"
+                    >
+                      <option value="recentes">Mais recentes primeiro</option>
+                      <option value="antigas">Mais antigas primeiro</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={notifDateFilter}
+                      onChange={e => setNotifDateFilter(e.target.value)}
+                      className="text-[10px] font-semibold text-zinc-600 border border-zinc-200 rounded px-1.5 py-1 cursor-pointer"
+                      title="Filtrar por data"
+                    />
+                    {notifDateFilter && (
+                      <button
+                        onClick={() => setNotifDateFilter("")}
+                        className="text-[10px] text-zinc-400 hover:text-editorial-primary cursor-pointer"
+                      >
+                        limpar data
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <p className="text-zinc-400 text-xs px-5 py-6 text-center">Nenhuma notificação ainda.</p>
+                  {visibleNotifications.length === 0 ? (
+                    <p className="text-zinc-400 text-xs px-5 py-6 text-center">
+                      {notifications.length === 0 ? "Nenhuma notificação ainda." : "Nenhuma notificação encontrada com esses filtros."}
+                    </p>
                   ) : (
-                    notifications.map((notif) => {
+                    visibleNotifications.map((notif) => {
                       const Icon = NOTIFICATION_ICONS[notif.type] || Bell;
                       return (
                         <div
@@ -1107,6 +1172,7 @@ export default function AdminDashboard({
         {/* TAB: GESTÃO DE ADMINISTRADORES (Supabase Auth) */}
         {activeTab === "admins" && <AdminUsersPanel />}
         {activeTab === "auditlog" && <AdminAuditLogPanel />}
+        {activeTab === "lixeira" && <AdminLixeiraPanel />}
 
         {/* TAB 1: RESERVAS & CONFIRMAÇÕES */}
         {activeTab === "bookings" && (

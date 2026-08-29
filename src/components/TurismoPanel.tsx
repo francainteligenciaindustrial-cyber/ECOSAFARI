@@ -61,7 +61,11 @@ export default function TurismoPanel() {
   }, []);
 
   const handleDelete = async (endpoint: string, id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+    // Só turistas passam pela Lixeira hoje (ver moverParaLixeira em
+    // server.ts) — roteiros/reservas/pagamentos/guias continuam exclusão
+    // direta, sem backup.
+    const recoveryNote = endpoint === "turistas" ? " Ele some do sistema, mas fica guardado na Lixeira (painel de admin, aba Sistema) por 30 dias caso precise restaurar." : "";
+    if (!confirm(`Tem certeza que deseja excluir este registro?${recoveryNote}`)) return;
     await adminFetch(`/api/${endpoint}/${id}`, { method: "DELETE" });
     fetchAll();
   };

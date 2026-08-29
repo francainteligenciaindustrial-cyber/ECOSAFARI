@@ -99,7 +99,7 @@ export default function AtracoesPanel() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Excluir esta atração?")) return;
+    if (!confirm("Excluir esta atração? Ela some do sistema, mas fica guardada na Lixeira (painel de admin, aba Sistema) por 30 dias caso precise restaurar.")) return;
     await adminFetch(`/api/atracoes/${id}`, { method: "DELETE" });
     fetchData();
   };
