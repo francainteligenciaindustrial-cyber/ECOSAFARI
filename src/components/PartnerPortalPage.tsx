@@ -65,7 +65,7 @@ export default function PartnerPortalPage() {
   const [form, setForm] = useState<any>(null);
   // Só a edição de pousada usa abas — atração/guia continuam num formulário
   // único de coluna simples (o volume de campos deles não justifica isso).
-  const [pousadaTab, setPousadaTab] = useState<"servicos" | "acomodacoes" | "bar" | "midias" | "produtos">("servicos");
+  const [pousadaTab, setPousadaTab] = useState<"sobre" | "servicos" | "acomodacoes" | "bar" | "midias" | "redes" | "produtos">("sobre");
   const [shareCopied, setShareCopied] = useState(false);
 
   // Whether the current session came from clicking an invite/recovery link
@@ -169,6 +169,11 @@ export default function PartnerPortalPage() {
             transportOptions: [...(data.pousada.transportOptions || [])],
             entertainmentOptions: [...(data.pousada.entertainmentOptions || [])],
             serviceNotes: data.pousada.serviceNotes || "",
+            hasParking: !!data.pousada.hasParking,
+            hasWifi: !!data.pousada.hasWifi,
+            facebookUrl: data.pousada.facebookUrl || "",
+            tiktokUrl: data.pousada.tiktokUrl || "",
+            youtubeUrl: data.pousada.youtubeUrl || "",
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
           setForm({
@@ -285,6 +290,11 @@ export default function PartnerPortalPage() {
           transportOptions: form.transportOptions,
           entertainmentOptions: form.entertainmentOptions,
           serviceNotes: form.serviceNotes.trim() || undefined,
+          hasParking: form.hasParking,
+          hasWifi: form.hasWifi,
+          facebookUrl: form.facebookUrl.trim() || undefined,
+          tiktokUrl: form.tiktokUrl.trim() || undefined,
+          youtubeUrl: form.youtubeUrl.trim() || undefined,
         };
       } else if (profile.partnerType === "atracao") {
         endpoint = `/api/atracoes/${profile.partnerId}`;
@@ -447,10 +457,12 @@ export default function PartnerPortalPage() {
         {profile?.partnerType === "pousada" && form && (
           <div className="flex gap-1 border-b border-editorial-border overflow-x-auto mb-6">
             {([
+              { id: "sobre", label: "Sobre" },
               { id: "servicos", label: "Serviços" },
               { id: "acomodacoes", label: "Acomodações" },
               { id: "bar", label: "Bar/Restaurantes" },
               { id: "midias", label: "Mídias" },
+              { id: "redes", label: "Redes Sociais" },
               { id: "produtos", label: "Produtos" },
             ] as const).map(tab => (
               <button
@@ -481,36 +493,31 @@ export default function PartnerPortalPage() {
           <form onSubmit={handleSave} className="bg-white border border-editorial-border rounded-lg p-6 space-y-5">
             {profile.partnerType === "pousada" && (
               <>
-                <FormSection title="Sobre">
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Descrição Curta</label>
-                    <input type="text" value={form.description} onChange={e => setForm((p: any) => ({ ...p, description: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                  </div>
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Descrição Completa</label>
-                    <textarea rows={4} value={form.longDescription} onChange={e => setForm((p: any) => ({ ...p, longDescription: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
-                  </div>
-                </FormSection>
-
-                <FormSection title="Preço & Capacidade">
-                  <div className="grid grid-cols-2 gap-3">
+                {/* Cada aba mostra só o que é dela — nada fica repetido nas
+                    outras (Sobre/Preço, antes sempre visíveis, agora são a
+                    própria aba "Sobre"). */}
+                {pousadaTab === "sobre" && (
+                  <FormSection title="Sobre">
                     <div className="text-xs">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Diária (R$)</label>
-                      <input type="number" min={0} value={form.pricePerNight} onChange={e => setForm((p: any) => ({ ...p, pricePerNight: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <label className="block text-editorial-text font-semibold mb-1.5">Descrição Curta</label>
+                      <input type="text" value={form.description} onChange={e => setForm((p: any) => ({ ...p, description: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                     </div>
                     <div className="text-xs">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Capacidade (hóspedes)</label>
-                      <input type="number" min={1} value={form.capacity} onChange={e => setForm((p: any) => ({ ...p, capacity: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <label className="block text-editorial-text font-semibold mb-1.5">Descrição Completa</label>
+                      <textarea rows={4} value={form.longDescription} onChange={e => setForm((p: any) => ({ ...p, longDescription: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
                     </div>
-                  </div>
-                </FormSection>
-
-                <FormSection title="Contato & Redes">
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Link do Instagram/Rede Social (opcional)</label>
-                    <input type="text" value={form.officialSiteUrl} onChange={e => setForm((p: any) => ({ ...p, officialSiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                  </div>
-                </FormSection>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="text-xs">
+                        <label className="block text-editorial-text font-semibold mb-1.5">Diária (R$)</label>
+                        <input type="number" min={0} value={form.pricePerNight} onChange={e => setForm((p: any) => ({ ...p, pricePerNight: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      </div>
+                      <div className="text-xs">
+                        <label className="block text-editorial-text font-semibold mb-1.5">Capacidade (hóspedes)</label>
+                        <input type="number" min={1} value={form.capacity} onChange={e => setForm((p: any) => ({ ...p, capacity: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      </div>
+                    </div>
+                  </FormSection>
+                )}
 
                 {pousadaTab === "servicos" && (
                   <FormSection title="Serviços">
@@ -525,6 +532,16 @@ export default function PartnerPortalPage() {
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Experiências Pagas (passeios)</label>
                       <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
+                    </div>
+                    <div className="flex flex-wrap gap-6">
+                      <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3 flex items-center gap-3">
+                        <label className="font-semibold text-editorial-text">Estacionamento</label>
+                        <ToggleSwitch checked={!!form.hasParking} onChange={checked => setForm((p: any) => ({ ...p, hasParking: checked }))} labelOn="Sim" labelOff="Não" />
+                      </div>
+                      <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3 flex items-center gap-3">
+                        <label className="font-semibold text-editorial-text">Wi-Fi</label>
+                        <ToggleSwitch checked={!!form.hasWifi} onChange={checked => setForm((p: any) => ({ ...p, hasWifi: checked }))} labelOn="Sim" labelOff="Não" />
+                      </div>
                     </div>
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Tipos de Culinária</label>
@@ -585,42 +602,6 @@ export default function PartnerPortalPage() {
                   <FormSection title="Mídias">
                     <ImageListEditor label="Imagens (Catálogo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
 
-                    {/* Compartilhar a página pública da pousada — não posta
-                        automaticamente nas redes (exigiria autorização OAuth
-                        de cada parceiro com Meta/Instagram, fora do escopo
-                        aqui), mas abre o compartilhamento nativo de
-                        WhatsApp/Facebook já preenchido com o link. */}
-                    <div className="text-xs border-t border-editorial-border pt-4">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Compartilhar nas redes sociais</label>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent(`Conheça a ${profile.pousada?.name || "nossa pousada"} na EcoSafari: ${window.location.origin}/pousadas/${profile.partnerId}`)}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition"
-                        >
-                          <Share2 className="h-3.5 w-3.5" /> WhatsApp
-                        </a>
-                        <a
-                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/pousadas/${profile.partnerId}`)}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition"
-                        >
-                          <Facebook className="h-3.5 w-3.5" /> Facebook
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/pousadas/${profile.partnerId}`);
-                            setShareCopied(true);
-                            setTimeout(() => setShareCopied(false), 1500);
-                          }}
-                          className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition cursor-pointer"
-                        >
-                          {shareCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {shareCopied ? "Copiado!" : "Copiar link"}
-                        </button>
-                      </div>
-                    </div>
-
                     <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
                       <label className="block text-editorial-text font-semibold mb-1.5">Você já tem um site próprio?</label>
                       <p className="text-editorial-muted text-[11px] mb-3">
@@ -675,6 +656,62 @@ export default function PartnerPortalPage() {
                         </div>
                       </>
                     )}
+                  </FormSection>
+                )}
+
+                {pousadaTab === "redes" && (
+                  <FormSection title="Redes Sociais">
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Instagram</label>
+                      <input type="text" placeholder="https://instagram.com/..." value={form.officialSiteUrl} onChange={e => setForm((p: any) => ({ ...p, officialSiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    </div>
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Facebook</label>
+                      <input type="text" placeholder="https://facebook.com/..." value={form.facebookUrl} onChange={e => setForm((p: any) => ({ ...p, facebookUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    </div>
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">TikTok</label>
+                      <input type="text" placeholder="https://tiktok.com/@..." value={form.tiktokUrl} onChange={e => setForm((p: any) => ({ ...p, tiktokUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    </div>
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">YouTube</label>
+                      <input type="text" placeholder="https://youtube.com/@..." value={form.youtubeUrl} onChange={e => setForm((p: any) => ({ ...p, youtubeUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    </div>
+
+                    {/* Compartilhar a página pública — não posta
+                        automaticamente (exigiria autorização OAuth de cada
+                        parceiro com Meta/TikTok, fora do escopo aqui), mas
+                        abre o compartilhamento nativo já com o link. */}
+                    <div className="text-xs border-t border-editorial-border pt-4">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Compartilhar a página da pousada</label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(`Conheça a ${profile.pousada?.name || "nossa pousada"} na EcoSafari: ${window.location.origin}/pousadas/${profile.partnerId}`)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition"
+                        >
+                          <Share2 className="h-3.5 w-3.5" /> WhatsApp
+                        </a>
+                        <a
+                          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/pousadas/${profile.partnerId}`)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition"
+                        >
+                          <Facebook className="h-3.5 w-3.5" /> Facebook
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/pousadas/${profile.partnerId}`);
+                            setShareCopied(true);
+                            setTimeout(() => setShareCopied(false), 1500);
+                          }}
+                          className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition cursor-pointer"
+                        >
+                          {shareCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {shareCopied ? "Copiado!" : "Copiar link"}
+                        </button>
+                      </div>
+                    </div>
                   </FormSection>
                 )}
               </>

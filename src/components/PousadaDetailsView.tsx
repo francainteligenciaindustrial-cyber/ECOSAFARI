@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users, UtensilsCrossed, Facebook, Youtube, Music2, Wifi, ParkingSquare } from "lucide-react";
 import { Pousada, Review } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
@@ -129,17 +129,23 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 <ExternalLink className="h-3.5 w-3.5" /> Ver site oficial
               </a>
               {pousada.officialSiteUrl && (
-                <a
-                  href={pousada.officialSiteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-editorial-primary hover:underline cursor-pointer"
-                >
-                  {pousada.officialSiteUrl.includes("instagram.com") ? (
-                    <><Instagram className="h-3.5 w-3.5" /> Instagram</>
-                  ) : (
-                    <><ExternalLink className="h-3.5 w-3.5" /> Redes Sociais</>
-                  )}
+                <a href={pousada.officialSiteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-editorial-primary hover:underline cursor-pointer">
+                  <Instagram className="h-3.5 w-3.5" /> Instagram
+                </a>
+              )}
+              {pousada.facebookUrl && (
+                <a href={pousada.facebookUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-editorial-primary hover:underline cursor-pointer">
+                  <Facebook className="h-3.5 w-3.5" /> Facebook
+                </a>
+              )}
+              {pousada.tiktokUrl && (
+                <a href={pousada.tiktokUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-editorial-primary hover:underline cursor-pointer">
+                  <Music2 className="h-3.5 w-3.5" /> TikTok
+                </a>
+              )}
+              {pousada.youtubeUrl && (
+                <a href={pousada.youtubeUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-editorial-primary hover:underline cursor-pointer">
+                  <Youtube className="h-3.5 w-3.5" /> YouTube
                 </a>
               )}
             </div>
@@ -307,9 +313,15 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
               {/* Serviços — culinária, transporte, entretenimento e um texto
                   livre de atendimento/necessidades especiais, além dos tags
                   de "features" já existentes acima. */}
-              {(pousada.cuisineTypes?.length || pousada.transportOptions?.length || pousada.entertainmentOptions?.length || pousada.serviceNotes) ? (
+              {(pousada.cuisineTypes?.length || pousada.transportOptions?.length || pousada.entertainmentOptions?.length || pousada.serviceNotes || pousada.hasParking || pousada.hasWifi) ? (
                 <div className="border-t border-editorial-border pt-6 mt-6 space-y-3">
                   <h3 className="font-serif font-bold text-editorial-primary text-base flex items-center gap-2"><UtensilsCrossed className="h-4.5 w-4.5 text-editorial-primary" /> Serviços</h3>
+                  {(pousada.hasParking || pousada.hasWifi) && (
+                    <div className="flex items-center gap-4">
+                      {pousada.hasParking && <span className="flex items-center gap-1.5 text-xs text-editorial-text"><ParkingSquare className="h-4 w-4 text-editorial-primary" /> Estacionamento</span>}
+                      {pousada.hasWifi && <span className="flex items-center gap-1.5 text-xs text-editorial-text"><Wifi className="h-4 w-4 text-editorial-primary" /> Wi-Fi</span>}
+                    </div>
+                  )}
                   {pousada.cuisineTypes && pousada.cuisineTypes.length > 0 && (
                     <p className="text-xs"><span className="text-editorial-muted font-semibold">Culinária: </span>{pousada.cuisineTypes.join(", ")}</p>
                   )}

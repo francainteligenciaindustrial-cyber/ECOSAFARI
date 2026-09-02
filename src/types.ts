@@ -51,6 +51,14 @@ export interface Pousada {
   transportOptions?: string[]; // ex: "Transfer aeroporto", "Traslado local"
   entertainmentOptions?: string[]; // ex: "Fogueira", "Música ao vivo"
   serviceNotes?: string; // atendimento, necessidades especiais, peculiaridades (texto livre)
+  hasParking?: boolean;
+  hasWifi?: boolean;
+  // Redes sociais — officialSiteUrl continua sendo o campo do Instagram
+  // (pousadas antigas já têm um link de Instagram salvo ali; manter o nome
+  // evita perder esse dado). Os outros são novos.
+  facebookUrl?: string;
+  tiktokUrl?: string;
+  youtubeUrl?: string;
   // Calendário Google dedicado desta pousada (dentro da conta única já
   // conectada em Gestão → Agenda Integrada) — quando ausente, os eventos de
   // reserva confirmada caem no calendário "primary" da conta, como sempre

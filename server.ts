@@ -874,7 +874,7 @@ function pickFields<T extends object>(body: any, allowedKeys: readonly (keyof T)
 // "viewCount" are deliberately excluded from POUSADA_* — they're computed by
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
-const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl", "menu", "cuisineTypes", "transportOptions", "entertainmentOptions", "serviceNotes"] as const;
+const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl", "menu", "cuisineTypes", "transportOptions", "entertainmentOptions", "serviceNotes", "hasParking", "hasWifi", "facebookUrl", "tiktokUrl", "youtubeUrl"] as const;
 // googleCalendarId fica de fora de POUSADA_CREATE_FIELDS de propósito — é
 // um detalhe de organização interna da agência (qual calendário Google essa
 // pousada usa), não algo que o parceiro deveria poder mexer autoeditando o
@@ -942,6 +942,11 @@ function mapPousadaRow(p: any): Pousada {
     transportOptions: toStringArray(p.transportOptions),
     entertainmentOptions: toStringArray(p.entertainmentOptions),
     serviceNotes: p.serviceNotes || "",
+    hasParking: typeof p.hasParking === "boolean" ? p.hasParking : false,
+    hasWifi: typeof p.hasWifi === "boolean" ? p.hasWifi : false,
+    facebookUrl: p.facebookUrl || "",
+    tiktokUrl: p.tiktokUrl || "",
+    youtubeUrl: p.youtubeUrl || "",
   };
 }
 
