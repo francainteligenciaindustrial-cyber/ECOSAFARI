@@ -219,6 +219,9 @@ export interface Turista {
   // pousada, roteiro) com o que a pessoa realmente quer ver/fazer.
   interests?: string[];
   photoUrl?: string;
+  // Foto de capa do perfil (estética "Facebook") — puramente estética, não
+  // alimenta nenhuma lógica de negócio como interests.
+  coverPhotoUrl?: string;
 }
 
 // Pousada que um turista logado marcou como "gostei" — alimenta o widget de
@@ -229,7 +232,7 @@ export interface Favorito {
   createdAt: string;
 }
 
-// Brinde que uma pousada oferece em troca de Coins — cadastrado pelo próprio
+// Brinde que uma pousada oferece em troca de Jaguars — cadastrado pelo próprio
 // parceiro no portal de autoatendimento.
 export interface Recompensa {
   id: string;
@@ -241,7 +244,7 @@ export interface Recompensa {
   createdAt: string;
 }
 
-// Troca de Coins por uma recompensa — gera um código que o turista mostra
+// Troca de Jaguars por uma recompensa — gera um código que o turista mostra
 // na pousada, que confirma o resgate no próprio portal dela.
 export interface Resgate {
   id: string;
@@ -253,6 +256,16 @@ export interface Resgate {
   status: 'pendente' | 'usado' | 'cancelado';
   createdAt: string;
   usedAt?: string;
+}
+
+// Diário pessoal de viagem no próprio perfil do turista — texto e/ou foto,
+// visível só pra ele mesmo (não é feed público). Ver POST /api/turista/posts.
+export interface TuristaPost {
+  id: string;
+  turistaId: string;
+  text: string;
+  photoUrl?: string;
+  createdAt: string;
 }
 
 // Item vendável pela pousada (frigobar, vestuário, brinde...) — cadastrado

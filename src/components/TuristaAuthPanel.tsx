@@ -284,7 +284,7 @@ export default function TuristaAuthPanel() {
             <p><span className="text-editorial-muted text-xs block">País</span> {profile.country}</p>
             {profile.language && <p><span className="text-editorial-muted text-xs block">Idioma</span> {profile.language}</p>}
             <p><span className="text-editorial-muted text-xs block">Idade</span> {profile.age}</p>
-            {typeof profile.coins === "number" && <p><span className="text-editorial-muted text-xs block">Coins</span> {profile.coins}</p>}
+            {typeof profile.coins === "number" && <p><span className="text-editorial-muted text-xs block">Jaguars</span> {profile.coins}</p>}
             <p><span className="text-editorial-muted text-xs block">Preferências</span> {profile.preferences}</p>
             <p className="text-emerald-700 text-xs font-semibold pt-2">✓ Você já pode avaliar pousadas, guias e atrações.</p>
           </div>

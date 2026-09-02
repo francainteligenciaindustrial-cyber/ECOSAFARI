@@ -19,7 +19,7 @@ function initials(name: string): string {
 
 // Widget de conta no canto superior direito, no mesmo espírito do menu de
 // perfil do Google/Instagram: um avatar que abre um painel resumido com
-// saldo de Coins, favoritos e histórico, sem sair da página atual.
+// saldo de Jaguars, favoritos e histórico, sem sair da página atual.
 export default function TouristProfileWidget() {
   const { checking, isTourist, profile, supabase } = useTouristSession();
   const [open, setOpen] = useState(false);
@@ -79,8 +79,14 @@ export default function TouristProfileWidget() {
         aria-label={profile?.name ? `Menu da conta de ${profile.name}` : "Minha conta"}
         aria-expanded={open}
       >
-        <span className="w-8 h-8 rounded-full bg-editorial-primary text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 ring-2 ring-transparent group-hover:ring-editorial-primary/30 transition">
-          {profile ? initials(profile.name) : <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+        <span className="w-8 h-8 rounded-full bg-editorial-primary text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 ring-2 ring-transparent group-hover:ring-editorial-primary/30 transition overflow-hidden">
+          {profile?.photoUrl ? (
+            <img src={profile.photoUrl} alt={profile.name} className="w-full h-full object-cover" />
+          ) : profile ? (
+            initials(profile.name)
+          ) : (
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+          )}
         </span>
         <ChevronDown className={`h-3.5 w-3.5 text-editorial-muted transition-transform hidden sm:block ${open ? "rotate-180" : ""}`} />
       </button>
@@ -90,8 +96,12 @@ export default function TouristProfileWidget() {
           {/* Header */}
           <div className="p-5 border-b border-editorial-border">
             <div className="flex items-center gap-3">
-              <span className="w-11 h-11 rounded-full bg-editorial-primary text-white text-sm font-bold flex items-center justify-center flex-shrink-0">
-                {profile ? initials(profile.name) : ""}
+              <span className="w-11 h-11 rounded-full bg-editorial-primary text-white text-sm font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {profile?.photoUrl ? (
+                  <img src={profile.photoUrl} alt={profile.name} className="w-full h-full object-cover" />
+                ) : profile ? (
+                  initials(profile.name)
+                ) : null}
               </span>
               <div className="min-w-0">
                 <p className="font-bold text-sm text-editorial-text truncate">{profile?.name}</p>
@@ -107,7 +117,7 @@ export default function TouristProfileWidget() {
 
             <div className="mt-4 bg-editorial-primary/5 border border-editorial-primary/15 rounded-lg px-3 py-2.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-editorial-primary font-bold text-sm">
-                <Coins className="h-4 w-4" /> {profile?.coins ?? 0} Coins
+                <Coins className="h-4 w-4" /> {profile?.coins ?? 0} Jaguars
               </span>
               <span className="text-editorial-muted text-[10px] uppercase tracking-wider">Ganhas no app EcoSafari</span>
             </div>
@@ -178,7 +188,7 @@ export default function TouristProfileWidget() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-editorial-muted text-xs">Suas Coins podem virar desconto nas pousadas parceiras — veja as recompensas no perfil de cada uma.</p>
+                  <p className="text-editorial-muted text-xs">Seus Jaguars podem virar desconto nas pousadas parceiras — veja as recompensas no perfil de cada uma.</p>
                 )}
               </div>
             </>

@@ -371,7 +371,7 @@ export default function App() {
             <LanguageSwitcher />
           </div>
 
-          {/* Tourist account menu — Coins, favoritos, histórico */}
+          {/* Tourist account menu — Jaguars, favoritos, histórico */}
           <TouristProfileWidget />
 
           {/* Hambúrguer — só mobile, abre o painel com Portal/Gestão e o

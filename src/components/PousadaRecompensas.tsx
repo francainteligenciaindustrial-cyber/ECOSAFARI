@@ -9,7 +9,7 @@ interface Props {
   pousadaId: string;
 }
 
-// Vitrine de recompensas trocáveis por Coins — as mesmas Coins ganhas no
+// Vitrine de recompensas trocáveis por Jaguars — os mesmos Jaguars ganhos no
 // aplicativo EcoSafari por foto de avistamento aprovada, aqui viram desconto
 // direto com a pousada.
 export default function PousadaRecompensas({ pousadaId }: Props) {
@@ -56,12 +56,12 @@ export default function PousadaRecompensas({ pousadaId }: Props) {
   return (
     <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
       <h2 className="text-2xl font-serif font-bold text-editorial-primary mb-1 flex items-center gap-2">
-        <Gift className="h-5 w-5" /> Resgate com Coins
+        <Gift className="h-5 w-5" /> Resgate com Jaguars
       </h2>
       <p className="text-editorial-muted text-xs mb-6">
         {isTourist
-          ? <>Suas Coins do aplicativo EcoSafari — você tem <span className="font-bold text-editorial-primary">{coins}</span>.</>
-          : "Entre com seu perfil de turista para resgatar com as Coins que você ganhou no aplicativo EcoSafari."}
+          ? <>Seus Jaguars do aplicativo EcoSafari — você tem <span className="font-bold text-editorial-primary">{coins}</span>.</>
+          : "Entre com seu perfil de turista para resgatar com os Jaguars que você ganhou no aplicativo EcoSafari."}
       </p>
 
       {error && <p className="text-red-600 text-xs font-medium mb-4">{error}</p>}
@@ -104,7 +104,7 @@ export default function PousadaRecompensas({ pousadaId }: Props) {
                   disabled={!canAfford || redeemingId === r.id}
                   className="mt-1 bg-editorial-primary text-white text-[11px] uppercase tracking-widest font-bold py-2 rounded-md hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  {redeemingId === r.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : canAfford ? "Resgatar" : "Coins insuficientes"}
+                  {redeemingId === r.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : canAfford ? "Resgatar" : "Jaguars insuficientes"}
                 </button>
               )}
             </div>

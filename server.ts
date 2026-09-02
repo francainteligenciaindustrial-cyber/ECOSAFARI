@@ -2967,13 +2967,19 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
     return res.status(400).json({ error: "Preencha ao menos nome e idade." });
   }
   const interests = req.body.interests !== undefined ? sanitizeTouristInterests(req.body.interests) : current.interests;
-  // Opcional — só é enviado quando a pessoa troca a foto (ver ImageUploadButton
-  // em TuristaProfileView.tsx); omitido, o UPDATE simplesmente não mexe nela.
+  // Opcionais — só são enviados quando a pessoa troca a foto de perfil ou de
+  // capa (ver ImageUploadButton em TuristaProfileView.tsx); omitidos, o
+  // UPDATE simplesmente não mexe neles.
   const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl.trim() : undefined;
+  const coverPhotoUrl = typeof req.body.coverPhotoUrl === "string" ? req.body.coverPhotoUrl.trim() : undefined;
 
   const { data, error } = await supabase
     .from("turistas")
-    .update({ name, whatsapp, country, language, age, preferences, interests, ...(photoUrl !== undefined ? { photoUrl } : {}) })
+    .update({
+      name, whatsapp, country, language, age, preferences, interests,
+      ...(photoUrl !== undefined ? { photoUrl } : {}),
+      ...(coverPhotoUrl !== undefined ? { coverPhotoUrl } : {}),
+    })
     .eq("id", userId)
     .select()
     .maybeSingle();
@@ -3134,10 +3140,40 @@ app.delete("/api/turista/favoritos/:pousadaId", requireTourist, async (req, res)
 });
 
 // ----------------------------------------------------
-// RECOMPENSAS & RESGATES — o programa de Coins em si. Cada pousada cadastra
-// os próprios brindes (recompensas); o turista troca Coins por um código,
-// que a pousada confirma presencialmente (resgate). As Coins em si nunca são
-// geradas aqui — vêm só do app separado, ver POST /api/integrations/app-coins-sync.
+// POSTS DO TURISTA — um diário pessoal de viagem no próprio perfil (texto +
+// foto opcional). Só o próprio turista vê os próprios posts — não existe
+// perfil público de turista nem feed compartilhado nesta plataforma.
+// ----------------------------------------------------
+app.get("/api/turista/posts", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { data, error } = await supabase.from("turista_posts").select("*").eq("turistaId", userId).order("createdAt", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar posts." });
+  res.json(data);
+});
+
+app.post("/api/turista/posts", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const text = String(req.body.text || "").trim();
+  const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl.trim() : "";
+  if (!text && !photoUrl) return res.status(400).json({ error: "Escreva algo ou adicione uma foto." });
+  const newPost = { id: `tp_${randomUUID()}`, turistaId: userId, text, photoUrl: photoUrl || null, createdAt: new Date().toISOString() };
+  const { error } = await supabase.from("turista_posts").insert(newPost);
+  if (error) return res.status(500).json({ error: "Erro ao publicar." });
+  res.status(201).json(newPost);
+});
+
+app.delete("/api/turista/posts/:id", requireTourist, async (req, res) => {
+  const userId = (res.locals.touristUser as { id: string }).id;
+  const { error } = await supabase.from("turista_posts").delete().eq("id", req.params.id).eq("turistaId", userId);
+  if (error) return res.status(500).json({ error: "Erro ao excluir post." });
+  res.json({ success: true });
+});
+
+// ----------------------------------------------------
+// RECOMPENSAS & RESGATES — o programa de Jaguars em si. Cada pousada cadastra
+// os próprios brindes (recompensas); o turista troca Jaguars por um código,
+// que a pousada confirma presencialmente (resgate). Os Jaguars em si nunca
+// são gerados aqui — vêm só do app separado, ver POST /api/integrations/app-coins-sync.
 // ----------------------------------------------------
 
 const RECOMPENSA_FIELDS = ["title", "description", "coinCost", "active"] as const;

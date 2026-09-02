@@ -7,7 +7,7 @@ interface Props {
   pousadaId: string;
 }
 
-// Autoatendimento do parceiro: cadastra os brindes trocáveis por Coins e
+// Autoatendimento do parceiro: cadastra os brindes trocáveis por Jaguars e
 // confirma presencialmente o código que um turista mostrar no check-in/balcão.
 export default function PousadaRecompensasManager({ pousadaId }: Props) {
   const [recompensas, setRecompensas] = useState<Recompensa[]>([]);
@@ -38,7 +38,7 @@ export default function PousadaRecompensasManager({ pousadaId }: Props) {
     setError("");
     const cost = Number(coinCost);
     if (!title.trim() || !Number.isFinite(cost) || cost <= 0) {
-      setError("Informe um título e um custo em Coins válido.");
+      setError("Informe um título e um custo em Jaguars válido.");
       return;
     }
     setCreating(true);
@@ -87,7 +87,7 @@ export default function PousadaRecompensasManager({ pousadaId }: Props) {
         setValidateResult({ ok: false, message: data.error || "Código inválido." });
         return;
       }
-      setValidateResult({ ok: true, message: `Resgate confirmado! ${data.coinCost} Coins.` });
+      setValidateResult({ ok: true, message: `Resgate confirmado! ${data.coinCost} Jaguars.` });
       setCode("");
     } finally {
       setValidating(false);
@@ -98,9 +98,9 @@ export default function PousadaRecompensasManager({ pousadaId }: Props) {
     <div className="bg-white border border-editorial-border rounded-lg p-6 space-y-6">
       <div>
         <h3 className="font-bold text-sm text-editorial-text flex items-center gap-2 mb-1">
-          <Coins className="h-4 w-4 text-editorial-primary" /> Recompensas em Coins
+          <Coins className="h-4 w-4 text-editorial-primary" /> Recompensas em Jaguars
         </h3>
-        <p className="text-editorial-muted text-xs">Brindes ou descontos que um turista pode trocar pelas Coins que ganhou no aplicativo EcoSafari.</p>
+        <p className="text-editorial-muted text-xs">Brindes ou descontos que um turista pode trocar pelos Jaguars que ganhou no aplicativo EcoSafari.</p>
       </div>
 
       {/* Validar código de resgate */}
@@ -161,7 +161,7 @@ export default function PousadaRecompensasManager({ pousadaId }: Props) {
         />
         <div className="flex gap-2">
           <input
-            type="number" min={1} value={coinCost} onChange={e => setCoinCost(e.target.value)} placeholder="Custo em Coins"
+            type="number" min={1} value={coinCost} onChange={e => setCoinCost(e.target.value)} placeholder="Custo em Jaguars"
             className="flex-1 border border-editorial-border rounded-md p-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
           <button type="submit" disabled={creating} className="bg-editorial-primary text-white text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-md disabled:opacity-60 cursor-pointer flex items-center gap-1.5">
