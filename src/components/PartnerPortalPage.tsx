@@ -65,7 +65,7 @@ export default function PartnerPortalPage() {
   const [form, setForm] = useState<any>(null);
   // Só a edição de pousada usa abas — atração/guia continuam num formulário
   // único de coluna simples (o volume de campos deles não justifica isso).
-  const [pousadaTab, setPousadaTab] = useState<"servicos" | "acomodacoes" | "bar" | "midias">("servicos");
+  const [pousadaTab, setPousadaTab] = useState<"servicos" | "acomodacoes" | "bar" | "midias" | "produtos">("servicos");
   const [shareCopied, setShareCopied] = useState(false);
 
   // Whether the current session came from clicking an invite/recovery link
@@ -442,6 +442,33 @@ export default function PartnerPortalPage() {
           {profile?.pousada?.name || profile?.atracao?.name || profile?.guia?.name || "Edite as informações que aparecem pra quem visita a EcoSafari."}
         </p>
 
+        {/* Abas: sobem pra cima da página inteira (logo abaixo do título),
+            em vez de ficarem enterradas depois de Sobre/Preço/Contato. */}
+        {profile?.partnerType === "pousada" && form && (
+          <div className="flex gap-1 border-b border-editorial-border overflow-x-auto mb-6">
+            {([
+              { id: "servicos", label: "Serviços" },
+              { id: "acomodacoes", label: "Acomodações" },
+              { id: "bar", label: "Bar/Restaurantes" },
+              { id: "midias", label: "Mídias" },
+              { id: "produtos", label: "Produtos" },
+            ] as const).map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setPousadaTab(tab.id)}
+                className={`px-3.5 py-2 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap border-b-2 transition cursor-pointer ${
+                  pousadaTab === tab.id
+                    ? "border-editorial-primary text-editorial-primary"
+                    : "border-transparent text-editorial-muted hover:text-editorial-text"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {loadingProfile ? (
           <div className="flex items-center justify-center py-16 text-editorial-muted gap-2">
             <LoaderCircle className="h-5 w-5 animate-spin" />
@@ -484,31 +511,6 @@ export default function PartnerPortalPage() {
                     <input type="text" value={form.officialSiteUrl} onChange={e => setForm((p: any) => ({ ...p, officialSiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                   </div>
                 </FormSection>
-
-                {/* Abas: o resto do cadastro (mais volumoso) fica organizado
-                    em Serviços / Acomodações / Bar & Restaurantes / Mídias
-                    em vez de uma pilha só de cartões. */}
-                <div className="flex gap-1 border-b border-editorial-border overflow-x-auto">
-                  {([
-                    { id: "servicos", label: "Serviços" },
-                    { id: "acomodacoes", label: "Acomodações" },
-                    { id: "bar", label: "Bar/Restaurantes" },
-                    { id: "midias", label: "Mídias" },
-                  ] as const).map(tab => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setPousadaTab(tab.id)}
-                      className={`px-3.5 py-2 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap border-b-2 transition cursor-pointer ${
-                        pousadaTab === tab.id
-                          ? "border-editorial-primary text-editorial-primary"
-                          : "border-transparent text-editorial-muted hover:text-editorial-text"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
 
                 {pousadaTab === "servicos" && (
                   <FormSection title="Serviços">
@@ -810,6 +812,18 @@ export default function PartnerPortalPage() {
           </ErrorBoundary>
         ) : null}
 
+        {/* PousadaProdutosManager tem o próprio <form> interno (cadastro de
+            produto) — não pode ficar aninhado dentro do <form> principal
+            acima (HTML não permite form dentro de form), então essa aba
+            renderiza fora dele, mas na mesma posição visual das outras. */}
+        {profile?.partnerType === "pousada" && form && pousadaTab === "produtos" && (
+          <div className="mt-6">
+            <ErrorBoundary variant="section" sectionLabel="o catálogo de produtos">
+              <PousadaProdutosManager pousadaId={profile.partnerId} />
+            </ErrorBoundary>
+          </div>
+        )}
+
         {profile?.partnerType === "pousada" && (
           <div className="mt-8 space-y-8">
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
@@ -817,9 +831,6 @@ export default function PartnerPortalPage() {
             </ErrorBoundary>
             <ErrorBoundary variant="section" sectionLabel="as recompensas">
               <PousadaRecompensasManager pousadaId={profile.partnerId} />
-            </ErrorBoundary>
-            <ErrorBoundary variant="section" sectionLabel="o catálogo de produtos">
-              <PousadaProdutosManager pousadaId={profile.partnerId} />
             </ErrorBoundary>
             <ErrorBoundary variant="section" sectionLabel="o consumo dos hóspedes">
               <PousadaConsumoManager pousadaId={profile.partnerId} />
