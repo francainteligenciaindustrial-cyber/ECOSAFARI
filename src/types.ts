@@ -29,9 +29,13 @@ export interface Pousada {
   officialSiteImages?: string[];
   // Estrutura de quartos — complementa "capacity" (limite agregado usado na
   // checagem de disponibilidade de reservas) com o detalhe real que um
-  // hóspede quer ver: quantos quartos existem e quantas pessoas cabem em
-  // cada um.
-  rooms?: { type: string; capacity: number; quantity: number }[];
+  // hóspede quer ver: quantos quartos existem, quantas pessoas cabem em
+  // cada um, e a configuração de camas (opcional — nem toda pousada
+  // detalha isso).
+  rooms?: { type: string; capacity: number; quantity: number; beds?: { bedType: string; count: number }[] }[];
+  // Cardápio do bar/restaurante da própria pousada, quando ela tiver um —
+  // mesma estrutura do menu de Atracao (item + preço).
+  menu?: { item: string; price: number }[];
   // Calendário Google dedicado desta pousada (dentro da conta única já
   // conectada em Gestão → Agenda Integrada) — quando ausente, os eventos de
   // reserva confirmada caem no calendário "primary" da conta, como sempre

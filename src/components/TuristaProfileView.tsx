@@ -55,6 +55,7 @@ export default function TuristaProfileView() {
   const [postText, setPostText] = useState("");
   const [postPhotoUrl, setPostPhotoUrl] = useState("");
   const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState("");
 
   const [exporting, setExporting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -168,18 +169,24 @@ export default function TuristaProfileView() {
     e.preventDefault();
     if (posting || (!postText.trim() && !postPhotoUrl)) return;
     setPosting(true);
+    setPostError("");
     try {
       const res = await adminFetch("/api/turista/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: postText.trim(), photoUrl: postPhotoUrl || undefined }),
       });
-      if (res.ok) {
-        const newPost = await res.json();
-        setPosts(prev => [newPost, ...(prev || [])]);
-        setPostText("");
-        setPostPhotoUrl("");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setPostError(body.error || "Erro ao publicar. Tente novamente.");
+        return;
       }
+      const newPost = await res.json();
+      setPosts(prev => [newPost, ...(prev || [])]);
+      setPostText("");
+      setPostPhotoUrl("");
+    } catch {
+      setPostError("Erro ao publicar. Tente novamente.");
     } finally {
       setPosting(false);
     }
@@ -541,6 +548,7 @@ export default function TuristaProfileView() {
                   </button>
                 </div>
               )}
+              {postError && <p className="text-red-600 text-xs font-medium ml-[52px]">{postError}</p>}
               <div className="flex items-center justify-between ml-[52px]">
                 <ImageUploadButton label="Foto" icon={<ImagePlus className="h-3.5 w-3.5" />} onUploaded={setPostPhotoUrl} />
                 <button

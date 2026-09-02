@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users, UtensilsCrossed } from "lucide-react";
 import { Pousada, Review } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
@@ -303,12 +303,34 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                   <h3 className="font-serif font-bold text-editorial-primary text-base mb-4 flex items-center gap-2"><Bed className="h-4.5 w-4.5 text-editorial-primary" /> Quartos</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {pousada.rooms.map((room, idx) => (
+                      <div key={idx} className="border border-editorial-border p-3 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-editorial-text">{room.type}</span>
+                          <span className="text-editorial-muted flex items-center gap-3">
+                            <span>{room.quantity}x</span>
+                            <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> até {room.capacity}</span>
+                          </span>
+                        </div>
+                        {room.beds && room.beds.length > 0 && (
+                          <p className="text-editorial-muted mt-1.5 pt-1.5 border-t border-editorial-border/60">
+                            {room.beds.map(b => `${b.count}x ${b.bedType}`).join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cardápio do bar/restaurante próprio, quando a pousada tiver um */}
+              {pousada.menu && pousada.menu.length > 0 && (
+                <div className="border-t border-editorial-border pt-6 mt-6">
+                  <h3 className="font-serif font-bold text-editorial-primary text-base mb-4 flex items-center gap-2"><UtensilsCrossed className="h-4.5 w-4.5 text-editorial-primary" /> Bar & Restaurante</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {pousada.menu.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between border border-editorial-border p-3 text-xs">
-                        <span className="font-medium text-editorial-text">{room.type}</span>
-                        <span className="text-editorial-muted flex items-center gap-3">
-                          <span>{room.quantity}x</span>
-                          <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> até {room.capacity}</span>
-                        </span>
+                        <span className="text-editorial-text">{item.item}</span>
+                        <span className="font-bold text-editorial-primary">R$ {item.price.toLocaleString('pt-BR')}</span>
                       </div>
                     ))}
                   </div>

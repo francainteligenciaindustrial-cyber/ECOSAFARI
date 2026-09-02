@@ -52,6 +52,9 @@ export default function PartnerPortalPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState<any>(null);
+  // Só a edição de pousada usa abas — atração/guia continuam num formulário
+  // único de coluna simples (o volume de campos deles não justifica isso).
+  const [pousadaTab, setPousadaTab] = useState<"servicos" | "acomodacoes" | "bar" | "midias">("servicos");
 
   // Whether the current session came from clicking an invite/recovery link
   // rather than a normal email+senha login — Supabase fires a dedicated
@@ -143,6 +146,7 @@ export default function PartnerPortalPage() {
             unavailableDates: [...(data.pousada.unavailableDates || [])],
             hasOwnWebsite: !!data.pousada.hasOwnWebsite,
             ownWebsiteUrl: data.pousada.ownWebsiteUrl || "",
+            menu: (data.pousada.menu || []).map(m => ({ title: m.item, price: m.price })) as ExperienceDraft[],
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
           setForm({
@@ -245,6 +249,7 @@ export default function PartnerPortalPage() {
           unavailableDates: form.unavailableDates,
           hasOwnWebsite: form.hasOwnWebsite,
           ownWebsiteUrl: form.ownWebsiteUrl.trim() || undefined,
+          menu: form.menu.filter((m: ExperienceDraft) => m.title.trim()).map((m: ExperienceDraft) => ({ item: m.title.trim(), price: m.price || 0 })),
         };
       } else if (profile.partnerType === "atracao") {
         endpoint = `/api/atracoes/${profile.partnerId}`;
@@ -438,40 +443,6 @@ export default function PartnerPortalPage() {
                   </div>
                 </FormSection>
 
-                <FormSection title="Fotos">
-                  <ImageListEditor label="Imagens (Catálogo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
-                </FormSection>
-
-                <FormSection title="Disponibilidade">
-                  <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Agenda — datas indisponíveis</label>
-                    <p className="text-editorial-muted text-[11px] mb-3">Bloqueie datas específicas (manutenção, evento fechado, reforma) sem precisar mexer nos quartos/capacidade.</p>
-                    <GuideAvailabilityCalendar value={form.unavailableDates} onChange={unavailableDates => setForm((p: any) => ({ ...p, unavailableDates }))} />
-                  </div>
-                </FormSection>
-
-                <FormSection title="Estrutura & Atividades">
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Estrutura & Comodidades</label>
-                    <TagInput value={form.features} onChange={features => setForm((p: any) => ({ ...p, features }))} placeholder="Digite e pressione Enter" />
-                  </div>
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Atividades</label>
-                    <TagInput value={form.activities} onChange={activities => setForm((p: any) => ({ ...p, activities }))} placeholder="Digite e pressione Enter" />
-                  </div>
-                </FormSection>
-
-                <FormSection title="Experiências & Quartos">
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Experiências Pagas (cardápio de passeios)</label>
-                    <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
-                  </div>
-                  <div className="text-xs">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Quartos</label>
-                    <RoomsEditor value={form.rooms} onChange={rooms => setForm((p: any) => ({ ...p, rooms }))} />
-                  </div>
-                </FormSection>
-
                 <FormSection title="Contato & Redes">
                   <div className="text-xs">
                     <label className="block text-editorial-text font-semibold mb-1.5">Link do Instagram/Rede Social (opcional)</label>
@@ -479,62 +450,131 @@ export default function PartnerPortalPage() {
                   </div>
                 </FormSection>
 
-                <FormSection title="Site Oficial">
-                  <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
-                    <label className="block text-editorial-text font-semibold mb-1.5">Você já tem um site próprio?</label>
-                    <p className="text-editorial-muted text-[11px] mb-3">
-                      {form.hasOwnWebsite
-                        ? "O botão \"Ver site oficial\" no catálogo vai levar direto pro seu site."
-                        : "Sem site próprio, a EcoSafari monta um pra você com as fotos e informações abaixo (pré-via ao lado, atualizando conforme você edita)."}
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: false }))}
-                        className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${!form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
-                      >
-                        Não, criar um pra mim
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: true }))}
-                        className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
-                      >
-                        Sim, já tenho
-                      </button>
-                    </div>
-                  </div>
+                {/* Abas: o resto do cadastro (mais volumoso) fica organizado
+                    em Serviços / Acomodações / Bar & Restaurantes / Mídias
+                    em vez de uma pilha só de cartões. */}
+                <div className="flex gap-1 border-b border-editorial-border overflow-x-auto">
+                  {([
+                    { id: "servicos", label: "Serviços" },
+                    { id: "acomodacoes", label: "Acomodações" },
+                    { id: "bar", label: "Bar/Restaurantes" },
+                    { id: "midias", label: "Mídias" },
+                  ] as const).map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setPousadaTab(tab.id)}
+                      className={`px-3.5 py-2 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap border-b-2 transition cursor-pointer ${
+                        pousadaTab === tab.id
+                          ? "border-editorial-primary text-editorial-primary"
+                          : "border-transparent text-editorial-muted hover:text-editorial-text"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-                  {form.hasOwnWebsite ? (
+                {pousadaTab === "servicos" && (
+                  <FormSection title="Serviços">
                     <div className="text-xs">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Link do seu site</label>
-                      <input type="text" placeholder="https://..." value={form.ownWebsiteUrl} onChange={e => setForm((p: any) => ({ ...p, ownWebsiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <label className="block text-editorial-text font-semibold mb-1.5">Estrutura & Comodidades</label>
+                      <TagInput value={form.features} onChange={features => setForm((p: any) => ({ ...p, features }))} placeholder="Digite e pressione Enter" />
                     </div>
-                  ) : (
-                    <>
-                      <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens do catálogo)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
-                      <div className="text-xs">
-                        <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
-                        <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Atividades</label>
+                      <TagInput value={form.activities} onChange={activities => setForm((p: any) => ({ ...p, activities }))} placeholder="Digite e pressione Enter" />
+                    </div>
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Experiências Pagas (passeios)</label>
+                      <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
+                    </div>
+                  </FormSection>
+                )}
+
+                {pousadaTab === "acomodacoes" && (
+                  <FormSection title="Acomodações">
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Quartos</label>
+                      <RoomsEditor value={form.rooms} onChange={rooms => setForm((p: any) => ({ ...p, rooms }))} />
+                    </div>
+                    <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Agenda — datas indisponíveis</label>
+                      <p className="text-editorial-muted text-[11px] mb-3">Bloqueie datas específicas (manutenção, evento fechado, reforma) sem precisar mexer nos quartos/capacidade.</p>
+                      <GuideAvailabilityCalendar value={form.unavailableDates} onChange={unavailableDates => setForm((p: any) => ({ ...p, unavailableDates }))} />
+                    </div>
+                  </FormSection>
+                )}
+
+                {pousadaTab === "bar" && (
+                  <FormSection title="Bar/Restaurantes">
+                    <div className="text-xs">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Cardápio (opcional — só se a pousada tiver bar/restaurante próprio)</label>
+                      <ExperienceListEditor value={form.menu} onChange={menu => setForm((p: any) => ({ ...p, menu }))} />
+                    </div>
+                  </FormSection>
+                )}
+
+                {pousadaTab === "midias" && (
+                  <FormSection title="Mídias">
+                    <ImageListEditor label="Imagens (Catálogo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
+
+                    <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Você já tem um site próprio?</label>
+                      <p className="text-editorial-muted text-[11px] mb-3">
+                        {form.hasOwnWebsite
+                          ? "O botão \"Ver site oficial\" no catálogo vai levar direto pro seu site."
+                          : "Sem site próprio, a EcoSafari monta um pra você com as fotos e informações abaixo (pré-via ao lado, atualizando conforme você edita)."}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: false }))}
+                          className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${!form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
+                        >
+                          Não, criar um pra mim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: true }))}
+                          className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
+                        >
+                          Sim, já tenho
+                        </button>
                       </div>
-                      <div className="text-xs border-t border-editorial-border pt-4">
-                        <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
-                        <div className="flex items-center gap-3 mb-2">
-                          {form.teamPhotoUrl && <img src={form.teamPhotoUrl} alt="Equipe" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
-                          <ImageUploadButton label={form.teamPhotoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={url => setForm((p: any) => ({ ...p, teamPhotoUrl: url }))} />
+                    </div>
+
+                    {form.hasOwnWebsite ? (
+                      <div className="text-xs">
+                        <label className="block text-editorial-text font-semibold mb-1.5">Link do seu site</label>
+                        <input type="text" placeholder="https://..." value={form.ownWebsiteUrl} onChange={e => setForm((p: any) => ({ ...p, ownWebsiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      </div>
+                    ) : (
+                      <>
+                        <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens do catálogo)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
+                          <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                         </div>
-                      </div>
-                      <div className="text-xs">
-                        <label className="block text-editorial-text font-semibold mb-1.5">Título da Seção da Equipe (padrão: "Quem vai te receber")</label>
-                        <input type="text" value={form.teamSectionTitle} onChange={e => setForm((p: any) => ({ ...p, teamSectionTitle: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                      </div>
-                      <div className="text-xs">
-                        <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
-                        <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
-                      </div>
-                    </>
-                  )}
-                </FormSection>
+                        <div className="text-xs border-t border-editorial-border pt-4">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
+                          <div className="flex items-center gap-3 mb-2">
+                            {form.teamPhotoUrl && <img src={form.teamPhotoUrl} alt="Equipe" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
+                            <ImageUploadButton label={form.teamPhotoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={url => setForm((p: any) => ({ ...p, teamPhotoUrl: url }))} />
+                          </div>
+                        </div>
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Título da Seção da Equipe (padrão: "Quem vai te receber")</label>
+                          <input type="text" value={form.teamSectionTitle} onChange={e => setForm((p: any) => ({ ...p, teamSectionTitle: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                        </div>
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
+                          <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
+                        </div>
+                      </>
+                    )}
+                  </FormSection>
+                )}
               </>
             )}
 
