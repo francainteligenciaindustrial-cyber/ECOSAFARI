@@ -11,6 +11,10 @@ export interface RoomDraft {
   capacity: number;
   quantity: number;
   beds?: BedDraft[];
+  hasAC?: boolean;
+  hasTV?: boolean;
+  hasMinibar?: boolean;
+  bathroomType?: "privado" | "comum";
 }
 
 // Categorias fixas em vez de texto livre — evita "casal", "Casal", "cama
@@ -114,12 +118,38 @@ export default function RoomsEditor({ value, onChange }: { value: RoomDraft[]; o
                 <Plus className="h-3 w-3" /> Adicionar cama
               </button>
             </div>
+
+            {/* Amenidades do quarto — ar/tv/frigobar/banheiro variam entre
+                tipos de quarto de uma mesma pousada (ex: suíte tem ar e
+                banheiro privado, quarto econômico não). */}
+            <div className="flex flex-wrap items-center gap-3 pl-1 pt-1 border-t border-zinc-100">
+              <label className="flex items-center gap-1.5 text-[11px] text-zinc-600 cursor-pointer">
+                <input type="checkbox" checked={!!room.hasAC} onChange={e => update(idx, { hasAC: e.target.checked })} className="cursor-pointer" /> Ar-condicionado
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-zinc-600 cursor-pointer">
+                <input type="checkbox" checked={!!room.hasTV} onChange={e => update(idx, { hasTV: e.target.checked })} className="cursor-pointer" /> TV
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-zinc-600 cursor-pointer">
+                <input type="checkbox" checked={!!room.hasMinibar} onChange={e => update(idx, { hasMinibar: e.target.checked })} className="cursor-pointer" /> Frigobar
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                Banheiro:
+                <select
+                  value={room.bathroomType || "privado"}
+                  onChange={e => update(idx, { bathroomType: e.target.value as "privado" | "comum" })}
+                  className="bg-zinc-50 border border-zinc-200 rounded p-1 text-[11px] focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="privado">Privado</option>
+                  <option value="comum">Comum</option>
+                </select>
+              </label>
+            </div>
           </div>
         );
       })}
       <button
         type="button"
-        onClick={() => onChange([...value, { type: "", capacity: 2, quantity: 1, beds: [] }])}
+        onClick={() => onChange([...value, { type: "", capacity: 2, quantity: 1, beds: [], bathroomType: "privado" }])}
         className="flex items-center gap-1 text-emerald-700 font-semibold text-[11px] hover:text-emerald-800 transition cursor-pointer"
       >
         <Plus className="h-3.5 w-3.5" /> Adicionar tipo de quarto

@@ -9,6 +9,13 @@ import FavoriteButton from "./FavoriteButton";
 import PousadaRecompensas from "./PousadaRecompensas";
 import { useStructuredData } from "../lib/structuredData";
 
+const MENU_CATEGORIES = [
+  { key: "prato" as const, label: "Pratos" },
+  { key: "bebida" as const, label: "Bebidas" },
+  { key: "drink" as const, label: "Drinks" },
+  { key: "sobremesa" as const, label: "Sobremesas" },
+];
+
 interface PousadaDetailsViewProps {
   pousada: Pousada;
   onBack: () => void;
@@ -297,6 +304,27 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 </div>
               </div>
 
+              {/* Serviços — culinária, transporte, entretenimento e um texto
+                  livre de atendimento/necessidades especiais, além dos tags
+                  de "features" já existentes acima. */}
+              {(pousada.cuisineTypes?.length || pousada.transportOptions?.length || pousada.entertainmentOptions?.length || pousada.serviceNotes) ? (
+                <div className="border-t border-editorial-border pt-6 mt-6 space-y-3">
+                  <h3 className="font-serif font-bold text-editorial-primary text-base flex items-center gap-2"><UtensilsCrossed className="h-4.5 w-4.5 text-editorial-primary" /> Serviços</h3>
+                  {pousada.cuisineTypes && pousada.cuisineTypes.length > 0 && (
+                    <p className="text-xs"><span className="text-editorial-muted font-semibold">Culinária: </span>{pousada.cuisineTypes.join(", ")}</p>
+                  )}
+                  {pousada.transportOptions && pousada.transportOptions.length > 0 && (
+                    <p className="text-xs"><span className="text-editorial-muted font-semibold">Transporte: </span>{pousada.transportOptions.join(", ")}</p>
+                  )}
+                  {pousada.entertainmentOptions && pousada.entertainmentOptions.length > 0 && (
+                    <p className="text-xs"><span className="text-editorial-muted font-semibold">Entretenimento: </span>{pousada.entertainmentOptions.join(", ")}</p>
+                  )}
+                  {pousada.serviceNotes && (
+                    <p className="text-editorial-muted text-xs whitespace-pre-line">{pousada.serviceNotes}</p>
+                  )}
+                </div>
+              ) : null}
+
               {/* Rooms breakdown */}
               {pousada.rooms && pousada.rooms.length > 0 && (
                 <div className="border-t border-editorial-border pt-6 mt-6">
@@ -316,24 +344,45 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                             {room.beds.map(b => `${b.count}x ${b.bedType}`).join(" · ")}
                           </p>
                         )}
+                        {(room.hasAC || room.hasTV || room.hasMinibar || room.bathroomType) && (
+                          <p className="text-editorial-muted mt-1.5 pt-1.5 border-t border-editorial-border/60">
+                            {[
+                              room.hasAC && "Ar-condicionado",
+                              room.hasTV && "TV",
+                              room.hasMinibar && "Frigobar",
+                              room.bathroomType && `Banheiro ${room.bathroomType}`,
+                            ].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Cardápio do bar/restaurante próprio, quando a pousada tiver um */}
+              {/* Cardápio do bar/restaurante próprio, quando a pousada tiver
+                  um — agrupado por categoria (Pratos/Bebidas/Drinks/
+                  Sobremesas) pra facilitar a leitura em vez de uma lista só. */}
               {pousada.menu && pousada.menu.length > 0 && (
                 <div className="border-t border-editorial-border pt-6 mt-6">
                   <h3 className="font-serif font-bold text-editorial-primary text-base mb-4 flex items-center gap-2"><UtensilsCrossed className="h-4.5 w-4.5 text-editorial-primary" /> Bar & Restaurante</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {pousada.menu.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between border border-editorial-border p-3 text-xs">
-                        <span className="text-editorial-text">{item.item}</span>
-                        <span className="font-bold text-editorial-primary">R$ {item.price.toLocaleString('pt-BR')}</span>
+                  {MENU_CATEGORIES.map(({ key, label }) => {
+                    const items = pousada.menu!.filter(item => (item.category || "prato") === key);
+                    if (items.length === 0) return null;
+                    return (
+                      <div key={key} className="mb-4 last:mb-0">
+                        <h4 className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-2">{label}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {items.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between border border-editorial-border p-3 text-xs">
+                              <span className="text-editorial-text">{item.item}</span>
+                              <span className="font-bold text-editorial-primary">R$ {item.price.toLocaleString('pt-BR')}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

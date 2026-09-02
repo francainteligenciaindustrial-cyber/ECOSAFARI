@@ -32,10 +32,25 @@ export interface Pousada {
   // hóspede quer ver: quantos quartos existem, quantas pessoas cabem em
   // cada um, e a configuração de camas (opcional — nem toda pousada
   // detalha isso).
-  rooms?: { type: string; capacity: number; quantity: number; beds?: { bedType: string; count: number }[] }[];
+  // ar/tv/frigobar/banheiro são amenidades do QUARTO em si (não da pousada
+  // toda) — a aba "Acomodações" do portal do parceiro pede especificamente
+  // isso por tipo de quarto.
+  rooms?: {
+    type: string; capacity: number; quantity: number;
+    beds?: { bedType: string; count: number }[];
+    hasAC?: boolean; hasTV?: boolean; hasMinibar?: boolean;
+    bathroomType?: "privado" | "comum";
+  }[];
   // Cardápio do bar/restaurante da própria pousada, quando ela tiver um —
-  // mesma estrutura do menu de Atracao (item + preço).
-  menu?: { item: string; price: number }[];
+  // mesma estrutura do menu de Atracao (item + preço), com categoria pra
+  // agrupar em Pratos/Bebidas/Drinks/Sobremesas na exibição.
+  menu?: { item: string; price: number; category?: "prato" | "bebida" | "drink" | "sobremesa" }[];
+  // Aba "Serviços" do portal do parceiro — características do
+  // atendimento/estrutura que vão além dos tags livres de "features".
+  cuisineTypes?: string[]; // tipos de culinária (ex: "Regional", "Italiana")
+  transportOptions?: string[]; // ex: "Transfer aeroporto", "Traslado local"
+  entertainmentOptions?: string[]; // ex: "Fogueira", "Música ao vivo"
+  serviceNotes?: string; // atendimento, necessidades especiais, peculiaridades (texto livre)
   // Calendário Google dedicado desta pousada (dentro da conta única já
   // conectada em Gestão → Agenda Integrada) — quando ausente, os eventos de
   // reserva confirmada caem no calendário "primary" da conta, como sempre
