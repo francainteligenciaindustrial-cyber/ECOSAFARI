@@ -414,6 +414,23 @@ function requirePartnerAccess(partnerType: PartnerType): express.RequestHandler[
           res.locals.isAdmin = false;
           return next();
         }
+        // Múltiplas propriedades: além do vínculo "principal" acima (em
+        // app_metadata), um parceiro pode ter propriedades extras
+        // registradas em partner_links (ver scripts/add-partner-links.sql) —
+        // dono de mais de uma pousada gerenciando tudo com o mesmo login.
+        if (role === "partner") {
+          const { data: link } = await supabase
+            .from("partner_links")
+            .select("id")
+            .eq("userId", data.user.id)
+            .eq("partnerType", partnerType)
+            .eq("partnerId", req.params.id)
+            .maybeSingle();
+          if (link) {
+            res.locals.isAdmin = false;
+            return next();
+          }
+        }
         return res.status(403).json({ error: "Acesso restrito ao administrador ou ao próprio parceiro." });
       } catch (err) {
         res.status(401).json({ error: "Token inválido." });
@@ -4116,6 +4133,19 @@ app.get("/api/partners/:type/:id/access", requireAdmin, async (req, res) => {
 // Creates (or re-links, if the email already has an account) a Supabase
 // Auth user and gets them access as fast as possible.
 //
+// Garante que exista um vínculo extra (além do "principal" em app_metadata)
+// entre esse login de parceiro e uma propriedade — idempotente (upsert),
+// então convidar a mesma pessoa pra mesma propriedade duas vezes não gera
+// duplicata. Ver scripts/add-partner-links.sql.
+async function ensurePartnerLink(userId: string, partnerType: string, partnerId: string) {
+  if (!userId || !partnerType || !partnerId) return;
+  const { error } = await supabase.from("partner_links").upsert(
+    { id: `pl_${userId}_${partnerType}_${partnerId}`, userId, partnerType, partnerId },
+    { onConflict: "userId,partnerType,partnerId" }
+  );
+  if (error) log.warn("Erro ao vincular propriedade extra de parceiro:", error.message);
+}
+
 // This used to call inviteUserByEmail first — the one admin API call that
 // both creates the user AND emails them via Supabase's own mail sending —
 // but that makes account creation and email delivery a single atomic step:
@@ -4178,6 +4208,14 @@ async function provisionPartnerLogin(
     const existingMeta = match.app_metadata || {};
     const isSameGrant = Object.entries(appMetadata).every(([k, v]) => existingMeta[k] === v);
     if (existingMeta.role && !isSameGrant) {
+      // Exceção: se já é parceiro e o convite novo também é de parceiro
+      // (só que de outra propriedade), não é conflito — é dono de mais de
+      // uma pousada/atração/guia. Soma como propriedade extra em
+      // partner_links em vez de rejeitar ou sobrescrever a principal.
+      if (existingMeta.role === "partner" && appMetadata.role === "partner") {
+        await ensurePartnerLink(match.id, String((appMetadata as any).partnerType), String((appMetadata as any).partnerId));
+        return { userId: match.id, actionLink: null, emailSent: false };
+      }
       return {
         userId: null,
         actionLink: null,
@@ -4269,6 +4307,10 @@ app.post("/api/partners/invite", requireAdmin, async (req, res) => {
     user: { id: result.userId, email },
     actionLink: result.actionLink,
     emailSent: result.emailSent,
+    // Sem link de ação porque a conta já existia e só ganhou uma propriedade
+    // extra (ver provisionPartnerLogin) — não precisa definir senha de novo,
+    // já consegue entrar e ver isso em "Minhas Pousadas".
+    linkedExisting: !result.actionLink && !result.error,
   });
 });
 
@@ -4398,6 +4440,10 @@ app.delete("/api/partners/access/:userId", requireAdmin, async (req, res) => {
 // Lets a logged-in partner fetch their own record without needing to know
 // their own id up front — the dashboard just calls this and renders
 // whichever of pousada/atracao/guia comes back.
+// Aceita ?partnerType=&partnerId= opcionais pra dono de mais de uma
+// propriedade escolher qual está editando ("Minhas Pousadas" no portal) —
+// sem os dois, cai na propriedade "principal" salva em app_metadata (mesmo
+// comportamento de sempre, pra quem só tem uma).
 app.get("/api/my-partner-profile", authLimiter, async (req, res) => {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -4405,10 +4451,28 @@ app.get("/api/my-partner-profile", authLimiter, async (req, res) => {
 
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) return res.status(401).json({ error: "Token inválido." });
+  if (data.user.app_metadata?.role !== "partner") {
+    return res.status(403).json({ error: "Esta conta não tem um perfil de parceiro vinculado." });
+  }
 
-  const partnerType = data.user.app_metadata?.partnerType as PartnerType | undefined;
-  const partnerId = data.user.app_metadata?.partnerId as string | undefined;
-  if (data.user.app_metadata?.role !== "partner" || !partnerType || !partnerId) {
+  const requestedType = req.query.partnerType as PartnerType | undefined;
+  const requestedId = req.query.partnerId ? String(req.query.partnerId) : undefined;
+
+  let partnerType: PartnerType | undefined;
+  let partnerId: string | undefined;
+  if (requestedType && requestedId) {
+    const isPrimary = data.user.app_metadata?.partnerType === requestedType && data.user.app_metadata?.partnerId === requestedId;
+    const { data: link } = isPrimary
+      ? { data: null }
+      : await supabase.from("partner_links").select("id").eq("userId", data.user.id).eq("partnerType", requestedType).eq("partnerId", requestedId).maybeSingle();
+    if (!isPrimary && !link) return res.status(403).json({ error: "Esta conta não tem acesso a essa propriedade." });
+    partnerType = requestedType;
+    partnerId = requestedId;
+  } else {
+    partnerType = data.user.app_metadata?.partnerType as PartnerType | undefined;
+    partnerId = data.user.app_metadata?.partnerId as string | undefined;
+  }
+  if (!partnerType || !partnerId) {
     return res.status(403).json({ error: "Esta conta não tem um perfil de parceiro vinculado." });
   }
 
@@ -4426,6 +4490,50 @@ app.get("/api/my-partner-profile", authLimiter, async (req, res) => {
     partnerId,
     [partnerType === "pousada" ? "pousada" : partnerType === "atracao" ? "atracao" : "guia"]: mapped,
   });
+});
+
+// Lista TODAS as propriedades que esse login de parceiro pode gerenciar —
+// a "principal" (app_metadata) mais qualquer extra em partner_links (dono de
+// mais de uma pousada). Alimenta a aba "Minhas Pousadas" no portal.
+app.get("/api/my-partner-properties", authLimiter, async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "Autenticação necessária." });
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return res.status(401).json({ error: "Token inválido." });
+  if (data.user.app_metadata?.role !== "partner") return res.status(403).json({ error: "Esta conta não tem acesso de parceiro." });
+
+  const links = new Map<string, { partnerType: PartnerType; partnerId: string }>();
+  const primaryType = data.user.app_metadata?.partnerType as PartnerType | undefined;
+  const primaryId = data.user.app_metadata?.partnerId as string | undefined;
+  if (primaryType && primaryId) links.set(`${primaryType}:${primaryId}`, { partnerType: primaryType, partnerId: primaryId });
+
+  const { data: extraLinks } = await supabase.from("partner_links").select('"partnerType", "partnerId"').eq("userId", data.user.id);
+  for (const l of (extraLinks || []) as any[]) {
+    links.set(`${l.partnerType}:${l.partnerId}`, { partnerType: l.partnerType, partnerId: l.partnerId });
+  }
+
+  const idsByType: Record<PartnerType, string[]> = { pousada: [], atracao: [], guia: [] };
+  for (const l of links.values()) idsByType[l.partnerType].push(l.partnerId);
+
+  const [pousadaRows, atracaoRows, guideRows] = await Promise.all([
+    idsByType.pousada.length ? supabase.from("pousadas").select("id,name").in("id", idsByType.pousada) : Promise.resolve({ data: [] as any[] }),
+    idsByType.atracao.length ? supabase.from("atracoes").select("id,name").in("id", idsByType.atracao) : Promise.resolve({ data: [] as any[] }),
+    idsByType.guia.length ? supabase.from("guides").select("id,name").in("id", idsByType.guia) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const nameById = new Map<string, string>();
+  for (const r of (pousadaRows.data || []) as any[]) nameById.set(`pousada:${r.id}`, resolveTranslation(r.name));
+  for (const r of (atracaoRows.data || []) as any[]) nameById.set(`atracao:${r.id}`, resolveTranslation(r.name));
+  for (const r of (guideRows.data || []) as any[]) nameById.set(`guia:${r.id}`, r.name);
+
+  const properties = Array.from(links.values()).map(l => ({
+    partnerType: l.partnerType,
+    partnerId: l.partnerId,
+    name: nameById.get(`${l.partnerType}:${l.partnerId}`) || "(sem nome)",
+  }));
+
+  res.json({ properties });
 });
 
 // SUPABASE SYSTEM STATUS & AUTO-CONFIGURATION ENDPOINTS

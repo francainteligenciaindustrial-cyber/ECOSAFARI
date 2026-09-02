@@ -3,7 +3,7 @@ import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldChec
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
-import { PartnerProfileResponse, Pousada } from "../types";
+import { PartnerProfileResponse, Pousada, PartnerType } from "../types";
 import { navigate } from "../lib/router";
 import ImageListEditor from "./ImageListEditor";
 import ImageUploadButton from "./ImageUploadButton";
@@ -65,8 +65,15 @@ export default function PartnerPortalPage() {
   const [form, setForm] = useState<any>(null);
   // Só a edição de pousada usa abas — atração/guia continuam num formulário
   // único de coluna simples (o volume de campos deles não justifica isso).
-  const [pousadaTab, setPousadaTab] = useState<"sobre" | "servicos" | "acomodacoes" | "bar" | "midias" | "redes" | "produtos">("sobre");
+  const [pousadaTab, setPousadaTab] = useState<"minhas-pousadas" | "sobre" | "servicos" | "acomodacoes" | "bar" | "midias" | "redes" | "editar-site" | "produtos">("sobre");
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Dono de mais de uma pousada gerencia todas com o mesmo login — ver
+  // GET /api/my-partner-properties/provisionPartnerLogin em server.ts.
+  // selectedProperty null = usa a propriedade "principal" salva em
+  // app_metadata (comportamento de sempre, pra quem só tem uma).
+  const [properties, setProperties] = useState<{ partnerType: PartnerType; partnerId: string; name: string }[] | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<{ partnerType: PartnerType; partnerId: string } | null>(null);
 
   // Whether the current session came from clicking an invite/recovery link
   // rather than a normal email+senha login — Supabase fires a dedicated
@@ -124,11 +131,22 @@ export default function PartnerPortalPage() {
     }
   };
 
+  // Lista de propriedades pra aba "Minhas Pousadas" — busca uma vez ao
+  // logar, não depende de qual está selecionada no momento.
+  useEffect(() => {
+    if (!isPartner) return;
+    adminFetch("/api/my-partner-properties")
+      .then(res => (res.ok ? res.json() : { properties: [] }))
+      .then(data => setProperties(data.properties || []))
+      .catch(() => setProperties([]));
+  }, [isPartner]);
+
   useEffect(() => {
     if (!isPartner) return;
     setLoadingProfile(true);
     setProfileError("");
-    adminFetch("/api/my-partner-profile")
+    const query = selectedProperty ? `?partnerType=${selectedProperty.partnerType}&partnerId=${encodeURIComponent(selectedProperty.partnerId)}` : "";
+    adminFetch(`/api/my-partner-profile${query}`)
       .then(async res => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -204,7 +222,7 @@ export default function PartnerPortalPage() {
       })
       .catch(err => setProfileError(err.message || "Erro ao carregar seu perfil."))
       .finally(() => setLoadingProfile(false));
-  }, [isPartner]);
+  }, [isPartner, selectedProperty]);
 
   // "Entrar com EcoSafari" — apps de terceiros (o aplicativo mobile
   // planejado, por exemplo) que o parceiro autorizou via a tela de
@@ -443,7 +461,7 @@ export default function PartnerPortalPage() {
   return (
     <div className="min-h-screen bg-editorial-bg font-sans">
       {header}
-      <div className={`mx-auto px-6 py-10 ${previewPousada ? "max-w-7xl" : "max-w-2xl"}`}>
+      <div className={`mx-auto px-6 py-10 ${pousadaTab === "editar-site" ? "max-w-6xl" : "max-w-2xl"}`}>
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-primary transition mb-6 cursor-pointer">
           <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao site
         </a>
@@ -457,12 +475,14 @@ export default function PartnerPortalPage() {
         {profile?.partnerType === "pousada" && form && (
           <div className="flex gap-1 border-b border-editorial-border overflow-x-auto mb-6">
             {([
+              { id: "minhas-pousadas", label: "Minhas Pousadas" },
               { id: "sobre", label: "Sobre" },
               { id: "servicos", label: "Serviços" },
               { id: "acomodacoes", label: "Acomodações" },
               { id: "bar", label: "Bar/Restaurantes" },
               { id: "midias", label: "Mídias" },
               { id: "redes", label: "Redes Sociais" },
+              { id: "editar-site", label: "Editar Site" },
               { id: "produtos", label: "Produtos" },
             ] as const).map(tab => (
               <button
@@ -489,13 +509,40 @@ export default function PartnerPortalPage() {
           <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs px-4 py-3 rounded-lg">{profileError}</div>
         ) : profile && form ? (
           <ErrorBoundary variant="section" sectionLabel="seu perfil">
-          <div className={previewPousada ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : ""}>
+          <div className={pousadaTab === "editar-site" && previewPousada ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-start" : ""}>
           <form onSubmit={handleSave} className="bg-white border border-editorial-border rounded-lg p-6 space-y-5">
             {profile.partnerType === "pousada" && (
               <>
                 {/* Cada aba mostra só o que é dela — nada fica repetido nas
                     outras (Sobre/Preço, antes sempre visíveis, agora são a
                     própria aba "Sobre"). */}
+                {pousadaTab === "minhas-pousadas" && (
+                  <FormSection title="Minhas Pousadas">
+                    <p className="text-editorial-muted text-[11px] -mt-1">
+                      Todas as propriedades que você gerencia com esse login. Clique numa pra editar — o resto das abas passa a valer pra ela. Quer adicionar outra pousada aqui? Peça pro administrador vincular pelo email dessa mesma conta.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(properties || []).filter(p => p.partnerType === "pousada").map(p => {
+                        const isActive = p.partnerId === profile.partnerId;
+                        return (
+                          <button
+                            key={p.partnerId}
+                            type="button"
+                            onClick={() => { setSelectedProperty({ partnerType: p.partnerType, partnerId: p.partnerId }); setPousadaTab("sobre"); }}
+                            className={`text-left border rounded-lg p-4 transition cursor-pointer ${isActive ? "border-editorial-primary bg-editorial-secondary/30" : "border-editorial-border hover:bg-editorial-secondary/20"}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-sm text-editorial-text">{p.name}</span>
+                              {isActive && <Check className="h-4 w-4 text-editorial-primary flex-shrink-0" />}
+                            </div>
+                            {isActive && <span className="text-[10px] uppercase tracking-widest font-bold text-editorial-primary">Editando agora</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </FormSection>
+                )}
+
                 {pousadaTab === "sobre" && (
                   <FormSection title="Sobre">
                     <div className="text-xs">
@@ -600,62 +647,8 @@ export default function PartnerPortalPage() {
 
                 {pousadaTab === "midias" && (
                   <FormSection title="Mídias">
+                    <p className="text-editorial-muted text-[11px] -mt-1">Fotos que aparecem no catálogo — adicione, troque ou remova quando quiser.</p>
                     <ImageListEditor label="Imagens (Catálogo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
-
-                    <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Você já tem um site próprio?</label>
-                      <p className="text-editorial-muted text-[11px] mb-3">
-                        {form.hasOwnWebsite
-                          ? "O botão \"Ver site oficial\" no catálogo vai levar direto pro seu site."
-                          : "Sem site próprio, a EcoSafari monta um pra você com as fotos e informações abaixo (pré-via ao lado, atualizando conforme você edita)."}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: false }))}
-                          className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${!form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
-                        >
-                          Não, criar um pra mim
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: true }))}
-                          className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
-                        >
-                          Sim, já tenho
-                        </button>
-                      </div>
-                    </div>
-
-                    {form.hasOwnWebsite ? (
-                      <div className="text-xs">
-                        <label className="block text-editorial-text font-semibold mb-1.5">Link do seu site</label>
-                        <input type="text" placeholder="https://..." value={form.ownWebsiteUrl} onChange={e => setForm((p: any) => ({ ...p, ownWebsiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                      </div>
-                    ) : (
-                      <>
-                        <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens do catálogo)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
-                        <div className="text-xs">
-                          <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
-                          <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                        </div>
-                        <div className="text-xs border-t border-editorial-border pt-4">
-                          <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
-                          <div className="flex items-center gap-3 mb-2">
-                            {form.teamPhotoUrl && <img src={form.teamPhotoUrl} alt="Equipe" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
-                            <ImageUploadButton label={form.teamPhotoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={url => setForm((p: any) => ({ ...p, teamPhotoUrl: url }))} />
-                          </div>
-                        </div>
-                        <div className="text-xs">
-                          <label className="block text-editorial-text font-semibold mb-1.5">Título da Seção da Equipe (padrão: "Quem vai te receber")</label>
-                          <input type="text" value={form.teamSectionTitle} onChange={e => setForm((p: any) => ({ ...p, teamSectionTitle: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                        </div>
-                        <div className="text-xs">
-                          <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
-                          <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
-                        </div>
-                      </>
-                    )}
                   </FormSection>
                 )}
 
@@ -712,6 +705,65 @@ export default function PartnerPortalPage() {
                         </button>
                       </div>
                     </div>
+                  </FormSection>
+                )}
+
+                {pousadaTab === "editar-site" && (
+                  <FormSection title="Editar Site">
+                    <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
+                      <label className="block text-editorial-text font-semibold mb-1.5">Você já tem um site próprio?</label>
+                      <p className="text-editorial-muted text-[11px] mb-3">
+                        {form.hasOwnWebsite
+                          ? "O botão \"Ver site oficial\" no catálogo vai levar direto pro seu site."
+                          : "Sem site próprio, a EcoSafari monta um pra você com as fotos e informações abaixo — a pré-via ao lado atualiza conforme você edita."}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: false }))}
+                          className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${!form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
+                        >
+                          Não, criar um pra mim
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: true }))}
+                          className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
+                        >
+                          Sim, já tenho
+                        </button>
+                      </div>
+                    </div>
+
+                    {form.hasOwnWebsite ? (
+                      <div className="text-xs">
+                        <label className="block text-editorial-text font-semibold mb-1.5">Link do seu site</label>
+                        <input type="text" placeholder="https://..." value={form.ownWebsiteUrl} onChange={e => setForm((p: any) => ({ ...p, ownWebsiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      </div>
+                    ) : (
+                      <>
+                        <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens do catálogo)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Link do Vídeo (YouTube/Instagram)</label>
+                          <input type="text" value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                        </div>
+                        <div className="text-xs border-t border-editorial-border pt-4">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
+                          <div className="flex items-center gap-3 mb-2">
+                            {form.teamPhotoUrl && <img src={form.teamPhotoUrl} alt="Equipe" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
+                            <ImageUploadButton label={form.teamPhotoUrl ? "Trocar foto" : "Enviar foto"} onUploaded={url => setForm((p: any) => ({ ...p, teamPhotoUrl: url }))} />
+                          </div>
+                        </div>
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Título da Seção da Equipe (padrão: "Quem vai te receber")</label>
+                          <input type="text" value={form.teamSectionTitle} onChange={e => setForm((p: any) => ({ ...p, teamSectionTitle: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                        </div>
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
+                          <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
+                        </div>
+                      </>
+                    )}
                   </FormSection>
                 )}
               </>
@@ -826,7 +878,7 @@ export default function PartnerPortalPage() {
             </div>
           </form>
 
-          {previewPousada && (
+          {pousadaTab === "editar-site" && previewPousada && (
             <div className="hidden lg:block lg:sticky lg:top-6">
               <div className="bg-white border border-editorial-border rounded-lg overflow-hidden shadow-sm">
                 <div className="bg-editorial-secondary/50 border-b border-editorial-border px-4 py-2.5 flex items-center gap-2">

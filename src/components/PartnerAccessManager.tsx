@@ -31,6 +31,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
   const [newAccessLink, setNewAccessLink] = useState<string | null>(null);
   const [newAccessEmailSent, setNewAccessEmailSent] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [linkedExisting, setLinkedExisting] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -51,6 +52,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
     setInviting(true);
     setError("");
     setNewAccessLink(null);
+    setLinkedExisting(false);
     try {
       const res = await adminFetch("/api/partners/invite", {
         method: "POST",
@@ -62,8 +64,15 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
         setError(data.error || "Erro ao convidar parceiro.");
         return;
       }
-      setNewAccessLink(data.actionLink || null);
-      setNewAccessEmailSent(!!data.emailSent);
+      // Sem link de ação + sem erro = a conta já existia (dona de outra
+      // pousada/atração/guia) e só ganhou esta propriedade a mais — não
+      // precisa definir senha de novo, já vê isso em "Minhas Pousadas".
+      if (data.linkedExisting) {
+        setLinkedExisting(true);
+      } else {
+        setNewAccessLink(data.actionLink || null);
+        setNewAccessEmailSent(!!data.emailSent);
+      }
       setEmail("");
       fetchUsers();
     } catch (err) {
@@ -117,6 +126,14 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
               </div>
               {error && <p className="text-red-600 text-xs font-medium">{error}</p>}
             </form>
+
+            {linkedExisting && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs">
+                <p className="text-emerald-900 font-semibold">
+                  Esse email já tinha uma conta de parceiro em outra pousada/atração/guia — "{partnerLabel}" foi adicionada ao acesso dela. Não precisa de novo convite, a pessoa já entra normalmente e escolhe qual propriedade gerenciar em "Minhas Pousadas".
+                </p>
+              </div>
+            )}
 
             {newAccessLink && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs space-y-2">
