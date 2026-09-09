@@ -192,6 +192,9 @@ export default function PartnerPortalPage() {
             facebookUrl: data.pousada.facebookUrl || "",
             tiktokUrl: data.pousada.tiktokUrl || "",
             youtubeUrl: data.pousada.youtubeUrl || "",
+            logoUrl: data.pousada.logoUrl || "",
+            themeColorPrimary: data.pousada.themeColorPrimary || "",
+            themeColorAccent: data.pousada.themeColorAccent || "",
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
           setForm({
@@ -313,6 +316,12 @@ export default function PartnerPortalPage() {
           facebookUrl: form.facebookUrl.trim() || undefined,
           tiktokUrl: form.tiktokUrl.trim() || undefined,
           youtubeUrl: form.youtubeUrl.trim() || undefined,
+          logoUrl: form.logoUrl.trim() || undefined,
+          // Sem "|| undefined" de propósito — precisa mandar string vazia
+          // quando a pessoa clica em "Usar paleta padrão", senão a limpeza
+          // não vai pro servidor (undefined some do payload por completo).
+          themeColorPrimary: form.themeColorPrimary.trim(),
+          themeColorAccent: form.themeColorAccent.trim(),
         };
       } else if (profile.partnerType === "atracao") {
         endpoint = `/api/atracoes/${profile.partnerId}`;
@@ -386,6 +395,9 @@ export default function PartnerPortalPage() {
           teamSectionTitle: form.teamSectionTitle.trim() || undefined,
           teamSectionText: form.teamSectionText.trim() || undefined,
           rooms: form.rooms.filter((r: RoomDraft) => r.type.trim()),
+          logoUrl: form.logoUrl.trim() || undefined,
+          themeColorPrimary: form.themeColorPrimary.trim() || undefined,
+          themeColorAccent: form.themeColorAccent.trim() || undefined,
         }
       : null;
 
@@ -761,6 +773,47 @@ export default function PartnerPortalPage() {
                         <div className="text-xs">
                           <label className="block text-editorial-text font-semibold mb-1.5">Texto de Apresentação da Equipe</label>
                           <textarea rows={3} value={form.teamSectionText} onChange={e => setForm((p: any) => ({ ...p, teamSectionText: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
+                        </div>
+
+                        {/* Logo + paleta próprias — cada Site Oficial pode ter
+                            sua própria identidade visual em vez de sempre
+                            herdar o verde/creme padrão do EcoSafari. Vazio =
+                            usa o tema padrão normalmente. */}
+                        <div className="text-xs border-t border-editorial-border pt-4">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Logo</label>
+                          <div className="flex items-center gap-3 mb-2">
+                            {form.logoUrl && <img src={form.logoUrl} alt="Logo" className="w-14 h-14 rounded-full object-cover border border-editorial-border" />}
+                            <ImageUploadButton label={form.logoUrl ? "Trocar logo" : "Enviar logo"} onUploaded={url => setForm((p: any) => ({ ...p, logoUrl: url }))} />
+                          </div>
+                        </div>
+                        <div className="text-xs">
+                          <label className="block text-editorial-text font-semibold mb-1.5">Paleta de Cores (opcional)</label>
+                          <p className="text-editorial-muted text-[11px] mb-2">Deixe em branco pra usar a paleta padrão da EcoSafari. Combine com sua logo pra um site com a cara da sua pousada.</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex items-center gap-2">
+                              <input type="color" value={form.themeColorPrimary || "#2D4635"} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
+                              <div className="flex-1">
+                                <label className="block text-editorial-text font-semibold mb-1">Cor principal</label>
+                                <input type="text" placeholder="#2D4635" value={form.themeColorPrimary} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input type="color" value={form.themeColorAccent || "#B08D4F"} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
+                              <div className="flex-1">
+                                <label className="block text-editorial-text font-semibold mb-1">Cor de destaque</label>
+                                <input type="text" placeholder="#B08D4F" value={form.themeColorAccent} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                              </div>
+                            </div>
+                          </div>
+                          {(form.themeColorPrimary || form.themeColorAccent) && (
+                            <button
+                              type="button"
+                              onClick={() => setForm((p: any) => ({ ...p, themeColorPrimary: "", themeColorAccent: "" }))}
+                              className="text-editorial-muted hover:text-editorial-primary text-[10px] uppercase tracking-widest font-bold mt-2 transition cursor-pointer"
+                            >
+                              Usar paleta padrão da EcoSafari
+                            </button>
+                          )}
                         </div>
                       </>
                     )}

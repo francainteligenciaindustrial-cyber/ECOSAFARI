@@ -27,6 +27,13 @@ export interface Pousada {
   // Oficial usa "images" como fallback, então pousadas antigas continuam
   // mostrando uma galeria mesmo sem configurar este campo.
   officialSiteImages?: string[];
+  // Identidade visual própria do Site Oficial (/site/:slug) — cada pousada
+  // pode ter sua própria logo + paleta de cores em vez de sempre herdar o
+  // verde/creme editorial padrão do EcoSafari. Quando ausentes, o Site
+  // Oficial usa o tema padrão normalmente (nada muda pra quem não configura).
+  logoUrl?: string;
+  themeColorPrimary?: string; // hex — substitui o verde editorial nessa página
+  themeColorAccent?: string; // hex — usado em detalhes/kickers, tom secundário
   // Estrutura de quartos — complementa "capacity" (limite agregado usado na
   // checagem de disponibilidade de reservas) com o detalhe real que um
   // hóspede quer ver: quantos quartos existem, quantas pessoas cabem em

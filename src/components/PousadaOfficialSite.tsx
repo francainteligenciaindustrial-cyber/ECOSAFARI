@@ -73,12 +73,29 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
     ? pousada.officialSiteImages
     : pousada.images;
 
+  // Identidade visual própria (logo + paleta) — sobrescreve as duas CSS
+  // custom properties que toda classe bg-editorial-primary/text-editorial-
+  // accent/etc já usa por baixo dos panos (ver @theme em src/index.css), só
+  // dentro desta página. Sem logo/cor configurada, herda o tema padrão do
+  // EcoSafari normalmente — nada muda pra quem não configurou.
+  const themeStyle: React.CSSProperties | undefined = (pousada.themeColorPrimary || pousada.themeColorAccent)
+    ? {
+        ...(pousada.themeColorPrimary ? { ["--color-editorial-primary" as any]: pousada.themeColorPrimary } : {}),
+        ...(pousada.themeColorAccent ? { ["--color-editorial-accent" as any]: pousada.themeColorAccent } : {}),
+      }
+    : undefined;
+
   return (
-    <div className="bg-editorial-bg font-sans text-editorial-text">
+    <div className="bg-editorial-bg font-sans text-editorial-text" style={themeStyle}>
 
       {/* Minimal site header — no EcoSafari nav, feels like its own domain */}
       <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white/70 backdrop-blur-sm sticky top-0 z-20">
-        <span className="font-serif italic font-bold text-lg text-editorial-primary">{pousada.name}</span>
+        <span className="flex items-center gap-2.5">
+          {pousada.logoUrl && (
+            <img src={pousada.logoUrl} alt={`Logo ${pousada.name}`} referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover border border-editorial-border" />
+          )}
+          <span className="font-serif italic font-bold text-lg text-editorial-primary">{pousada.name}</span>
+        </span>
         <div className="flex items-center gap-3">
           {/* Trocar idioma recarrega a página inteira (ver LanguageSwitcher.tsx)
               — dentro do preview ao vivo do parceiro isso perderia as edições
@@ -131,7 +148,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
 
       {/* About */}
       <section className="max-w-4xl mx-auto px-6 md:px-10 py-16">
-        <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold block mb-2">Sobre Nós</span>
+        <span className="text-editorial-accent text-[11px] uppercase tracking-[0.2em] font-bold block mb-2">Sobre Nós</span>
         <p className="text-editorial-text text-lg font-light leading-relaxed whitespace-pre-line">
           {pousada.longDescription || pousada.description}
         </p>
@@ -180,7 +197,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
               />
             </div>
             <div className="order-1 md:order-2">
-              <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold block mb-2">Quem vai te receber</span>
+              <span className="text-editorial-accent text-[11px] uppercase tracking-[0.2em] font-bold block mb-2">Quem vai te receber</span>
               <h2 className="text-2xl md:text-3xl font-serif font-bold text-editorial-primary mb-4">
                 {pousada.teamSectionTitle || "Quem vai te receber"}
               </h2>
@@ -213,7 +230,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
       {/* Welcome video from the family */}
       {pousada.videoUrl && (
         <section className="max-w-4xl mx-auto px-6 md:px-10 pb-16">
-          <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold flex items-center justify-center gap-1.5 mb-2">
+          <span className="text-editorial-accent text-[11px] uppercase tracking-[0.2em] font-bold flex items-center justify-center gap-1.5 mb-2">
             <PlayCircle className="h-3.5 w-3.5" /> Um recado da família
           </span>
           <h2 className="text-2xl md:text-3xl font-serif font-bold text-editorial-primary mb-6 text-center">Antes de vir, dá um oi pra gente</h2>
@@ -227,7 +244,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
       {reviews.length > 0 && (
         <section className="bg-editorial-secondary border-y border-editorial-border py-16">
           <div className="max-w-5xl mx-auto px-6 md:px-10">
-            <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold flex items-center justify-center gap-1.5 mb-2">
+            <span className="text-editorial-accent text-[11px] uppercase tracking-[0.2em] font-bold flex items-center justify-center gap-1.5 mb-2">
               <Sparkles className="h-3.5 w-3.5" /> Quem já veio conta
             </span>
             <h2 className="text-2xl md:text-3xl font-serif font-bold text-editorial-primary mb-10 text-center">O que os hóspedes dizem</h2>

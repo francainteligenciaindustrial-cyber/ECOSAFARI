@@ -15,6 +15,11 @@
   --color-editorial-muted: #6B6B66;
   --color-editorial-dark-muted: #8A8A82;
   --color-editorial-border: #E5E2D9;
+  /* Tom secundário — padrão neutro (dourado suave), mas cada Site Oficial
+     (PousadaOfficialSite.tsx) pode sobrescrever isso via CSS custom
+     property inline (Pousada.themeColorAccent), do mesmo jeito que
+     themeColorPrimary sobrescreve --color-editorial-primary. */
+  --color-editorial-accent: #B08D4F;
 
   /* animate-fadeIn era usado em vários dropdowns/modais pelo app inteiro
      sem nunca ter sido definido — a classe existia mas não fazia nada. */
