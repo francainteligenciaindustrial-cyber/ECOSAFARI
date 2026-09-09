@@ -725,7 +725,19 @@ export default function AdminDashboard({
   });
   const bookingsPagination = usePagination(filteredBookings, 20);
   const pousadasPagination = usePagination(pousadas, 10);
-  const guidesPagination = usePagination(guides, 20);
+
+  // Filtro da aba Guias — nome, idiomas falados e especialidade/foco.
+  const [guideSearch, setGuideSearch] = useState("");
+  const filteredGuides = guides.filter(g => {
+    if (!guideSearch.trim()) return true;
+    const q = guideSearch.toLowerCase();
+    return (
+      g.name.toLowerCase().includes(q) ||
+      (g.languages || []).some(l => l.language.toLowerCase().includes(q)) ||
+      (g.specialty || []).some(s => s.toLowerCase().includes(q))
+    );
+  });
+  const guidesPagination = usePagination(filteredGuides, 20);
   const speciesPagination = usePagination(species, 20);
 
   // Agenda Anual (aba "Agenda Integrada"): visão de todo o ano — quem vai
@@ -1588,14 +1600,24 @@ export default function AdminDashboard({
         {/* TAB 3: GUIAS CRUD */}
         {activeTab === "guides" && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 border border-zinc-200 rounded-2xl">
-              <span className="font-bold text-sm text-zinc-800">Total: {guides.length} guias cadastrados</span>
-              <button
-                onClick={() => setShowAddGuide(!showAddGuide)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm"
-              >
-                <Plus className="h-4 w-4" /> Cadastrar Novo Guia
-              </button>
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-white p-4 border border-zinc-200 rounded-2xl">
+              <span className="font-bold text-sm text-zinc-800 flex-shrink-0">Total: {guides.length} guias cadastrados{guideSearch && ` (${filteredGuides.length} encontrados)`}</span>
+              <div className="flex items-center gap-2 flex-1 sm:flex-none sm:justify-end">
+                <div className="relative flex-1 sm:flex-none">
+                  <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text" value={guideSearch} onChange={e => setGuideSearch(e.target.value)}
+                    placeholder="Buscar por nome, idioma ou especialidade..."
+                    className="pl-8 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-500 w-full sm:w-72"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowAddGuide(!showAddGuide)}
+                  className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="h-4 w-4" /> Cadastrar Novo Guia
+                </button>
+              </div>
             </div>
 
             {/* Add Guide form */}
@@ -1898,6 +1920,13 @@ export default function AdminDashboard({
                       </td>
                     </tr>
                   ))}
+                  {filteredGuides.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center p-8 text-zinc-400">
+                        {guides.length === 0 ? "Nenhum guia cadastrado ainda." : "Nenhum guia encontrado com esse filtro."}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
               <Pagination
