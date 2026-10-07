@@ -1221,16 +1221,28 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
   const { id } = req.params;
   const updates = pickFields<Pousada>(req.body, res.locals.isAdmin ? POUSADA_UPDATE_FIELDS : POUSADA_CREATE_FIELDS);
   const { data, error } = await supabase.from("pousadas").update(updates).eq("id", id).select().single();
-  if (error || !data) return res.status(404).json({ error: "Pousada não encontrada" });
+  // PGRST204 = coluna inexistente (migração SQL ainda não rodada) — antes
+  // isso virava um 404 genérico e o portal mostrava "salvo" sem ter salvo.
+  if (error && error.code === "PGRST204") {
+    console.error("[PUT /api/pousadas/:id] coluna ausente:", error.message);
+    return res.status(500).json({ error: `Não foi possível salvar: o banco de dados ainda não tem um dos campos novos (${error.message}). Avise o administrador para rodar as migrações SQL pendentes.` });
+  }
+  if (error && error.code !== "PGRST116") {
+    console.error("[PUT /api/pousadas/:id]", error);
+    return res.status(500).json({ error: `Erro ao salvar: ${error.message}` });
+  }
+  if (!data) return res.status(404).json({ error: "Pousada não encontrada" });
   await logAdminAction(res.locals.actorUser, "update", "pousada", id, data.name);
   res.json(mapPousadaRow(data));
 });
 
-app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
+// O próprio gestor também pode remover a pousada pelo perfil — vai pra
+// lixeira (restaurável pelo admin por 30 dias), nunca apagada de vez.
+app.delete("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) => {
   const { id } = req.params;
   let existing: any;
   try {
-    existing = await moverParaLixeira("pousada", id, res.locals.adminUser?.email || "admin");
+    existing = await moverParaLixeira("pousada", id, res.locals.actorUser?.email || "admin");
   } catch (err: any) {
     log.error("Erro ao mover pousada para a lixeira:", err.message);
     return res.status(500).json({ error: "Erro ao excluir pousada" });
@@ -1241,7 +1253,8 @@ app.delete("/api/pousadas/:id", requireAdmin, async (req, res) => {
     log.error("Erro ao excluir pousada no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao excluir pousada" });
   }
-  await logAdminAction(res.locals.adminUser, "delete", "pousada", id, existing?.name || id);
+  await supabase.from("partner_links").delete().eq("partnerType", "pousada").eq("partnerId", id);
+  await logAdminAction(res.locals.actorUser, "delete", "pousada", id, existing?.name || id);
   res.json({ success: true, message: "Pousada movida para a lixeira. Pode ser restaurada em até 30 dias." });
 });
 
@@ -4530,13 +4543,144 @@ app.get("/api/my-partner-properties", authLimiter, async (req, res) => {
   for (const r of (atracaoRows.data || []) as any[]) nameById.set(`atracao:${r.id}`, resolveTranslation(r.name));
   for (const r of (guideRows.data || []) as any[]) nameById.set(`guia:${r.id}`, r.name);
 
-  const properties = Array.from(links.values()).map(l => ({
-    partnerType: l.partnerType,
-    partnerId: l.partnerId,
-    name: nameById.get(`${l.partnerType}:${l.partnerId}`) || "(sem nome)",
-  }));
+  // Sem o filtro, uma pousada removida (ainda apontada pelo app_metadata
+  // "principal") continuaria aparecendo como "(sem nome)" na lista.
+  const properties = Array.from(links.values())
+    .filter(l => nameById.has(`${l.partnerType}:${l.partnerId}`))
+    .map(l => ({
+      partnerType: l.partnerType,
+      partnerId: l.partnerId,
+      name: nameById.get(`${l.partnerType}:${l.partnerId}`)!,
+    }));
 
   res.json({ properties });
+});
+
+async function getPartnerUserFromRequest(req: express.Request) {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user;
+}
+
+// Gestor de pousada cadastra uma pousada nova direto do próprio perfil — já
+// fica vinculada ao login dele (partner_links). Nasce sem o selo
+// "verificada", que continua sendo só do admin.
+app.post("/api/my-pousadas", authLimiter, async (req, res) => {
+  const user = await getPartnerUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: "Autenticação necessária." });
+  if (user.app_metadata?.role !== "partner" || user.app_metadata?.partnerType !== "pousada") {
+    return res.status(403).json({ error: "Só gestores de pousada podem cadastrar pousadas." });
+  }
+  const name = String(req.body.name || "").trim();
+  const location = String(req.body.location || "").trim();
+  if (!name || !location) return res.status(400).json({ error: "Informe o nome e a localização da pousada." });
+
+  const newPousada = {
+    id: `p_${randomUUID()}`,
+    name,
+    location,
+    description: String(req.body.description || "").trim(),
+    pricePerNight: 0,
+    capacity: 1,
+    images: [],
+    features: [],
+    activities: [],
+    experiences: [],
+    verified: false,
+    viewCount: 0,
+  };
+  const { error } = await supabase.from("pousadas").insert(newPousada);
+  if (error) {
+    log.error("Erro ao criar pousada pelo gestor:", error.message);
+    return res.status(500).json({ error: `Erro ao criar pousada: ${error.message}` });
+  }
+  const { error: linkErr } = await supabase.from("partner_links").upsert(
+    { id: `pl_${user.id}_pousada_${newPousada.id}`, userId: user.id, partnerType: "pousada", partnerId: newPousada.id },
+    { onConflict: "userId,partnerType,partnerId" }
+  );
+  if (linkErr) {
+    await supabase.from("pousadas").delete().eq("id", newPousada.id);
+    return res.status(500).json({ error: `Pousada não criada: falha ao vincular ao seu login (${linkErr.message}). A tabela partner_links existe? (scripts/add-partner-links.sql)` });
+  }
+  await logAdminAction(user, "create", "pousada", newPousada.id, name);
+  res.status(201).json({ partnerType: "pousada", partnerId: newPousada.id, name });
+});
+
+// Gestores de uma pousada = quem tem ela como propriedade "principal"
+// (app_metadata) + quem tem vínculo extra em partner_links.
+app.get("/api/pousadas/:id/gestores", requirePartnerAccess("pousada"), async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada." });
+  const { id } = req.params;
+  const { data: links } = await supabase.from("partner_links").select('"userId"').eq("partnerType", "pousada").eq("partnerId", id);
+  const linkedIds = new Set(((links || []) as any[]).map(l => l.userId));
+  const { data: usersData, error } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+  if (error) return res.status(500).json({ error: describeAuthError(error, "Erro ao listar gestores.") });
+  const gestores = (usersData?.users || [])
+    .filter((u: any) => {
+      const meta = u.app_metadata || {};
+      const isPrimary = meta.role === "partner" && meta.partnerType === "pousada" && meta.partnerId === id;
+      return isPrimary || (meta.role === "partner" && linkedIds.has(u.id));
+    })
+    .map((u: any) => ({
+      userId: u.id,
+      email: u.email,
+      name: u.user_metadata?.name || "",
+      isPrimary: u.app_metadata?.partnerId === id,
+      isMe: u.id === res.locals.actorUser?.id,
+    }));
+  res.json({ gestores });
+});
+
+app.post("/api/pousadas/:id/gestores", requirePartnerAccess("pousada"), async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada — não dá pra criar acesso agora." });
+  const email = String(req.body.email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Email inválido." });
+  const { id } = req.params;
+  const result = await provisionPartnerLogin(email, { role: "partner", partnerType: "pousada", partnerId: id });
+  if (result.error || !result.userId) return res.status(400).json({ error: result.error || "Não foi possível adicionar o gestor." });
+  await logAdminAction(res.locals.actorUser, "update", "pousada", id, `gestor adicionado: ${email}`);
+  // O link de definição de senha nunca volta pra quem convidou — se o email
+  // já fosse de outra pessoa, isso permitiria tomar a conta dela.
+  res.json({ success: true, emailSent: result.emailSent });
+});
+
+app.delete("/api/pousadas/:id/gestores/:userId", requirePartnerAccess("pousada"), async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "SUPABASE_SERVICE_ROLE_KEY não configurada." });
+  const { id, userId } = req.params;
+
+  const [{ data: usersData }, { data: links }] = await Promise.all([
+    supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 }),
+    supabase.from("partner_links").select('"userId"').eq("partnerType", "pousada").eq("partnerId", id),
+  ]);
+  const linkedIds = new Set(((links || []) as any[]).map(l => l.userId));
+  const users = (usersData?.users || []) as any[];
+  const gestorIds = users
+    .filter(u => u.app_metadata?.role === "partner" && ((u.app_metadata?.partnerType === "pousada" && u.app_metadata?.partnerId === id) || linkedIds.has(u.id)))
+    .map(u => u.id);
+  if (!gestorIds.includes(userId)) return res.status(404).json({ error: "Esse usuário não é gestor desta pousada." });
+  if (gestorIds.length <= 1) return res.status(400).json({ error: "Esse é o único gestor da pousada — adicione outro antes de remover." });
+
+  await supabase.from("partner_links").delete().eq("userId", userId).eq("partnerType", "pousada").eq("partnerId", id);
+
+  // Se esta era a propriedade "principal" (app_metadata), promove outra
+  // propriedade vinculada a principal; sem nenhuma, a conta perde o acesso
+  // de parceiro (não sobra nada pra gerenciar).
+  const target = users.find(u => u.id === userId);
+  const meta = target?.app_metadata || {};
+  if (meta.partnerType === "pousada" && meta.partnerId === id) {
+    const { data: rest } = await supabase.from("partner_links").select('id, "partnerType", "partnerId"').eq("userId", userId).limit(1);
+    const next = (rest || [])[0] as any;
+    const newMeta = next ? { ...meta, partnerType: next.partnerType, partnerId: next.partnerId } : { ...meta, role: null, partnerType: null, partnerId: null };
+    const { error: metaErr } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: newMeta });
+    if (metaErr) return res.status(500).json({ error: describeAuthError(metaErr, "Erro ao atualizar o acesso do gestor.") });
+    if (next) await supabase.from("partner_links").delete().eq("id", next.id);
+  }
+
+  await logAdminAction(res.locals.actorUser, "update", "pousada", id, `gestor removido: ${target?.email || userId}`);
+  res.json({ success: true });
 });
 
 // SUPABASE SYSTEM STATUS & AUTO-CONFIGURATION ENDPOINTS

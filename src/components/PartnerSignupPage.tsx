@@ -7,6 +7,53 @@ const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | u
 
 type PartnerType = "guia" | "pousada" | "atracao";
 
+const LANGUAGE_OPTIONS = ["Português", "Inglês", "Espanhol", "Francês", "Alemão", "Italiano", "Mandarim", "Japonês", "Russo", "Árabe", "Libras"];
+const SPECIALTY_OPTIONS = ["Observação de aves", "Safári fotográfico", "Trilhas", "Pesca esportiva", "Passeio de barco", "Focagem noturna", "Cavalgada", "Flora e plantas medicinais", "Cultura indígena", "Turismo de aventura"];
+
+// Seleção múltipla em chips com opções pré-definidas + campo "Outro" pra
+// algo fora da lista.
+function ChipMultiSelect({ label, required, options, value, onChange, otherPlaceholder }: { label: string; required?: boolean; options: string[]; value: string[]; onChange: (v: string[]) => void; otherPlaceholder: string }) {
+  const [other, setOther] = useState("");
+  const toggle = (opt: string) => onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt]);
+  const addOther = () => {
+    const v = other.trim();
+    if (v && !value.includes(v)) onChange([...value, v]);
+    setOther("");
+  };
+  const extras = value.filter(v => !options.includes(v));
+  return (
+    <div role="group" aria-label={label} className="space-y-2">
+      <span className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted">
+        {label}{required && <span className="text-editorial-primary"> *</span>}
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {[...options, ...extras].map(opt => {
+          const active = value.includes(opt);
+          return (
+            <button
+              key={opt}
+              type="button"
+              aria-pressed={active}
+              onClick={() => toggle(opt)}
+              className={`text-xs px-3 py-1.5 rounded-full border transition cursor-pointer ${active ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
+            >
+              {active ? "✓ " : ""}{opt}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text" value={other} onChange={e => setOther(e.target.value)} placeholder={otherPlaceholder} aria-label={otherPlaceholder}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addOther(); } }}
+          className="flex-1 border border-editorial-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+        />
+        <button type="button" onClick={addOther} className="text-xs font-semibold border border-editorial-border px-3 rounded-md hover:bg-editorial-secondary cursor-pointer">Adicionar</button>
+      </div>
+    </div>
+  );
+}
+
 // Loads the reCAPTCHA v3 script once and resolves a fresh token per submit.
 // No-op (resolves undefined) when VITE_RECAPTCHA_SITE_KEY isn't configured —
 // the backend accepts submissions without a token in that case too.
@@ -39,7 +86,7 @@ export default function PartnerSignupPage() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [guiaForm, setGuiaForm] = useState({
-    name: "", email: "", phone: "", languages: "", age: "", experienceYears: "", specialty: "", message: ""
+    name: "", email: "", phone: "", languages: [] as string[], age: "", experienceYears: "", specialty: [] as string[], message: ""
   });
   const [pousadaForm, setPousadaForm] = useState({
     pousadaName: "", name: "", email: "", phone: "", location: "", capacity: "", message: ""
@@ -51,6 +98,10 @@ export default function PartnerSignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (type === "guia" && guiaForm.languages.length === 0) {
+      setError("Selecione pelo menos um idioma que você fala.");
+      return;
+    }
     setSubmitting(true);
     setError("");
 
@@ -63,10 +114,10 @@ export default function PartnerSignupPage() {
           name: guiaForm.name,
           email: guiaForm.email,
           phone: guiaForm.phone,
-          languages: guiaForm.languages,
+          languages: guiaForm.languages.join(", "),
           age: guiaForm.age ? parseInt(guiaForm.age) : undefined,
           experienceYears: guiaForm.experienceYears ? parseInt(guiaForm.experienceYears) : undefined,
-          specialty: guiaForm.specialty,
+          specialty: guiaForm.specialty.join(", "),
           message: guiaForm.message,
         }
       : type === "pousada"
@@ -281,12 +332,8 @@ export default function PartnerSignupPage() {
                   <Input type="number" min="0" value={guiaForm.experienceYears} onChange={e => setGuiaForm({ ...guiaForm, experienceYears: e.target.value })} />
                 </Field>
               </div>
-              <Field label="Idiomas que fala" required>
-                <Input required placeholder="Ex: Português, Inglês, Espanhol" value={guiaForm.languages} onChange={e => setGuiaForm({ ...guiaForm, languages: e.target.value })} />
-              </Field>
-              <Field label="Especialidade">
-                <Input placeholder="Ex: Observação de aves, safári fotográfico, trilhas" value={guiaForm.specialty} onChange={e => setGuiaForm({ ...guiaForm, specialty: e.target.value })} />
-              </Field>
+              <ChipMultiSelect label="Idiomas que fala (selecione todos)" required options={LANGUAGE_OPTIONS} value={guiaForm.languages} onChange={languages => setGuiaForm({ ...guiaForm, languages })} otherPlaceholder="Outro idioma..." />
+              <ChipMultiSelect label="Especialidades (selecione todas)" options={SPECIALTY_OPTIONS} value={guiaForm.specialty} onChange={specialty => setGuiaForm({ ...guiaForm, specialty })} otherPlaceholder="Outra especialidade..." />
               <Field label="Conte um pouco sobre você">
                 <Textarea value={guiaForm.message} onChange={e => setGuiaForm({ ...guiaForm, message: e.target.value })} />
               </Field>

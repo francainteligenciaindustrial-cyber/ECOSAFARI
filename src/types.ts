@@ -51,7 +51,7 @@ export interface Pousada {
   // Cardápio do bar/restaurante da própria pousada, quando ela tiver um —
   // mesma estrutura do menu de Atracao (item + preço), com categoria pra
   // agrupar em Pratos/Bebidas/Drinks/Sobremesas na exibição.
-  menu?: { item: string; price: number; category?: "prato" | "bebida" | "drink" | "sobremesa" }[];
+  menu?: { item: string; price: number; category?: "prato" | "bebida" | "drink" | "sobremesa" | "outro" }[];
   // Aba "Serviços" do portal do parceiro — características do
   // atendimento/estrutura que vão além dos tags livres de "features".
   cuisineTypes?: string[]; // tipos de culinária (ex: "Regional", "Italiana")

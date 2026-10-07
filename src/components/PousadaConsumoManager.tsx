@@ -16,6 +16,10 @@ interface HospedeAtivo {
 
 interface Props {
   pousadaId: string;
+  // Quando informado, mostra só o consumo dessa reserva (detalhe aberto a
+  // partir da Agenda de Reservas) em vez da lista de hóspedes ativos.
+  bookingId?: string;
+  guestName?: string;
 }
 
 // A "comanda" de cada hóspede — o que consumiu de frigobar/vestuário/
@@ -23,12 +27,12 @@ interface Props {
 // que alimenta isso). Escanear o QR do produto (QrProductScanner) ou
 // adicionar manualmente lançam na conta do hóspede selecionado; "Marcar
 // como Pago" (fora do Stripe) e "Cobrar" (gera link Stripe) fecham a conta.
-export default function PousadaConsumoManager({ pousadaId }: Props) {
+export default function PousadaConsumoManager({ pousadaId, bookingId, guestName }: Props) {
   const { showToast } = useToast();
   const [hospedes, setHospedes] = useState<HospedeAtivo[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(bookingId ?? null);
   const [consumos, setConsumos] = useState<Consumo[]>([]);
   const [loadingConsumos, setLoadingConsumos] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -62,10 +66,14 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
       .finally(() => setLoadingConsumos(false));
   };
 
-  const handleSelectHospede = (bookingId: string) => {
-    setSelectedBookingId(bookingId);
-    fetchConsumos(bookingId);
+  const handleSelectHospede = (id: string) => {
+    setSelectedBookingId(id);
+    fetchConsumos(id);
   };
+
+  useEffect(() => {
+    if (bookingId) handleSelectHospede(bookingId);
+  }, [bookingId]);
 
   const handleAddConsumo = async (produtoId: string) => {
     if (!selectedBookingId || adding) return;
@@ -131,13 +139,13 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
 
   const pendente = consumos.filter(c => c.status === "pendente");
   const totalPendente = pendente.reduce((sum, c) => sum + c.totalPrice, 0);
-  const selectedHospede = hospedes.find(h => h.id === selectedBookingId);
+  const selectedName = guestName || hospedes.find(h => h.id === selectedBookingId)?.customerName;
 
   return (
-    <div className="bg-white border border-editorial-border rounded-lg p-6 space-y-6">
+    <div className={bookingId ? "space-y-4" : "bg-white border border-editorial-border rounded-lg p-6 space-y-6"}>
       <div>
         <h3 className="font-bold text-sm text-editorial-text flex items-center gap-2 mb-1">
-          <ShoppingBag className="h-4 w-4 text-editorial-primary" /> Consumo dos Hóspedes
+          <ShoppingBag className="h-4 w-4 text-editorial-primary" /> {bookingId ? "Consumo do Hóspede" : "Consumo dos Hóspedes"}
         </h3>
         <p className="text-editorial-muted text-xs">O que cada hóspede consumiu durante a estadia — escaneie o QR do produto ou adicione manualmente.</p>
       </div>
@@ -145,10 +153,10 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
       {loading ? (
         <div className="flex justify-center py-6"><LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-1 space-y-1.5 max-h-96 overflow-y-auto">
+        <div className={bookingId ? "" : "grid grid-cols-1 md:grid-cols-3 gap-4"}>
+          {!bookingId && <div className="md:col-span-1 space-y-1.5 max-h-96 overflow-y-auto">
             {hospedes.map(h => (
-              <button
+              <button type="button"
                 key={h.id}
                 onClick={() => handleSelectHospede(h.id)}
                 className={`w-full text-left border rounded-md p-2.5 text-xs transition cursor-pointer ${selectedBookingId === h.id ? "border-editorial-primary bg-editorial-primary/5" : "border-editorial-border hover:bg-editorial-secondary"}`}
@@ -158,16 +166,16 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
               </button>
             ))}
             {hospedes.length === 0 && <p className="text-editorial-muted text-xs italic">Nenhum hóspede com reserva ativa no momento.</p>}
-          </div>
+          </div>}
 
-          <div className="md:col-span-2">
+          <div className={bookingId ? "" : "md:col-span-2"}>
             {!selectedBookingId ? (
               <p className="text-editorial-muted text-xs italic py-6 text-center">Selecione um hóspede pra ver/lançar o consumo.</p>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h4 className="text-sm font-bold text-editorial-text">{selectedHospede?.customerName}</h4>
-                  <button
+                  <h4 className="text-sm font-bold text-editorial-text">{selectedName}</h4>
+                  <button type="button"
                     onClick={() => setShowScanner(true)}
                     className="flex items-center gap-1.5 bg-editorial-primary text-white text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-md cursor-pointer"
                   >
@@ -187,7 +195,7 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
                     type="number" min={1} value={quantity} onChange={e => setQuantity(e.target.value)}
                     className="w-16 border border-editorial-border rounded-md p-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                   />
-                  <button
+                  <button type="button"
                     onClick={() => manualProdutoId && handleAddConsumo(manualProdutoId)}
                     disabled={!manualProdutoId || adding}
                     className="bg-editorial-secondary border border-editorial-border text-editorial-text text-xs font-bold px-3 py-2 rounded-md disabled:opacity-60 cursor-pointer flex items-center gap-1"
@@ -209,7 +217,7 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
                           {c.status === "pago" ? (
                             <span className="text-emerald-700 text-[9px] uppercase font-bold flex items-center gap-1"><Check className="h-3 w-3" /> Pago</span>
                           ) : (
-                            <button onClick={() => handleRemove(c.id)} className="text-editorial-muted hover:text-red-600 cursor-pointer"><Trash2 className="h-3 w-3" /></button>
+                            <button type="button" onClick={() => handleRemove(c.id)} className="text-editorial-muted hover:text-red-600 cursor-pointer"><Trash2 className="h-3 w-3" /></button>
                           )}
                         </div>
                       </div>
@@ -222,10 +230,10 @@ export default function PousadaConsumoManager({ pousadaId }: Props) {
                   <div className="bg-editorial-secondary/40 border border-editorial-border rounded-md p-3 flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-bold text-editorial-text">Pendente: R$ {totalPendente.toLocaleString('pt-BR')}</span>
                     <div className="flex items-center gap-2">
-                      <button onClick={handleMarkPaid} className="text-[10px] uppercase tracking-widest font-bold border border-editorial-border px-3 py-1.5 rounded-md hover:bg-white transition cursor-pointer">
+                      <button type="button" onClick={handleMarkPaid} className="text-[10px] uppercase tracking-widest font-bold border border-editorial-border px-3 py-1.5 rounded-md hover:bg-white transition cursor-pointer">
                         Marcar como Pago
                       </button>
-                      <button
+                      <button type="button"
                         onClick={handleChargeStripe}
                         disabled={charging}
                         className="flex items-center gap-1.5 bg-editorial-primary text-white text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-md disabled:opacity-60 cursor-pointer"

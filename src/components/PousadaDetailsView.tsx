@@ -11,9 +11,10 @@ import { useStructuredData } from "../lib/structuredData";
 
 const MENU_CATEGORIES = [
   { key: "prato" as const, label: "Pratos" },
+  { key: "sobremesa" as const, label: "Sobremesas" },
   { key: "bebida" as const, label: "Bebidas" },
   { key: "drink" as const, label: "Drinks" },
-  { key: "sobremesa" as const, label: "Sobremesas" },
+  { key: "outro" as const, label: "Outros Produtos" },
 ];
 
 interface PousadaDetailsViewProps {
