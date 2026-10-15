@@ -702,7 +702,7 @@ export default function PousadaCatalog({
 
       {/* Wildlife Species Showcase (O que avistar) Section */}
       <ErrorBoundary variant="section" sectionLabel="a vitrine de espécies">
-      <section className="arara-stripes bg-[#0B1E2D] text-[#FBF8F1] py-24 border-t border-editorial-border/10 relative overflow-hidden">
+      <section className="arara-stripes bg-[#0A1133] text-[#FBF8F1] py-24 border-t border-editorial-border/10 relative overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-editorial-primary/10 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -730,7 +730,7 @@ export default function PousadaCatalog({
                 last card's text). */}
             <button
               onClick={scrollSpeciesLeft}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0B1E2D]/85 hover:bg-amber-500 hover:text-[#0B1E2D] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0A1133]/85 hover:bg-amber-500 hover:text-[#0A1133] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label="Anterior"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -739,7 +739,7 @@ export default function PousadaCatalog({
             {/* Right Button */}
             <button
               onClick={scrollSpeciesRight}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0B1E2D]/85 hover:bg-amber-500 hover:text-[#0B1E2D] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0A1133]/85 hover:bg-amber-500 hover:text-[#0A1133] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label="Próximo"
             >
               <ChevronRight className="h-6 w-6" />
@@ -941,12 +941,12 @@ export default function PousadaCatalog({
       {/* Species Detail Modal */}
       {selectedSpecies && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-6 z-50 animate-fadeIn">
-          <div className="bg-[#0B1E2D] text-[#FBF8F1] border border-white/10 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
+          <div className="bg-[#0A1133] text-[#FBF8F1] border border-white/10 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
             
             {/* Close Button */}
             <button
               onClick={() => setSelectedSpecies(null)}
-              className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#0B1E2D] border border-white/10 text-[#FBF8F1] p-2 rounded-full transition cursor-pointer"
+              className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#0A1133] border border-white/10 text-[#FBF8F1] p-2 rounded-full transition cursor-pointer"
               aria-label="Fechar"
             >
               <X className="h-5 w-5" />
@@ -1019,7 +1019,7 @@ export default function PousadaCatalog({
                       setSelectedSpecies(null);
                     }
                   }}
-                  className="flex-1 bg-white hover:bg-amber-500 hover:text-[#0B1E2D] text-[#0B1E2D] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
+                  className="flex-1 bg-white hover:bg-amber-500 hover:text-[#0A1133] text-[#0A1133] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
                 >
                   Conhecer Pousada Ideal
                 </button>

@@ -2233,7 +2233,7 @@ async function enviarLembreteCancelamento(booking: Booking, dias: number) {
         subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — EcoSafari`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #0A5A8C;">Sua expedição está chegando 🐆</h2>
+            <h2 style="color: #101B4C;">Sua expedição está chegando 🐆</h2>
             <p>Olá, ${dest.name}! Faltam <strong>${dias} dias</strong> para a reserva de <strong>${booking.customerName}</strong> (${booking.checkIn} a ${booking.checkOut}).</p>
             <p>Se precisar cancelar a partir de agora, a política de cancelamento se aplica: <strong>${consequencia}</strong>.</p>
             <p style="color: #888; font-size: 12px;">Cancelamentos com 45 dias ou mais de antecedência não têm nenhuma penalidade.</p>
@@ -2422,11 +2422,11 @@ function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fillColor("#0A5A8C").fontSize(22).text("EcoSafari Brasil", { align: "left" });
+    doc.fillColor("#101B4C").fontSize(22).text("EcoSafari Brasil", { align: "left" });
     doc.fillColor("#666").fontSize(10).text("Voucher de Reserva Confirmada", { align: "left" });
     doc.moveDown(1.5);
 
-    doc.strokeColor("#0A5A8C").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.strokeColor("#101B4C").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(1);
 
     doc.fillColor("#111").fontSize(14).text(`Reserva #${booking.id}`, { underline: false });
@@ -2448,10 +2448,10 @@ function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
     row("Status:", "Pagamento confirmado");
 
     doc.moveDown(1);
-    doc.strokeColor("#0A5A8C").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.strokeColor("#101B4C").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(1);
 
-    doc.fontSize(14).fillColor("#0A5A8C").text(`Total pago: R$ ${booking.totalPrice.toLocaleString('pt-BR')}`);
+    doc.fontSize(14).fillColor("#101B4C").text(`Total pago: R$ ${booking.totalPrice.toLocaleString('pt-BR')}`);
     doc.moveDown(1.5);
 
     doc.fontSize(9).fillColor("#888").text(
@@ -2474,7 +2474,7 @@ async function sendBookingConfirmationEmail(booking: Booking) {
     subject: `Reserva confirmada — ${booking.pousadaName} (#${booking.id})`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #0A5A8C;">Pagamento confirmado! 🌿</h2>
+        <h2 style="color: #101B4C;">Pagamento confirmado! 🌿</h2>
         <p>Olá, ${booking.customerName}! Sua reserva na <strong>${booking.pousadaName}</strong> está confirmada.</p>
         <p><strong>Check-in:</strong> ${booking.checkIn}<br/>
         <strong>Check-out:</strong> ${booking.checkOut}<br/>
@@ -2952,9 +2952,9 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
       subject: "Confirme seu email — EcoSafari Brasil",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #0A5A8C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
+          <h2 style="color: #101B4C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
           <p>Olá, ${name}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e poder avaliar pousadas, guias e atrações.</p>
-          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#0A5A8C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
           <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${linkData.properties.action_link}</p>
         </div>
       `,
@@ -4279,9 +4279,9 @@ async function provisionPartnerLogin(
         subject: "Seu acesso de parceiro EcoSafari",
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #0A5A8C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
+            <h2 style="color: #101B4C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
             <p>Seu acesso ao portal do parceiro foi criado. Clique no link abaixo para definir sua senha e acessar seu perfil:</p>
-            <p><a href="${actionLink}" style="display:inline-block; background:#0A5A8C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
+            <p><a href="${actionLink}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
             <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${actionLink}</p>
           </div>
         `,

@@ -6,17 +6,17 @@
   --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Paleta da arara-canindé (Ara ararauna): azul profundo das asas como
-     cor principal, creme do rosto como fundo, preto do bico/garganta no
+  /* Paleta da arara-canindé (Ara ararauna): azul-marinho profundo das asas
+     como cor principal, creme do rosto como fundo, preto do bico/garganta no
      texto, amarelo-ouro do peito e verde da coroa como destaques. */
   --color-editorial-bg: #FBF8F1;
-  --color-editorial-primary: #0A5A8C;
-  --color-editorial-secondary: #F2F6F9;
+  --color-editorial-primary: #101B4C;
+  --color-editorial-secondary: #F1F3F8;
   --color-editorial-beige: #F6EEDC;
   --color-editorial-text: #16181A;
   --color-editorial-muted: #5E6670;
   --color-editorial-dark-muted: #848C94;
-  --color-editorial-border: #DCE4EB;
+  --color-editorial-border: #DDE1EB;
 
   /* Cores puras da arara — amarelo/laranja só como preenchimento (com texto
      escuro por cima); como texto sobre o creme não têm contraste suficiente. */
@@ -25,7 +25,7 @@
   --color-arara-orange: #F28C00;
   --color-arara-green: #3F8A2E;
   --color-arara-black: #141414;
-  --color-arara-night: #0B1E2D;
+  --color-arara-night: #0A1133;
   /* Tom secundário — ouro escuro do peito da arara (versão legível como
      texto), mas cada Site Oficial
      (PousadaOfficialSite.tsx) pode sobrescrever isso via CSS custom

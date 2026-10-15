@@ -7,7 +7,7 @@ const META: Record<string, { label: string; icon: React.ReactNode; color: string
   youtube: { label: "YouTube", icon: <Youtube className="h-3.5 w-3.5" />, color: "#FF0000" },
   facebook: { label: "Facebook", icon: <Facebook className="h-3.5 w-3.5" />, color: "#1877F2" },
   instagram: { label: "Instagram", icon: <Instagram className="h-3.5 w-3.5" />, color: "url(#instagramGradient)" },
-  friend: { label: "Indicação de amigo", icon: <Users className="h-3.5 w-3.5" />, color: "#0A5A8C" },
+  friend: { label: "Indicação de amigo", icon: <Users className="h-3.5 w-3.5" />, color: "#101B4C" },
   other: { label: "Outras redes", icon: <Sparkles className="h-3.5 w-3.5" />, color: "#9CA3AF" },
 };
 
