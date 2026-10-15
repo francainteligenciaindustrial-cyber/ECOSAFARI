@@ -873,17 +873,17 @@ export default function PartnerPortalPage() {
                           <p className="text-editorial-muted text-[11px] mb-2">Deixe em branco pra usar a paleta padrão da EcoSafari. Combine com sua logo pra um site com a cara da sua pousada.</p>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-2">
-                              <input type="color" value={form.themeColorPrimary || "#2D4635"} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
+                              <input type="color" value={form.themeColorPrimary || "#0A5A8C"} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
                               <div className="flex-1">
                                 <label className="block text-editorial-text font-semibold mb-1">Cor principal</label>
-                                <input type="text" placeholder="#2D4635" value={form.themeColorPrimary} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                                <input type="text" placeholder="#0A5A8C" value={form.themeColorPrimary} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <input type="color" value={form.themeColorAccent || "#B08D4F"} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
+                              <input type="color" value={form.themeColorAccent || "#A35F00"} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
                               <div className="flex-1">
                                 <label className="block text-editorial-text font-semibold mb-1">Cor de destaque</label>
-                                <input type="text" placeholder="#B08D4F" value={form.themeColorAccent} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                                <input type="text" placeholder="#A35F00" value={form.themeColorAccent} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                               </div>
                             </div>
                           </div>

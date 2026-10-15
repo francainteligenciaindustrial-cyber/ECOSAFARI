@@ -54,19 +54,19 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
   };
 
   return (
-    <div id="video-cinema-page" className="bg-editorial-primary min-h-screen text-[#FDFCF8] py-10 font-sans">
+    <div id="video-cinema-page" className="bg-editorial-primary min-h-screen text-[#FBF8F1] py-10 font-sans">
       <div className="max-w-7xl mx-auto px-6">
         
         {/* Navigation */}
-        <div className="flex items-center justify-between mb-8 border-b border-[#FDFCF8]/10 pb-6">
+        <div className="flex items-center justify-between mb-8 border-b border-[#FBF8F1]/10 pb-6">
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#FDFCF8]/80 hover:text-white transition cursor-pointer"
+            className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#FBF8F1]/80 hover:text-white transition cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo
           </button>
           
-          <div className="bg-[#FDFCF8]/10 border border-[#FDFCF8]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#FDFCF8] font-bold flex items-center gap-1.5 animate-pulse">
+          <div className="bg-[#FBF8F1]/10 border border-[#FBF8F1]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#FBF8F1] font-bold flex items-center gap-1.5 animate-pulse">
             <Sparkles className="h-3.5 w-3.5" /> EcoCinema Auto-Executável
           </div>
         </div>
@@ -76,7 +76,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
           
           {/* Main Video Player */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-            <div className="relative aspect-video bg-black border border-[#FDFCF8]/10 shadow-2xl group overflow-hidden">
+            <div className="relative aspect-video bg-black border border-[#FBF8F1]/10 shadow-2xl group overflow-hidden">
               
               <video
                 ref={videoRef}
@@ -96,10 +96,10 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                 <div className="flex justify-between items-start">
                   <div>
                     <h2 className="font-serif font-bold text-lg tracking-tight">Expedições EcoSafari Brasil</h2>
-                    <p className="text-zinc-300 text-xs flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3 text-[#FDFCF8]" /> Vivências em Alta Resolução</p>
+                    <p className="text-zinc-300 text-xs flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3 text-[#FBF8F1]" /> Vivências em Alta Resolução</p>
                   </div>
                   {pousada && (
-                    <span className="bg-[#FDFCF8] text-editorial-primary text-[9px] uppercase font-bold tracking-widest px-2.5 py-1">
+                    <span className="bg-[#FBF8F1] text-editorial-primary text-[9px] uppercase font-bold tracking-widest px-2.5 py-1">
                       Exibição: {pousada.name}
                     </span>
                   )}
@@ -110,14 +110,14 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                   <div className="flex items-center gap-4">
                     <button
                       onClick={handlePlayPause}
-                      className="bg-[#FDFCF8] text-editorial-primary p-2.5 rounded-none hover:scale-105 transition cursor-pointer"
+                      className="bg-[#FBF8F1] text-editorial-primary p-2.5 rounded-none hover:scale-105 transition cursor-pointer"
                     >
                       {isPlaying ? <Pause className="h-4 w-4 fill-editorial-primary" /> : <Play className="h-4 w-4 fill-editorial-primary" />}
                     </button>
                     
                     <button
                       onClick={handleMuteUnmute}
-                      className="text-white hover:text-[#FDFCF8] p-2 transition cursor-pointer"
+                      className="text-white hover:text-[#FBF8F1] p-2 transition cursor-pointer"
                     >
                       {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                     </button>
@@ -132,7 +132,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
               {isMuted && (
                 <button
                   onClick={handleMuteUnmute}
-                  className="absolute bottom-6 right-6 bg-[#FDFCF8] text-editorial-primary text-[10px] uppercase tracking-widest px-3 py-1.5 font-bold shadow transition z-10 animate-bounce cursor-pointer"
+                  className="absolute bottom-6 right-6 bg-[#FBF8F1] text-editorial-primary text-[10px] uppercase tracking-widest px-3 py-1.5 font-bold shadow transition z-10 animate-bounce cursor-pointer"
                 >
                   <VolumeX className="h-4 w-4 inline mr-1" /> Ativar Som
                 </button>
@@ -140,9 +140,9 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
             </div>
 
             {/* Video metadata */}
-            <div className="bg-[#FDFCF8]/5 border border-[#FDFCF8]/10 p-6 shadow-sm">
+            <div className="bg-[#FBF8F1]/5 border border-[#FBF8F1]/10 p-6 shadow-sm">
               <h3 className="font-serif font-bold text-lg mb-2">Vivencie o Safári Fotográfico Ecológico</h3>
-              <p className="text-[#FDFCF8]/80 text-xs leading-relaxed font-light">
+              <p className="text-[#FBF8F1]/80 text-xs leading-relaxed font-light">
                 Nossos vídeos mostram imagens reais capturadas por biólogos e turistas parceiros em expedições. A EcoSafari financia projetos locais de conservação e monitoramento de grandes carnívoros. Hospedando-se em nossas pousadas parceiras, você ajuda a manter a floresta e o cerrado de pé.
               </p>
             </div>
@@ -152,9 +152,9 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
           <div className="lg:col-span-4 flex flex-col gap-6">
             
             {/* Chapters list */}
-            <div className="bg-[#FDFCF8]/5 border border-[#FDFCF8]/10 p-6 flex-1">
-              <h3 className="font-serif font-bold text-[#FDFCF8] text-sm uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                <Compass className="h-4 w-4 text-[#FDFCF8]" /> Capítulos da Expedição
+            <div className="bg-[#FBF8F1]/5 border border-[#FBF8F1]/10 p-6 flex-1">
+              <h3 className="font-serif font-bold text-[#FBF8F1] text-sm uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                <Compass className="h-4 w-4 text-[#FBF8F1]" /> Capítulos da Expedição
               </h3>
               
               <div className="space-y-3">
@@ -165,31 +165,31 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                     className={`p-4 cursor-pointer border transition ${
                       activeChapter === idx
                         ? "bg-white/10 border-white"
-                        : "bg-white/0 border-[#FDFCF8]/15 hover:border-[#FDFCF8]/40 hover:bg-white/5"
+                        : "bg-white/0 border-[#FBF8F1]/15 hover:border-[#FBF8F1]/40 hover:bg-white/5"
                     }`}
                   >
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-serif font-bold text-sm text-[#FDFCF8]">{chap.title}</span>
-                      <span className="text-[9px] font-mono text-[#FDFCF8] bg-white/10 px-1.5 py-0.5">{chap.duration}</span>
+                      <span className="font-serif font-bold text-sm text-[#FBF8F1]">{chap.title}</span>
+                      <span className="text-[9px] font-mono text-[#FBF8F1] bg-white/10 px-1.5 py-0.5">{chap.duration}</span>
                     </div>
-                    <p className="text-[#FDFCF8]/75 text-xs leading-normal font-light">{chap.desc}</p>
+                    <p className="text-[#FBF8F1]/75 text-xs leading-normal font-light">{chap.desc}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Call to action card */}
-            <div className="bg-[#FDFCF8]/10 border border-[#FDFCF8]/25 p-6 flex flex-col justify-between text-center gap-4">
+            <div className="bg-[#FBF8F1]/10 border border-[#FBF8F1]/25 p-6 flex flex-col justify-between text-center gap-4">
               <div>
-                <span className="text-[#FDFCF8]/80 font-bold text-[9px] uppercase tracking-widest block mb-1">Gostou da Experiência?</span>
+                <span className="text-[#FBF8F1]/80 font-bold text-[9px] uppercase tracking-widest block mb-1">Gostou da Experiência?</span>
                 <h4 className="font-serif font-bold text-white text-base">Agende este safári hoje mesmo</h4>
-                <p className="text-[#FDFCF8]/85 text-xs mt-2 leading-relaxed font-light">
+                <p className="text-[#FBF8F1]/85 text-xs mt-2 leading-relaxed font-light">
                   Converse diretamente com o nosso bot virtual "Sofia" via WhatsApp Business para montar seu pacote integrado!
                 </p>
               </div>
               <button
                 onClick={() => onOpenBot(pousada || null as any)}
-                className="w-full bg-[#FDFCF8] hover:bg-[#FDFCF8]/95 text-editorial-primary font-bold py-3 text-[11px] uppercase tracking-widest transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                className="w-full bg-[#FBF8F1] hover:bg-[#FBF8F1]/95 text-editorial-primary font-bold py-3 text-[11px] uppercase tracking-widest transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 <MessageSquare className="h-4 w-4" /> Conversar com Sofia
               </button>

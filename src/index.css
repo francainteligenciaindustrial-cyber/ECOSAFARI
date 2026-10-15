@@ -6,24 +6,71 @@
   --font-serif: "Playfair Display", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Theme colors corresponding to the Editorial Aesthetic */
-  --color-editorial-bg: #FDFCF8;
-  --color-editorial-primary: #2D4635;
-  --color-editorial-secondary: #F9F7F2;
-  --color-editorial-beige: #EFECE6;
-  --color-editorial-text: #1A1A1A;
-  --color-editorial-muted: #6B6B66;
-  --color-editorial-dark-muted: #8A8A82;
-  --color-editorial-border: #E5E2D9;
-  /* Tom secundário — padrão neutro (dourado suave), mas cada Site Oficial
+  /* Paleta da arara-canindé (Ara ararauna): azul profundo das asas como
+     cor principal, creme do rosto como fundo, preto do bico/garganta no
+     texto, amarelo-ouro do peito e verde da coroa como destaques. */
+  --color-editorial-bg: #FBF8F1;
+  --color-editorial-primary: #0A5A8C;
+  --color-editorial-secondary: #F2F6F9;
+  --color-editorial-beige: #F6EEDC;
+  --color-editorial-text: #16181A;
+  --color-editorial-muted: #5E6670;
+  --color-editorial-dark-muted: #848C94;
+  --color-editorial-border: #DCE4EB;
+
+  /* Cores puras da arara — amarelo/laranja só como preenchimento (com texto
+     escuro por cima); como texto sobre o creme não têm contraste suficiente. */
+  --color-arara-blue: #1E9BD7;
+  --color-arara-yellow: #F7B500;
+  --color-arara-orange: #F28C00;
+  --color-arara-green: #3F8A2E;
+  --color-arara-black: #141414;
+  --color-arara-night: #0B1E2D;
+  /* Tom secundário — ouro escuro do peito da arara (versão legível como
+     texto), mas cada Site Oficial
      (PousadaOfficialSite.tsx) pode sobrescrever isso via CSS custom
      property inline (Pousada.themeColorAccent), do mesmo jeito que
      themeColorPrimary sobrescreve --color-editorial-primary. */
-  --color-editorial-accent: #B08D4F;
+  --color-editorial-accent: #A35F00;
 
   /* animate-fadeIn era usado em vários dropdowns/modais pelo app inteiro
      sem nunca ter sido definido — a classe existia mas não fazia nada. */
   --animate-fadeIn: fadeIn 0.2s ease-out;
+}
+
+/* Faixa com as cores da arara na ordem em que aparecem na ave: coroa
+   verde, azul das costas, amarelo do peito e o preto da garganta. */
+.arara-ribbon,
+.arara-edge-bottom::after,
+.arara-edge-top::before {
+  height: 4px;
+  background: linear-gradient(90deg,
+    var(--color-arara-green) 0 12%,
+    var(--color-arara-blue) 12% 30%,
+    var(--color-editorial-primary) 30% 55%,
+    var(--color-arara-yellow) 55% 82%,
+    var(--color-arara-orange) 82% 94%,
+    var(--color-arara-black) 94% 100%);
+}
+
+.arara-edge-bottom,
+.arara-edge-top {
+  position: relative;
+}
+.arara-edge-bottom::after,
+.arara-edge-top::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.arara-edge-bottom::after { bottom: -1px; }
+.arara-edge-top::before { top: 0; }
+
+/* Listras finas do rosto da arara — textura discreta para fundos escuros. */
+.arara-stripes {
+  background-image: repeating-linear-gradient(-28deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 14px);
 }
 
 @keyframes fadeIn {

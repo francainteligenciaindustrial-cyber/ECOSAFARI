@@ -318,7 +318,7 @@ export default function App() {
     <div className="min-h-screen bg-editorial-bg flex flex-col font-sans text-editorial-text">
       
       {/* Top Demo Header & Nav (Editorial Aesthetic) */}
-      <header className="h-20 bg-editorial-bg border-b border-editorial-border flex items-center justify-between px-6 md:px-10 z-30 select-none">
+      <header className="arara-edge-bottom h-20 bg-editorial-bg flex items-center justify-between px-6 md:px-10 z-30 select-none">
         
         {/* Brand logo */}
         <div className="flex items-center gap-3">
@@ -531,7 +531,7 @@ export default function App() {
       </main>
 
       {/* Footer (Editorial Aesthetic style) */}
-      <footer className="bg-editorial-primary text-[#FDFCF8] border-t border-editorial-border py-12 px-6 md:px-10 text-[10px] uppercase tracking-widest font-sans">
+      <footer className="arara-edge-top arara-stripes bg-editorial-primary text-[#FBF8F1] py-12 px-6 md:px-10 text-[10px] uppercase tracking-widest font-sans">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           
           {/* Logo and Status */}
@@ -578,7 +578,7 @@ export default function App() {
           </div>
 
           {/* Copyright */}
-          <div className="text-center md:text-right text-[9px] text-[#FDFCF8]/60 font-bold">
+          <div className="text-center md:text-right text-[9px] text-[#FBF8F1]/60 font-bold">
             <span className="block mb-1">© 2026 EcoSafari Brasil • WildStay Systems</span>
             <span className="text-editorial-dark-muted font-normal italic font-serif tracking-normal capitalize text-xs block mt-1">
               Conservação e Turismo Sustentável
@@ -588,7 +588,7 @@ export default function App() {
         </div>
 
         {/* Institutional links */}
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-white/10 text-[9px] text-[#FDFCF8]/70 font-bold">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-white/10 text-[9px] text-[#FBF8F1]/70 font-bold">
           <a href="/sobre" onClick={(e) => { e.preventDefault(); navigate("/sobre"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Sobre Nós</a>
           <a href="/faq" onClick={(e) => { e.preventDefault(); navigate("/faq"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Perguntas Frequentes</a>
           <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Política de Privacidade</a>
@@ -600,7 +600,7 @@ export default function App() {
             site to look legitimate (and for LGPD's data-controller
             disclosure). Values come from VITE_COMPANY_CNPJ/VITE_COMPANY_ADDRESS
             (see .env.example) — set them before launch. */}
-        <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#FDFCF8]/50 font-normal normal-case tracking-normal">
+        <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#FBF8F1]/50 font-normal normal-case tracking-normal">
           EcoSafari Brasil • CNPJ: {COMPANY_CNPJ} • {COMPANY_ADDRESS}
         </div>
       </footer>

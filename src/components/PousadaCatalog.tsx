@@ -329,17 +329,18 @@ export default function PousadaCatalog({
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-editorial-primary/45"></div>
         
         <div className="relative max-w-5xl mx-auto px-6 text-center z-10 flex flex-col items-center">
-          <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#EFECE6]/80 mb-4">
+          <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#F6EEDC]/80 mb-4">
             Cada turista é único aqui na EcoSafari
           </span>
+          <span aria-hidden="true" className="block w-14 h-[3px] bg-arara-yellow -mt-2 mb-6" />
           <h1 className="text-4xl md:text-6xl font-serif tracking-tight mb-6 max-w-4xl text-balance leading-tight">
             Seja um dos primeiros a descobrir a <span className="italic font-normal opacity-90">fauna e flora escondida</span> no interior de Mato Grosso
           </h1>
-          <p className="text-sm md:text-base text-[#EFECE6] mb-8 max-w-2xl text-balance font-light leading-relaxed tracking-wide">
+          <p className="text-sm md:text-base text-[#F6EEDC] mb-8 max-w-2xl text-balance font-light leading-relaxed tracking-wide">
             Conectamos você às pousadas de selva mais conceituadas e sustentáveis do Mato Grosso. Viva safáris inesquecíveis guiados por biólogos locais.
           </p>
           <div className="flex flex-wrap gap-4 justify-center text-[11px] uppercase tracking-[0.2em] font-semibold">
-            <a href="#catalogo" className="bg-[#FDFCF8] text-editorial-primary hover:bg-[#EFECE6] px-6 py-3 rounded-none transition duration-200 shadow-sm flex items-center gap-2">
+            <a href="#catalogo" className="bg-arara-yellow text-arara-black hover:bg-arara-orange px-6 py-3 rounded-none transition duration-200 shadow-sm flex items-center gap-2">
               <Compass className="h-4 w-4" /> Explorar Catálogo
             </a>
           </div>
@@ -366,7 +367,7 @@ export default function PousadaCatalog({
                 onClick={() => setFilterLocation("all")}
                 className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
                   filterLocation === "all"
-                    ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
+                    ? "bg-editorial-primary text-[#FBF8F1] border-editorial-primary shadow-sm"
                     : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
                 }`}
               >
@@ -378,7 +379,7 @@ export default function PousadaCatalog({
                   onClick={() => setFilterLocation(loc)}
                   className={`px-4 py-2 rounded-full transition duration-200 border cursor-pointer ${
                     filterLocation === loc
-                      ? "bg-editorial-primary text-[#FDFCF8] border-editorial-primary shadow-sm"
+                      ? "bg-editorial-primary text-[#FBF8F1] border-editorial-primary shadow-sm"
                       : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
                   }`}
                 >
@@ -477,10 +478,10 @@ export default function PousadaCatalog({
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
                 />
-                <div className="absolute top-4 left-4 bg-editorial-primary/95 text-[#FDFCF8] px-3 py-1 text-[9px] uppercase tracking-wider font-bold flex items-center gap-1 shadow-sm">
+                <div className="absolute top-4 left-4 bg-editorial-primary/95 text-[#FBF8F1] px-3 py-1 text-[9px] uppercase tracking-wider font-bold flex items-center gap-1 shadow-sm">
                   <MapPin className="h-3 w-3" /> {pousada.location || "Localização não disponível"}
                 </div>
-                <div className="absolute top-4 right-4 bg-[#FDFCF8] text-editorial-text px-2.5 py-1 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-editorial-border">
+                <div className="absolute top-4 right-4 bg-[#FBF8F1] text-editorial-text px-2.5 py-1 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-editorial-border">
                   {pousada.rating > 0 ? (
                     <><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> {pousada.rating}</>
                   ) : (
@@ -701,7 +702,7 @@ export default function PousadaCatalog({
 
       {/* Wildlife Species Showcase (O que avistar) Section */}
       <ErrorBoundary variant="section" sectionLabel="a vitrine de espécies">
-      <section className="bg-[#121613] text-[#FDFCF8] py-24 border-t border-editorial-border/10 relative overflow-hidden">
+      <section className="arara-stripes bg-[#0B1E2D] text-[#FBF8F1] py-24 border-t border-editorial-border/10 relative overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-editorial-primary/10 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -729,7 +730,7 @@ export default function PousadaCatalog({
                 last card's text). */}
             <button
               onClick={scrollSpeciesLeft}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#121613]/85 hover:bg-amber-500 hover:text-[#121613] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0B1E2D]/85 hover:bg-amber-500 hover:text-[#0B1E2D] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label="Anterior"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -738,7 +739,7 @@ export default function PousadaCatalog({
             {/* Right Button */}
             <button
               onClick={scrollSpeciesRight}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#121613]/85 hover:bg-amber-500 hover:text-[#121613] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0B1E2D]/85 hover:bg-amber-500 hover:text-[#0B1E2D] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label="Próximo"
             >
               <ChevronRight className="h-6 w-6" />
@@ -940,12 +941,12 @@ export default function PousadaCatalog({
       {/* Species Detail Modal */}
       {selectedSpecies && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-6 z-50 animate-fadeIn">
-          <div className="bg-[#121613] text-[#FDFCF8] border border-white/10 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
+          <div className="bg-[#0B1E2D] text-[#FBF8F1] border border-white/10 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
             
             {/* Close Button */}
             <button
               onClick={() => setSelectedSpecies(null)}
-              className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#121613] border border-white/10 text-[#FDFCF8] p-2 rounded-full transition cursor-pointer"
+              className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#0B1E2D] border border-white/10 text-[#FBF8F1] p-2 rounded-full transition cursor-pointer"
               aria-label="Fechar"
             >
               <X className="h-5 w-5" />
@@ -1018,7 +1019,7 @@ export default function PousadaCatalog({
                       setSelectedSpecies(null);
                     }
                   }}
-                  className="flex-1 bg-white hover:bg-amber-500 hover:text-[#121613] text-[#121613] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
+                  className="flex-1 bg-white hover:bg-amber-500 hover:text-[#0B1E2D] text-[#0B1E2D] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
                 >
                   Conhecer Pousada Ideal
                 </button>
@@ -1030,7 +1031,7 @@ export default function PousadaCatalog({
                     }
                     setSelectedSpecies(null);
                   }}
-                  className="flex-1 bg-transparent hover:bg-white/5 border border-white/20 text-[#FDFCF8] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition text-center cursor-pointer"
+                  className="flex-1 bg-transparent hover:bg-white/5 border border-white/20 text-[#FBF8F1] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition text-center cursor-pointer"
                 >
                   Solicitar Guia Especializado
                 </button>
@@ -1049,9 +1050,9 @@ export default function PousadaCatalog({
           
           {/* Write a review column */}
           <div className="lg:col-span-5 flex flex-col justify-center">
-            <span className="text-[#EFECE6] font-bold uppercase text-[9px] tracking-[0.3em] mb-2 inline-block">Sua opinião importa</span>
+            <span className="text-[#F6EEDC] font-bold uppercase text-[9px] tracking-[0.3em] mb-2 inline-block">Sua opinião importa</span>
             <h2 className="text-3xl md:text-4xl font-serif font-bold tracking-tight mb-4 text-balance">O que nossos aventureiros andam dizendo</h2>
-            <p className="text-[#EFECE6]/80 text-xs leading-relaxed mb-6 font-light">
+            <p className="text-[#F6EEDC]/80 text-xs leading-relaxed mb-6 font-light">
               Todos os relatos ao lado vêm de hóspedes reais que viveram expedições de conservação em nossas pousadas parceiras. Escreva sua avaliação e ajude outros viajantes!
             </p>
 

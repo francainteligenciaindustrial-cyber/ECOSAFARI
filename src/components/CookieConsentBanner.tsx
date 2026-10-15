@@ -30,7 +30,7 @@ export default function CookieConsentBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-50 bg-editorial-primary text-[#FDFCF8] border-t border-white/10 px-6 py-5 md:py-4 animate-fadeIn">
+    <div className="fixed bottom-0 inset-x-0 z-50 bg-editorial-primary text-[#FBF8F1] border-t border-white/10 px-6 py-5 md:py-4 animate-fadeIn">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8">
         <Cookie className="h-6 w-6 flex-shrink-0 hidden sm:block" />
         <p className="text-xs md:text-[13px] leading-relaxed flex-1 text-center md:text-left">
