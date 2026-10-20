@@ -4,6 +4,7 @@ import { navigate } from "../lib/router";
 import { nextBestMonth, SeasonLevel } from "../data/wildSpecies";
 import { bookingUrl } from "./SpeciesSeasonCalendar";
 import PictureImg from "./PictureImg";
+import { PawPrint } from "lucide-react";
 
 interface SpeciesRow {
   id: string;
@@ -16,9 +17,9 @@ interface SpeciesRow {
 }
 
 const CELL: Record<SeasonLevel, string> = {
-  2: "bg-editorial-primary",
-  1: "bg-editorial-primary/25",
-  0: "bg-editorial-secondary",
+  2: "bg-editorial-primary text-white",
+  1: "bg-editorial-primary/25 text-editorial-primary",
+  0: "bg-editorial-secondary text-editorial-muted",
 };
 
 // Tabela "espécie × mês" da home: uma olhada mostra que a seca concentra os
@@ -61,13 +62,29 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
               {rows.map(s => (
                 <tr key={s.id} className="border-t border-editorial-border">
                   <th scope="row" className="text-left font-normal px-4 py-2">
-                    <button type="button" onClick={() => onOpenSpecies(s.id)} className="flex items-center gap-2 cursor-pointer hover:text-editorial-primary transition">
-                      <PictureImg src={s.image} alt="" className="w-8 h-8 rounded-full object-cover border border-editorial-border" />
-                      <span>
-                        <span className="font-serif font-bold text-sm text-editorial-text block">{s.name}</span>
-                        {s.seasonFromApp && <span className="text-[9px] uppercase tracking-widest font-bold text-emerald-700">{t("species.appDataSpecies")}</span>}
-                      </span>
-                    </button>
+                    {(() => {
+                      const inner = (
+                        <>
+                          {s.image ? (
+                            <PictureImg src={s.image} alt="" className="w-8 h-8 rounded-full object-cover border border-editorial-border" />
+                          ) : (
+                            <span aria-hidden="true" className="w-8 h-8 rounded-full border border-editorial-border bg-editorial-secondary flex items-center justify-center text-editorial-muted"><PawPrint className="h-4 w-4" /></span>
+                          )}
+                          <span>
+                            <span className="font-serif font-bold text-sm text-editorial-text block">{s.name}</span>
+                            <span className={`text-[9px] uppercase tracking-widest font-bold ${s.seasonFromApp ? "text-emerald-700" : "text-editorial-muted"}`}>
+                              {s.seasonFromApp ? t("species.appDataSpecies") : t("species.referenceBadge")}
+                            </span>
+                          </span>
+                        </>
+                      );
+                      // Espécie que só existe no app não tem ficha na vitrine.
+                      return s.id.startsWith("app:") ? (
+                        <span className="flex items-center gap-2">{inner}</span>
+                      ) : (
+                        <button type="button" onClick={() => onOpenSpecies(s.id)} className="flex items-center gap-2 cursor-pointer hover:text-editorial-primary transition text-left">{inner}</button>
+                      );
+                    })()}
                   </th>
                   {s.season.map((level, i) => {
                     // Mês que já passou neste ano: a reserva vai para o ano que vem.
@@ -83,10 +100,14 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
                             onClick={() => navigate(bookingUrl(s.bestPousadaId, year, i + 1))}
                             aria-label={`${label}. ${action}`}
                             title={`${label} · ${action}`}
-                            className={`block w-full h-7 rounded-sm cursor-pointer hover:ring-2 hover:ring-arara-blue transition ${CELL[level]}`}
-                          />
+                            className={`flex items-center justify-center w-full h-7 rounded-sm cursor-pointer hover:ring-2 hover:ring-arara-blue transition text-[10px] font-bold ${CELL[level]}`}
+                          >
+                            {count ? count : ""}
+                          </button>
                         ) : (
-                          <span role="img" aria-label={label} title={label} className={`block w-full h-7 rounded-sm ${CELL[level]}`} />
+                          <span role="img" aria-label={label} title={label} className={`flex items-center justify-center w-full h-7 rounded-sm text-[10px] font-bold ${CELL[level]}`}>
+                            {count ? count : ""}
+                          </span>
                         )}
                       </td>
                     );

@@ -327,8 +327,7 @@ export default function AdminDashboard({
       });
 
       if (response.ok) {
-        // Vínculo com o app pode ter mudado: recalcula as estatísticas.
-        adminFetch("/api/admin/app-stats/refresh", { method: "POST" }).catch(() => {});
+
         setEditingPousadaId(null);
         onRefreshData();
       }

@@ -66,7 +66,7 @@ export const WILD_SPECIES: WildSpeciesInfo[] = [
     scientificName: "Caiman yacare",
     image: "/species/jacare-do-pantanal.png",
     sightingRate: "95%+",
-    aliases: ["jacare", "jacare-do-pantanal", "caiman", "yacare"],
+    aliases: ["jacare", "jacare-do-pantanal", "jacare do pantanal", "caiman", "yacare"],
     season: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1],
     areas: [AREAS.transpantaneira, AREAS.portoJofre],
     text: {
@@ -108,7 +108,7 @@ export const WILD_SPECIES: WildSpeciesInfo[] = [
     scientificName: "Ara ararauna",
     image: "/species/arara-caninde.png",
     sightingRate: "95%+",
-    aliases: ["arara", "arara-caninde", "blue-and-yellow macaw", "guacamayo"],
+    aliases: ["arara", "arara-caninde", "caninde", "arara caninde", "blue-and-yellow macaw", "guacamayo"],
     season: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1],
     areas: [AREAS.transpantaneira, AREAS.pixaim],
     text: {
@@ -122,7 +122,7 @@ export const WILD_SPECIES: WildSpeciesInfo[] = [
     scientificName: "Panthera onca",
     image: "/species/onca-pintada.png",
     sightingRate: "95%+",
-    aliases: ["onca", "onca-pintada", "jaguar", "jaguar"],
+    aliases: ["onca", "onca-pintada", "onca pintada", "jaguar"],
     season: [0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 1, 0],
     areas: [AREAS.portoJofre, AREAS.tresIrmaos],
     text: {
@@ -136,7 +136,7 @@ export const WILD_SPECIES: WildSpeciesInfo[] = [
     scientificName: "Athene cunicularia",
     image: "/species/coruja-buraqueira.png",
     sightingRate: "90%+",
-    aliases: ["coruja", "coruja-buraqueira", "burrowing owl", "lechucita"],
+    aliases: ["coruja", "coruja-buraqueira", "coruja buraqueira", "burrowing owl", "lechucita"],
     season: [1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1],
     areas: [AREAS.poconeCampos, AREAS.transpantaneira],
     text: {

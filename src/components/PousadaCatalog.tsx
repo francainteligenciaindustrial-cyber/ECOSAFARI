@@ -16,7 +16,7 @@ import { WILD_SPECIES, findWildSpecies, SeasonLevel } from "../data/wildSpecies"
 import SpeciesSeasonCalendar from "./SpeciesSeasonCalendar";
 import SeasonCalendarSection from "./SeasonCalendarSection";
 import PacotesSection from "./PacotesSection";
-import { useSightingStats, matchSpeciesStats } from "../lib/useSightingStats";
+import { useSightingStats, matchSpeciesStats, unmatchedSpeciesStats, publishablePoints } from "../lib/useSightingStats";
 import { seasonFromMonthly } from "../lib/sightingStats";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
@@ -118,6 +118,22 @@ export default function PousadaCatalog({
       ...(top ? { bestPousadaId: top.id, bestPousadaName: top.name } : {}),
     };
   }), [baseSpecies, sightingStats, pousadas]);
+
+  // Espécies registradas no app que ainda não estão na vitrine: entram no
+  // calendário com os registros atuais.
+  const extraCalendarRows = useMemo(() => unmatchedSpeciesStats(sightingStats, baseSpecies).map(s => {
+    const top = s.topPousadaId ? pousadas.find(p => p.id === s.topPousadaId) : undefined;
+    return {
+      id: `app:${s.key}`,
+      name: s.name,
+      image: "",
+      season: seasonFromMonthly(s.monthly, s.total) || undefined,
+      bestPousadaId: top?.id || "",
+      monthlyCounts: s.monthly,
+      seasonFromApp: true,
+    };
+  }), [sightingStats, baseSpecies, pousadas]);
+  const mapPoints = useMemo(() => publishablePoints(sightingStats, baseSpecies), [sightingStats, baseSpecies]);
   const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
   const { showToast } = useToast();
   const [filterLocation, setFilterLocation] = useState("all");
@@ -774,7 +790,7 @@ export default function PousadaCatalog({
 
       <ErrorBoundary variant="section" sectionLabel="o calendário de melhor época">
         <SeasonCalendarSection
-          species={displaySpecies}
+          species={[...displaySpecies, ...extraCalendarRows]}
           onOpenSpecies={id => setSelectedSpecies(displaySpecies.find(s => s.id === id) || null)}
         />
       </ErrorBoundary>
@@ -788,7 +804,7 @@ export default function PousadaCatalog({
               <p className="text-editorial-muted text-xs mt-2">{t("map.subtitle")}</p>
             </div>
             <Suspense fallback={<div className="h-[520px] flex items-center justify-center border border-editorial-border text-editorial-muted text-xs">{t("map.loading")}</div>}>
-              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} sightingPoints={sightingStats?.points} />
+              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} sightingPoints={mapPoints} />
             </Suspense>
           </div>
         </section>
