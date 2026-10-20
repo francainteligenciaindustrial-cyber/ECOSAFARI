@@ -18,7 +18,7 @@ describe("mapPousadaRow", () => {
       emailContato: "c@p.com", emailRemetente: "r@p.com", emailRemetenteNome: "Pousada", latitude: -16.5, longitude: "-56.7",
     };
     for (const f of core.POUSADA_UPDATE_FIELDS) if (!(f in row)) row[f] = f === "latitude" || f === "longitude" ? 1 : `v-${f}`;
-    const mapped = core.mapPousadaRow(row) as Record<string, unknown>;
+    const mapped = core.mapPousadaRow(row) as unknown as Record<string, unknown>;
     const ignorados = new Set(["images", "features", "activities", "experiences", "officialSiteImages", "rooms", "menu", "unavailableDates", "cuisineTypes", "transportOptions", "entertainmentOptions", "capacity", "pricePerNight", "verified", "hasOwnWebsite", "hasParking", "hasWifi", "sitePublicado"]);
     for (const f of core.POUSADA_UPDATE_FIELDS) {
       expect(mapped, `campo "${f}" não chega ao site`).toHaveProperty(f);
