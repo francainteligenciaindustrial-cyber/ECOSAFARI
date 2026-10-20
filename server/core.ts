@@ -1037,7 +1037,24 @@ export function mapPousadaRow(p: any): Pousada {
     logoUrl: p.logoUrl || "",
     themeColorPrimary: p.themeColorPrimary || "",
     themeColorAccent: p.themeColorAccent || "",
+    // Campos novos precisam estar aqui: esta função é uma lista fixa, e o que
+    // não passa por ela nunca chega ao site — nem ao formulário da Gestão,
+    // que então salvaria o campo vazio por cima do valor do banco.
+    latitude: toNumberOrUndefined(p.latitude),
+    longitude: toNumberOrUndefined(p.longitude),
+    emailContato: p.emailContato || "",
+    emailRemetente: p.emailRemetente || "",
+    emailRemetenteNome: p.emailRemetenteNome || "",
+    customDomain: p.customDomain || "",
+    sitePublicado: p.sitePublicado === true,
+    appLodgeId: p.appLodgeId || "",
   };
+}
+
+function toNumberOrUndefined(v: unknown): number | undefined {
+  if (v === null || v === undefined || v === "") return undefined;
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : undefined;
 }
 
 // Image uploads go to the "site-media" Supabase Storage bucket (public,
@@ -1221,6 +1238,8 @@ export function mapAtracaoRow(a: any): Atracao {
     images: parseJSONSafe(a.images) || [],
     menu: parseJSONSafe(a.menu) || undefined,
     availability: a.availability || undefined,
+    latitude: toNumberOrUndefined(a.latitude),
+    longitude: toNumberOrUndefined(a.longitude),
     rating: typeof a.rating === "number" ? a.rating : (a.rating ? parseFloat(a.rating) : 0),
     verified: typeof a.verified === "boolean" ? a.verified : false,
     dateCreated: a.dateCreated || ""

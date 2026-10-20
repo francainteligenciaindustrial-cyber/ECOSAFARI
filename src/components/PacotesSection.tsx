@@ -28,11 +28,13 @@ export default function PacotesSection() {
         <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">{t("pkg.title")}</h2>
         <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">{t("pkg.subtitle")}</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Celular: carrossel deslizante (um cartão e meio visível); tablet
+          em diante: grade. */}
+      <div className="flex md:grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-6 px-6 md:mx-0 md:px-0 pb-2 md:pb-0">
         {pacotes.map(p => {
           const href = `/reservar/${encodeURIComponent(p.pousadaId)}?pacote=${encodeURIComponent(p.id)}`;
           return (
-            <article key={p.id} className="bg-white border border-editorial-border flex flex-col">
+            <article key={p.id} className="bg-white border border-editorial-border flex flex-col min-w-[82%] sm:min-w-[60%] md:min-w-0 snap-start">
               <div className="h-44 bg-editorial-secondary overflow-hidden relative">
                 {p.imageUrl ? (
                   <PictureImg src={p.imageUrl} alt="" className="w-full h-full object-cover" />

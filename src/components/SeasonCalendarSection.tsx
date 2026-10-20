@@ -48,7 +48,57 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
           <p className="text-editorial-muted text-xs mt-2 leading-relaxed">{t("species.calendarSubtitle")}</p>
         </div>
 
-        <div className="overflow-x-auto border border-editorial-border bg-white">
+        {/* Celular: um cartão por espécie com os 12 meses visíveis de uma vez
+            (a tabela larga obrigava a rolar para o lado e só mostrava 4). */}
+        <ul className="md:hidden space-y-2">
+          {rows.map(s => {
+            const appOnly = s.id.startsWith("app:");
+            return (
+              <li key={s.id} className="bg-white border border-editorial-border p-3">
+                <button
+                  type="button"
+                  disabled={appOnly}
+                  onClick={() => onOpenSpecies(s.id)}
+                  className="flex items-center gap-2 w-full text-left mb-2 disabled:cursor-default cursor-pointer"
+                >
+                  {s.image ? (
+                    <PictureImg src={s.image} alt="" className="w-8 h-8 rounded-full object-cover border border-editorial-border flex-shrink-0" />
+                  ) : (
+                    <span aria-hidden="true" className="w-8 h-8 rounded-full border border-editorial-border bg-editorial-secondary flex items-center justify-center text-editorial-muted flex-shrink-0"><PawPrint className="h-4 w-4" /></span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="font-serif font-bold text-sm text-editorial-text block truncate">{s.name}</span>
+                    <span className={`text-[9px] uppercase tracking-widest font-bold ${s.seasonFromApp ? "text-emerald-700" : "text-editorial-muted"}`}>
+                      {s.seasonFromApp ? t("species.appDataSpecies") : t("species.referenceBadge")}
+                    </span>
+                  </span>
+                </button>
+                <ol className="grid grid-cols-12 gap-0.5" aria-label={s.name}>
+                  {s.season.map((level, i) => {
+                    const year = i < now.getMonth() ? now.getFullYear() + 1 : now.getFullYear();
+                    const count = s.monthlyCounts?.[i];
+                    const label = `${s.name} — ${monthLabels[i]}: ${levelName(level)}${count ? ` · ${t("species.monthSightings", { n: count })}` : ""}`;
+                    const cell = `flex items-center justify-center w-full h-7 rounded-sm text-[9px] font-bold ${CELL[level]}`;
+                    return (
+                      <li key={i} className="text-center">
+                        {s.bestPousadaId && level > 0 ? (
+                          <button type="button" onClick={() => navigate(bookingUrl(s.bestPousadaId, year, i + 1))} aria-label={`${label}. ${t("species.bookMonth", { month: monthLabels[i] })}`} className={`${cell} cursor-pointer`}>
+                            {count ? count : ""}
+                          </button>
+                        ) : (
+                          <span role="img" aria-label={label} className={cell}>{count ? count : ""}</span>
+                        )}
+                        <span aria-hidden="true" className={`block text-[8px] uppercase mt-0.5 ${i === now.getMonth() ? "text-editorial-primary font-bold" : "text-editorial-muted"}`}>{monthLabels[i].slice(0, 1)}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="hidden md:block overflow-x-auto border border-editorial-border bg-white">
           <table className="w-full min-w-[720px] text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-widest text-editorial-muted">
