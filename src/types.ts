@@ -51,7 +51,7 @@ export interface Pousada {
   // Cardápio do bar/restaurante da própria pousada, quando ela tiver um —
   // mesma estrutura do menu de Atracao (item + preço), com categoria pra
   // agrupar em Pratos/Bebidas/Drinks/Sobremesas na exibição.
-  menu?: { item: string; price: number; category?: "prato" | "bebida" | "drink" | "sobremesa" | "outro" }[];
+  menu?: { item: string; price: number; description?: string; category?: "prato" | "bebida" | "drink" | "sobremesa" | "outro" }[];
   // Aba "Serviços" do portal do parceiro — características do
   // atendimento/estrutura que vão além dos tags livres de "features".
   cuisineTypes?: string[]; // tipos de culinária (ex: "Regional", "Italiana")
@@ -177,6 +177,11 @@ export interface Booking {
   guideName?: string;
   dateCreated: string;
   googleCalendarEventId?: string;
+  turistaId?: string;
+  // JSON com o que o turista informou na reserva online (chegada, ocasião,
+  // transfer, interesses, observações).
+  guestDetails?: string;
+  origem?: string;
   // Deve bater com um Pousada.rooms[].type — quando informado, a
   // disponibilidade é checada por unidade daquele tipo de quarto (não só
   // contra a capacidade agregada da pousada). Opcional pra manter

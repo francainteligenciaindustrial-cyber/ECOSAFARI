@@ -332,6 +332,9 @@ export default function PousadaCatalog({
           <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#F6EEDC]/80 mb-4">
             Cada turista é único aqui na EcoSafari
           </span>
+          <span lang="en" translate="no" className="text-[10px] uppercase tracking-[0.3em] font-semibold text-[#F6EEDC]/60 -mt-3 mb-4">
+            Every traveler is unique here at EcoSafari
+          </span>
           <span aria-hidden="true" className="block w-14 h-[3px] bg-arara-yellow -mt-2 mb-6" />
           <h1 className="text-4xl md:text-6xl font-serif tracking-tight mb-6 max-w-4xl text-balance leading-tight">
             Seja um dos primeiros a descobrir a <span className="italic font-normal opacity-90">fauna e flora escondida</span> no interior de Mato Grosso

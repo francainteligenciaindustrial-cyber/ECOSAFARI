@@ -84,7 +84,9 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  // camera=(self): o leitor de QR dos produtos (Caixa/Consumo) usa a câmera
+// do próprio site — "camera=()" bloqueava o scanner em produção.
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=(self)");
   res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   // Allowlist reflects the third-party scripts this app actually loads:
   // Google reCAPTCHA v3, Meta Pixel, Google Analytics 4, Supabase (API +
@@ -100,7 +102,10 @@ app.use((req, res, next) => {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https:",
       "connect-src 'self' https://*.supabase.co https://www.google.com https://www.facebook.com https://*.sentry.io https://www.googletagmanager.com https://*.google-analytics.com",
-      "frame-src https://www.google.com",
+      // YouTube (modo sem cookies) e Google Drive: vídeos de apresentação
+      // das pousadas colados pelo gestor na Galeria de Fotos.
+      "frame-src https://www.google.com https://www.youtube-nocookie.com https://www.youtube.com https://drive.google.com",
+      "media-src 'self' blob: https://*.supabase.co",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -451,12 +456,12 @@ const requireTourist: express.RequestHandler[] = [
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     if (!token) {
-      return res.status(401).json({ error: "Crie um perfil de turista (ou faça login) para avaliar." });
+      return res.status(401).json({ error: "Crie um perfil de turista (ou faça login) para continuar." });
     }
     try {
       const { data, error } = await supabase.auth.getUser(token);
       if (error || !data.user || !isTouristUser(data.user)) {
-        return res.status(403).json({ error: "É preciso ter um perfil de turista para avaliar." });
+        return res.status(403).json({ error: "É preciso ter um perfil de turista para continuar." });
       }
       res.locals.touristUser = data.user;
       next();
@@ -716,6 +721,31 @@ if (RESEND_API_KEY && RESEND_API_KEY !== "MY_RESEND_API_KEY") {
     }
   } else {
     log.warn(`Resend desativado neste deploy (VERCEL_ENV=${VERCEL_ENV}) — nenhum email real será enviado. Defina ALLOW_LIVE_INTEGRATIONS_IN_PREVIEW=true pra testar de propósito.`);
+  }
+}
+
+// Remetente precisa ser de um domínio verificado no Resend — o padrão
+// onboarding@resend.dev só entrega pro email do dono da conta Resend, e pra
+// qualquer outro destinatário a API responde com erro (sem lançar exceção).
+const EMAIL_FROM = process.env.EMAIL_FROM || "EcoSafari Brasil <onboarding@resend.dev>";
+if (resend && !process.env.EMAIL_FROM) {
+  log.warn("EMAIL_FROM não definido — usando onboarding@resend.dev, que só entrega para o email dono da conta Resend. Verifique um domínio no Resend e defina EMAIL_FROM.");
+}
+
+// O SDK do Resend devolve { error } em vez de lançar quando a API recusa o
+// envio — sem checar isso, falhas viravam "email enviado" silenciosamente.
+async function sendEmail(msg: { to: string; subject: string; html: string; attachments?: { filename: string; content: string }[] }): Promise<{ ok: boolean; error?: string }> {
+  if (!resend) return { ok: false, error: "Resend não configurado" };
+  try {
+    const { error } = await resend.emails.send({ from: EMAIL_FROM, ...msg });
+    if (error) {
+      log.warn(`Resend recusou o envio para ${msg.to}: ${error.message}`);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    log.warn(`Falha ao enviar email para ${msg.to}: ${err.message}`);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -1213,6 +1243,29 @@ app.post("/api/pousadas", requireAdmin, async (req, res) => {
   res.status(201).json(newPousada);
 });
 
+// Grava pulando colunas que ainda não existem no banco (migração SQL
+// pendente) em vez de falhar a gravação inteira — o resto dos campos é
+// salvo e quem chamou recebe a lista do que ficou de fora.
+async function writeSkippingMissingColumns(
+  row: Record<string, any>,
+  run: (row: Record<string, any>) => PromiseLike<{ data: any; error: any }>
+): Promise<{ data: any; error: any; skipped: string[] }> {
+  const current = { ...row };
+  const skipped: string[] = [];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const result = await run(current);
+    const missing = result.error?.code === "PGRST204" ? /'([^']+)' column/.exec(result.error.message || "")?.[1] : undefined;
+    if (missing && missing in current) {
+      skipped.push(missing);
+      delete current[missing];
+      continue;
+    }
+    if (skipped.length) log.warn(`Campos ignorados por migração SQL pendente: ${skipped.join(", ")}`);
+    return { data: result.data, error: result.error, skipped };
+  }
+  return { data: null, error: { message: "Colunas demais ausentes no banco — rode as migrações SQL pendentes." }, skipped };
+}
+
 // Admin OR the pousada's own linked partner account can edit it — "verified"
 // stays admin-only (POUSADA_CREATE_FIELDS excludes it; only the admin branch
 // upgrades to POUSADA_UPDATE_FIELDS), since that's a trust badge the partner
@@ -1220,20 +1273,14 @@ app.post("/api/pousadas", requireAdmin, async (req, res) => {
 app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) => {
   const { id } = req.params;
   const updates = pickFields<Pousada>(req.body, res.locals.isAdmin ? POUSADA_UPDATE_FIELDS : POUSADA_CREATE_FIELDS);
-  const { data, error } = await supabase.from("pousadas").update(updates).eq("id", id).select().single();
-  // PGRST204 = coluna inexistente (migração SQL ainda não rodada) — antes
-  // isso virava um 404 genérico e o portal mostrava "salvo" sem ter salvo.
-  if (error && error.code === "PGRST204") {
-    console.error("[PUT /api/pousadas/:id] coluna ausente:", error.message);
-    return res.status(500).json({ error: `Não foi possível salvar: o banco de dados ainda não tem um dos campos novos (${error.message}). Avise o administrador para rodar as migrações SQL pendentes.` });
-  }
+  const { data, error, skipped } = await writeSkippingMissingColumns(updates, row => supabase.from("pousadas").update(row).eq("id", id).select().single());
   if (error && error.code !== "PGRST116") {
-    console.error("[PUT /api/pousadas/:id]", error);
+    log.error("[PUT /api/pousadas/:id]", error.message);
     return res.status(500).json({ error: `Erro ao salvar: ${error.message}` });
   }
   if (!data) return res.status(404).json({ error: "Pousada não encontrada" });
   await logAdminAction(res.locals.actorUser, "update", "pousada", id, data.name);
-  res.json(mapPousadaRow(data));
+  res.json({ ...mapPousadaRow(data), skippedFields: skipped });
 });
 
 // O próprio gestor também pode remover a pousada pelo perfil — vai pra
@@ -1518,6 +1565,62 @@ app.get("/api/bookings/public-confirmed", async (req, res) => {
 // toda criação de reserva com uma função não testada. Se esse endpoint um
 // dia virar self-service (ver conversa sobre escala), esse é o primeiro
 // lugar a reforçar antes de abrir pro público.
+type AvailabilityResult = { ok: boolean; status?: number; body?: Record<string, unknown> };
+
+const shiftDays = (date: string, days: number) => new Date(Date.parse(date) + days * 86400000).toISOString().slice(0, 10);
+
+// Disponibilidade de uma pousada num período — usada tanto pelo cadastro
+// manual do admin quanto pela reserva online do turista. Estadias que só
+// se encostam (check-out de uma = check-in da outra) não conflitam.
+// excludeBookingId permite revalidar depois de gravar a própria reserva.
+async function checkPousadaAvailability(pousada: Pousada, checkIn: string, checkOut: string, newGuests: number, roomType?: string, excludeBookingId?: string): Promise<AvailabilityResult> {
+  const suggestions = [{ checkIn: shiftDays(checkIn, 7), checkOut: shiftDays(checkOut, 7), note: "Uma semana mais tarde" }];
+
+  const blocked = (pousada.unavailableDates || []).filter(d => d >= checkIn && d < checkOut);
+  if (blocked.length > 0) {
+    return { ok: false, status: 400, body: { error: `A pousada não recebe hóspedes em: ${blocked.slice(0, 5).join(", ")}.`, available: false, suggestions } };
+  }
+
+  let query = supabase
+    .from("bookings")
+    .select("id, checkIn, checkOut, adults, children, roomType")
+    .eq("pousadaId", pousada.id)
+    .neq("status", "cancelado")
+    .lt("checkIn", checkOut)
+    .gt("checkOut", checkIn);
+  if (excludeBookingId) query = query.neq("id", excludeBookingId);
+  const { data: overlapping, error } = await query;
+  if (error) return { ok: false, status: 500, body: { error: "Erro ao consultar a disponibilidade." } };
+  const overlappingBookings = overlapping || [];
+
+  if (roomType) {
+    const room = (pousada.rooms || []).find(r => r.type === roomType);
+    if (!room) return { ok: false, status: 400, body: { error: `Tipo de quarto "${roomType}" não encontrado nesta pousada.` } };
+    if (newGuests > room.capacity) {
+      return { ok: false, status: 400, body: { error: `O quarto "${roomType}" acomoda no máximo ${room.capacity} hóspedes.`, available: false } };
+    }
+    const sameRoom = overlappingBookings.filter(b => b.roomType === roomType).length;
+    if (sameRoom >= room.quantity) {
+      return { ok: false, status: 400, body: { error: `Sem unidades disponíveis do quarto "${roomType}" para estas datas (${room.quantity} no total).`, available: false, suggestions } };
+    }
+    return { ok: true };
+  }
+
+  const guestsAlready = overlappingBookings.reduce((acc, b) => acc + (b.adults || 0) + (b.children || 0), 0);
+  if (guestsAlready + newGuests > pousada.capacity) {
+    return { ok: false, status: 400, body: { error: "Indisponível para estas datas por atingir capacidade máxima.", available: false, suggestions } };
+  }
+  return { ok: true };
+}
+
+// Preço sempre calculado no servidor a partir do cadastro da pousada —
+// nunca a partir de um valor enviado pelo navegador.
+function computeBookingTotal(pousada: Pousada, checkIn: string, checkOut: string, adults: number, experienceType?: string): number {
+  const nights = Math.max(1, Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000));
+  const exp = experienceType ? (pousada.experiences || []).find(e => e.title === experienceType) : undefined;
+  return pousada.pricePerNight * nights + (exp ? exp.price * adults : 0);
+}
+
 app.post("/api/bookings", requireAdmin, async (req, res) => {
   const { pousadaId, checkIn, checkOut, adults, children, roomType } = req.body;
   const { data: pousadaRow, error: pErr } = await supabase.from("pousadas").select("*").eq("id", pousadaId).maybeSingle();
@@ -1527,68 +1630,11 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
   const targetPousada = mapPousadaRow(pousadaRow);
   const newGuests = (adults || 1) + (children || 0);
 
-  // Double Check Availability (Mock Calendar check) — count current
-  // bookings in that date range for this pousada
-  const { data: candidateBookings } = await supabase
-    .from("bookings")
-    .select("*")
-    .eq("pousadaId", pousadaId)
-    .neq("status", "cancelado");
-  const overlappingBookings = (candidateBookings || []).filter(b =>
-    // Overlap condition: (StartA <= EndB) and (EndA >= StartB)
-    b.checkIn <= checkOut && b.checkOut >= checkIn
-  );
-
-  if (roomType) {
-    // Disponibilidade POR UNIDADE de um tipo de quarto específico — sem
-    // isso, duas reservas que juntas cabem na capacidade agregada da
-    // pousada podiam pedir o MESMO quarto físico ao mesmo tempo (rooms[]
-    // existia no cadastro mas nunca era consultado aqui).
-    const room = (targetPousada.rooms || []).find(r => r.type === roomType);
-    if (!room) {
-      return res.status(400).json({ error: `Tipo de quarto "${roomType}" não encontrado nesta pousada.` });
-    }
-    if (newGuests > room.capacity) {
-      return res.status(400).json({ error: `O quarto "${roomType}" acomoda no máximo ${room.capacity} hóspedes.`, available: false });
-    }
-    const overlappingSameRoom = overlappingBookings.filter(b => b.roomType === roomType).length;
-    if (overlappingSameRoom >= room.quantity) {
-      const altCheckIn = new Date(new Date(checkIn).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      const altCheckOut = new Date(new Date(checkOut).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      return res.status(400).json({
-        error: `Sem unidades disponíveis do quarto "${roomType}" para estas datas (${room.quantity} no total).`,
-        available: false,
-        suggestions: [{ checkIn: altCheckIn, checkOut: altCheckOut, note: "Uma semana mais tarde" }],
-      });
-    }
-  } else {
-    // Sem tipo de quarto informado — cai no comportamento anterior
-    // (capacidade agregada da pousada), mantido pra pousadas sem "rooms"
-    // cadastrado ou fluxos que ainda não passam essa informação.
-    const totalGuestsAlready = overlappingBookings.reduce((acc, curr) => acc + curr.adults + curr.children, 0);
-    if (totalGuestsAlready + newGuests > targetPousada.capacity) {
-      const altCheckIn = new Date(new Date(checkIn).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      const altCheckOut = new Date(new Date(checkOut).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      return res.status(400).json({
-        error: "Indisponível para estas datas por atingir capacidade máxima.",
-        available: false,
-        suggestions: [
-          { checkIn: altCheckIn, checkOut: altCheckOut, note: "Uma semana mais tarde" }
-        ]
-      });
-    }
-  }
+  const availability = await checkPousadaAvailability(targetPousada, checkIn, checkOut, newGuests, roomType);
+  if (!availability.ok) return res.status(availability.status || 400).json(availability.body);
 
   // Create booking
-  const days = Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24)));
-  let experiencePrice = 0;
-  if (req.body.experienceType) {
-    const exp = targetPousada.experiences.find(e => e.title === req.body.experienceType);
-    if (exp) {
-      experiencePrice = exp.price * (adults || 1);
-    }
-  }
-  const totalPrice = (targetPousada.pricePerNight * days) + experiencePrice;
+  const totalPrice = computeBookingTotal(targetPousada, checkIn, checkOut, adults || 1, req.body.experienceType);
 
   const newBooking: Booking = {
     id: `b_${randomUUID()}`,
@@ -2226,23 +2272,18 @@ async function enviarLembreteCancelamento(booking: Booking, dias: number) {
   for (const dest of destinatarios) {
     const email = await findPartnerEmail(dest.type, dest.id);
     if (!email) continue;
-    try {
-      await resend.emails.send({
-        from: "EcoSafari Brasil <onboarding@resend.dev>",
-        to: email,
-        subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — EcoSafari`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #101B4C;">Sua expedição está chegando 🐆</h2>
-            <p>Olá, ${dest.name}! Faltam <strong>${dias} dias</strong> para a reserva de <strong>${booking.customerName}</strong> (${booking.checkIn} a ${booking.checkOut}).</p>
-            <p>Se precisar cancelar a partir de agora, a política de cancelamento se aplica: <strong>${consequencia}</strong>.</p>
-            <p style="color: #888; font-size: 12px;">Cancelamentos com 45 dias ou mais de antecedência não têm nenhuma penalidade.</p>
-          </div>
-        `,
-      });
-    } catch (err: any) {
-      log.warn(`Falha ao enviar lembrete de cancelamento pra ${dest.type} ${dest.id}:`, err.message);
-    }
+    await sendEmail({
+      to: email,
+      subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — EcoSafari`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #101B4C;">Sua expedição está chegando 🐆</h2>
+          <p>Olá, ${escapeHtml(dest.name)}! Faltam <strong>${dias} dias</strong> para a reserva de <strong>${escapeHtml(booking.customerName)}</strong> (${booking.checkIn} a ${booking.checkOut}).</p>
+          <p>Se precisar cancelar a partir de agora, a política de cancelamento se aplica: <strong>${consequencia}</strong>.</p>
+          <p style="color: #888; font-size: 12px;">Cancelamentos com 45 dias ou mais de antecedência não têm nenhuma penalidade.</p>
+        </div>
+      `,
+    });
   }
 }
 
@@ -2297,32 +2338,41 @@ app.post("/api/create-checkout-session", checkoutLimiter, async (req, res) => {
     return res.status(404).json({ error: "Reserva não encontrada" });
   }
 
-  const protocol = (req.headers["x-forwarded-proto"] as string) || req.protocol;
-  const origin = `${protocol}://${req.get("host")}`;
+  if (booking.status !== "pendente_pagamento") {
+    return res.status(409).json({ error: "Esta reserva não está aguardando pagamento." });
+  }
 
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      payment_method_types: ["card"],
-      line_items: [{
-        price_data: {
-          currency: "brl",
-          product_data: { name: `${booking.pousadaName} — ${booking.experienceType}` },
-          unit_amount: Math.round(booking.totalPrice * 100),
-        },
-        quantity: 1,
-      }],
-      customer_email: booking.customerEmail || undefined,
-      metadata: { bookingId: booking.id },
-      success_url: `${origin}/pagamento-confirmado?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/?payment=cancelled`,
-    });
-    res.json({ url: session.url });
+    res.json({ url: await createBookingCheckoutSession(booking as Booking) });
   } catch (err: any) {
     log.error("Erro ao criar sessão de checkout Stripe:", err.message);
     res.status(500).json({ error: "Erro ao criar sessão de pagamento" });
   }
 });
+
+// URLs de retorno sempre no domínio oficial (SITE_URL), nunca montadas a
+// partir do cabeçalho Host da requisição. Sem payment_method_types fixo, o
+// Stripe oferece os meios ativados no painel (cartão, Pix, boleto...).
+async function createBookingCheckoutSession(booking: Booking): Promise<string> {
+  if (!stripe) throw new Error("Stripe não configurado");
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: [{
+      price_data: {
+        currency: "brl",
+        product_data: { name: `${booking.pousadaName} — ${booking.experienceType}` },
+        unit_amount: Math.round(booking.totalPrice * 100),
+      },
+      quantity: 1,
+    }],
+    customer_email: booking.customerEmail || undefined,
+    metadata: { bookingId: booking.id },
+    success_url: `${SITE_URL}/pagamento-confirmado?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${SITE_URL}/turista?pagamento=cancelado`,
+  });
+  if (!session.url) throw new Error("Stripe não devolveu a URL do checkout");
+  return session.url;
+}
 
 // Signature-verified webhook: Stripe calls this directly (server-to-server),
 // so it confirms payment even if the customer's browser never makes it back
@@ -2468,14 +2518,13 @@ async function sendBookingConfirmationEmail(booking: Booking) {
 
   const pdfBuffer = await generateVoucherPdfBuffer(booking);
 
-  await resend.emails.send({
-    from: "EcoSafari Brasil <onboarding@resend.dev>",
+  await sendEmail({
     to: booking.customerEmail,
     subject: `Reserva confirmada — ${booking.pousadaName} (#${booking.id})`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #101B4C;">Pagamento confirmado! 🌿</h2>
-        <p>Olá, ${booking.customerName}! Sua reserva na <strong>${booking.pousadaName}</strong> está confirmada.</p>
+        <p>Olá, ${escapeHtml(booking.customerName)}! Sua reserva na <strong>${escapeHtml(booking.pousadaName)}</strong> está confirmada.</p>
         <p><strong>Check-in:</strong> ${booking.checkIn}<br/>
         <strong>Check-out:</strong> ${booking.checkOut}<br/>
         <strong>Total pago:</strong> R$ ${booking.totalPrice.toLocaleString('pt-BR')}</p>
@@ -2893,8 +2942,8 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   }
   // All profile fields are mandatory at signup — a "perfil de turista"
   // that's just an empty shell defeats the point of requiring one to review.
-  if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
+  if (!name || !whatsapp || !country || !language || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma e idade." });
   }
 
   // Só exige a confirmação de email de verdade quando dá pra mandar o link
@@ -2942,27 +2991,262 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   });
   if (linkErr || !linkData?.properties?.action_link) {
     log.warn("Turista criado, mas falha ao gerar link de confirmação:", linkErr?.message);
+    await supabaseAdminAuth.auth.admin.updateUserById(created.user.id, { email_confirm: true }).catch(() => {});
     return res.status(201).json({ success: true, emailConfirmationSent: false });
   }
 
-  try {
-    await resend!.emails.send({
-      from: "EcoSafari Brasil <onboarding@resend.dev>",
+  const sent = await sendEmail({
       to: email,
       subject: "Confirme seu email — EcoSafari Brasil",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #101B4C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
-          <p>Olá, ${name}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e poder avaliar pousadas, guias e atrações.</p>
+          <p>Olá, ${escapeHtml(name)}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e fazer suas reservas.</p>
           <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
           <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${linkData.properties.action_link}</p>
         </div>
       `,
     });
-    res.status(201).json({ success: true, emailConfirmationSent: true });
+  if (sent.ok) return res.status(201).json({ success: true, emailConfirmationSent: true });
+
+  // Não deixa a pessoa presa numa conta que nunca vai poder confirmar: se o
+  // email não saiu, confirma a conta e segue com login direto.
+  await supabaseAdminAuth.auth.admin.updateUserById(created.user.id, { email_confirm: true }).catch(() => {});
+  res.status(201).json({ success: true, emailConfirmationSent: false });
+});
+
+// Recuperação de senha de parceiro/colaborador pelo Resend. Resposta
+// sempre igual pra não revelar quais emails têm conta.
+app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
+  const generic = { success: true };
+  const email = String(req.body.email || "").trim().toLowerCase();
+  if (!supabaseAdminAuth || !resend || !/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) return res.json(generic);
+  const { data } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+  const user = (data?.users || []).find((u: any) => u.email?.toLowerCase() === email);
+  const role = user?.app_metadata?.role;
+  if (!user || (role !== "partner" && role !== "colaborador")) return res.json(generic);
+  const { data: linkData, error } = await supabaseAdminAuth.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${SITE_URL}/parceiro` },
+  });
+  const link = linkData?.properties?.action_link;
+  if (error || !link) {
+    log.warn("Falha ao gerar link de recuperação:", error?.message);
+    return res.json(generic);
+  }
+  await sendEmail({
+    to: email,
+    subject: "Redefinir sua senha — EcoSafari Brasil",
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #101B4C;">Redefinir senha</h2>
+        <p>Recebemos um pedido para redefinir a senha do seu acesso ao portal EcoSafari.</p>
+        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Criar nova senha</a></p>
+        <p style="color: #888; font-size: 12px;">Se você não pediu isso, ignore este email — sua senha continua a mesma.</p>
+      </div>
+    `,
+  });
+  res.json(generic);
+});
+
+// Reenvia o link de confirmação. Resposta sempre igual (exista ou não a
+// conta) pra não servir de verificador de quais emails estão cadastrados.
+app.post("/api/turista/resend-confirmation", publicFormLimiter, async (req, res) => {
+  const generic = { success: true, message: "Se houver um cadastro pendente com esse email, enviamos um novo link." };
+  const email = String(req.body.email || "").trim().toLowerCase();
+  if (!supabaseAdminAuth || !resend || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.json(generic);
+
+  const { data } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+  const user = (data?.users || []).find((u: any) => u.email?.toLowerCase() === email);
+  if (!user || user.email_confirmed_at || user.app_metadata?.role !== "tourist") return res.json(generic);
+
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: { redirectTo: `${SITE_URL}/turista` },
+  });
+  const link = linkData?.properties?.action_link;
+  if (linkErr || !link) {
+    log.warn("Falha ao gerar novo link de confirmação:", linkErr?.message);
+    return res.json(generic);
+  }
+  await sendEmail({
+    to: email,
+    subject: "Confirme seu email — EcoSafari Brasil",
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #101B4C;">Confirme seu email 🌿</h2>
+        <p>Clique no botão abaixo para ativar seu perfil de turista na EcoSafari.</p>
+        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+        <p style="color: #888; font-size: 12px;">Se você não pediu isso, pode ignorar este email.</p>
+      </div>
+    `,
+  });
+  res.json(generic);
+});
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const clip = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+
+// Reserva online feita pelo próprio turista (logado), direto da página da
+// pousada — sem depender do WhatsApp. Preço e disponibilidade são sempre
+// decididos aqui no servidor.
+app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, res) => {
+  const user = res.locals.touristUser as { id: string; email?: string };
+  const pousadaId = clip(req.body.pousadaId, 100);
+  const checkIn = clip(req.body.checkIn, 10);
+  const checkOut = clip(req.body.checkOut, 10);
+  const adults = Math.trunc(Number(req.body.adults));
+  const children = Math.trunc(Number(req.body.children) || 0);
+  const roomType = clip(req.body.roomType, 120) || undefined;
+  const experienceType = clip(req.body.experienceType, 200) || undefined;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (!ISO_DATE.test(checkIn) || !ISO_DATE.test(checkOut) || Number.isNaN(Date.parse(checkIn)) || Number.isNaN(Date.parse(checkOut))) {
+    return res.status(400).json({ error: "Datas inválidas." });
+  }
+  if (checkIn < today) return res.status(400).json({ error: "O check-in não pode ser no passado." });
+  if (checkOut <= checkIn) return res.status(400).json({ error: "O check-out precisa ser depois do check-in." });
+  if ((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000 > 60) return res.status(400).json({ error: "Reservas online vão até 60 noites — para estadias maiores, fale com a equipe." });
+  if (checkIn > shiftDays(today, 730)) return res.status(400).json({ error: "Reservas online podem ser feitas com até 2 anos de antecedência." });
+  if (!Number.isInteger(adults) || adults < 1 || adults > 30 || children < 0 || children > 30) {
+    return res.status(400).json({ error: "Número de hóspedes inválido." });
+  }
+
+  const { data: pousadaRow } = await supabase.from("pousadas").select("*").eq("id", pousadaId).maybeSingle();
+  if (!pousadaRow) return res.status(404).json({ error: "Pousada não encontrada." });
+  const pousada = mapPousadaRow(pousadaRow);
+  if ((pousada.rooms || []).length > 0 && !roomType) return res.status(400).json({ error: "Escolha o tipo de quarto." });
+  if (experienceType && !(pousada.experiences || []).some(e => e.title === experienceType)) {
+    return res.status(400).json({ error: "Experiência não encontrada nesta pousada." });
+  }
+
+  const { data: profile } = await supabase.from("turistas").select("name, whatsapp, country").eq("id", user.id).maybeSingle();
+  if (!profile) return res.status(403).json({ error: "Complete seu perfil de turista antes de reservar." });
+
+  const availability = await checkPousadaAvailability(pousada, checkIn, checkOut, adults + children, roomType);
+  if (!availability.ok) return res.status(availability.status || 400).json(availability.body);
+
+  const details = {
+    arrivalTime: clip(req.body.details?.arrivalTime, 40),
+    occasion: clip(req.body.details?.occasion, 120),
+    needsTransfer: !!req.body.details?.needsTransfer,
+    interests: clip(req.body.details?.interests, 500),
+    notes: clip(req.body.details?.notes, 1000),
+  };
+  const detailsSummary = [
+    details.arrivalTime && `Chegada prevista: ${details.arrivalTime}`,
+    details.occasion && `Ocasião: ${details.occasion}`,
+    details.needsTransfer && "Precisa de transfer",
+    details.interests && `Interesses: ${details.interests}`,
+    details.notes && `Observações: ${details.notes}`,
+  ].filter(Boolean).join(" | ");
+
+  const newBooking = {
+    id: `b_${randomUUID()}`,
+    pousadaId,
+    pousadaName: pousada.name,
+    customerName: profile.name,
+    customerEmail: user.email || "",
+    customerPhone: profile.whatsapp || "",
+    nationality: profile.country || "",
+    adults,
+    children,
+    childAges: clip(req.body.childAges, 200),
+    dietaryRestrictions: clip(req.body.dietaryRestrictions, 500) || "Nenhuma",
+    specialNeeds: clip(req.body.specialNeeds, 500) || "Nenhuma",
+    checkIn,
+    checkOut,
+    experienceType: experienceType || "Hospedagem",
+    totalPrice: computeBookingTotal(pousada, checkIn, checkOut, adults, experienceType),
+    status: "pendente_pagamento" as const,
+    dateCreated: new Date().toISOString(),
+    roomType,
+    turistaId: user.id,
+    guestDetails: JSON.stringify(details),
+    origem: "site",
+  };
+
+  const { error: insertErr, skipped } = await writeSkippingMissingColumns(newBooking, row => supabase.from("bookings").insert(row));
+  if (insertErr) {
+    log.error("Erro ao salvar reserva online:", insertErr.message);
+    return res.status(500).json({ error: "Não foi possível registrar sua reserva. Tente novamente." });
+  }
+  // Sem a coluna guestDetails (migração pendente), os detalhes não se
+  // perdem: vão junto do campo de necessidades especiais.
+  if (skipped.includes("guestDetails") && detailsSummary) {
+    await supabase.from("bookings").update({ specialNeeds: `${newBooking.specialNeeds} | ${detailsSummary}`.slice(0, 1800) }).eq("id", newBooking.id);
+  }
+
+  // Duas reservas simultâneas podem passar pela checagem ao mesmo tempo —
+  // revalida já contando a outra e desfaz esta se o quarto estourou.
+  const recheck = await checkPousadaAvailability(pousada, checkIn, checkOut, adults + children, roomType, newBooking.id);
+  if (!recheck.ok) {
+    await supabase.from("bookings").delete().eq("id", newBooking.id);
+    return res.status(409).json({ error: "Essas datas acabaram de ser reservadas por outra pessoa. Escolha outras datas.", available: false });
+  }
+
+  addNotification("admin", `Nova reserva online: ${newBooking.customerName} na ${newBooking.pousadaName} (${checkIn} a ${checkOut}).`, "booking_new", newBooking.id);
+  addNotification("pousada", `Nova reserva online de ${newBooking.customerName} (${checkIn} a ${checkOut}).`, "booking_new", newBooking.id);
+
+  for (const gestorEmail of await getPousadaGestorEmails(pousadaId)) {
+    await sendEmail({
+      to: gestorEmail,
+      subject: `Nova reserva online — ${pousada.name}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #101B4C;">Nova reserva pelo site 🌿</h2>
+          <p><strong>${escapeHtml(newBooking.customerName)}</strong> reservou de <strong>${checkIn}</strong> a <strong>${checkOut}</strong> (${adults} adulto(s), ${children} criança(s))${roomType ? ` — ${escapeHtml(roomType)}` : ""}.</p>
+          ${detailsSummary ? `<p style="color:#555">${escapeHtml(detailsSummary)}</p>` : ""}
+          <p>A reserva aparece na sua Agenda de Reservas. Ela fica como "pendente de pagamento" até o hóspede pagar.</p>
+          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Abrir minha agenda</a></p>
+        </div>
+      `,
+    });
+  }
+
+  let checkoutUrl: string | null = null;
+  if (stripe) {
+    try {
+      checkoutUrl = await createBookingCheckoutSession(newBooking as Booking);
+    } catch (err: any) {
+      log.warn("Reserva online criada, mas falha ao abrir o checkout:", err.message);
+    }
+  }
+
+  res.status(201).json({
+    booking: { id: newBooking.id, pousadaName: newBooking.pousadaName, checkIn, checkOut, totalPrice: newBooking.totalPrice, status: newBooking.status },
+    checkoutUrl,
+  });
+});
+
+// Minhas reservas — casadas pelo email da conta (funciona mesmo em reservas
+// antigas criadas pelo admin, que não têm turistaId).
+app.get("/api/turista/bookings", requireTourist, async (req, res) => {
+  const user = res.locals.touristUser as { email?: string };
+  if (!user.email) return res.json([]);
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, pousadaId, pousadaName, checkIn, checkOut, adults, children, roomType, experienceType, totalPrice, status, dateCreated")
+    .eq("customerEmail", user.email)
+    .order("checkIn", { ascending: false });
+  if (error) return res.status(500).json({ error: "Erro ao buscar suas reservas." });
+  res.json(data || []);
+});
+
+// Retomar o pagamento de uma reserva própria que ficou pendente.
+app.post("/api/turista/bookings/:id/pagar", checkoutLimiter, requireTourist, async (req, res) => {
+  const user = res.locals.touristUser as { email?: string };
+  if (!stripe) return res.status(503).json({ error: "Pagamento online ainda não está ativo — a equipe vai te enviar o link de pagamento." });
+  const { data: booking } = await supabase.from("bookings").select("*").eq("id", req.params.id).maybeSingle();
+  if (!booking || !user.email || booking.customerEmail !== user.email) return res.status(404).json({ error: "Reserva não encontrada." });
+  if (booking.status !== "pendente_pagamento") return res.status(409).json({ error: "Esta reserva não está aguardando pagamento." });
+  try {
+    res.json({ url: await createBookingCheckoutSession(booking as Booking) });
   } catch (err: any) {
-    log.warn("Turista criado, mas falha ao enviar email de confirmação via Resend:", err.message);
-    res.status(201).json({ success: true, emailConfirmationSent: false });
+    log.error("Erro ao criar checkout para reserva do turista:", err.message);
+    res.status(500).json({ error: "Erro ao abrir o pagamento." });
   }
 });
 
@@ -3104,8 +3388,8 @@ app.post("/api/turista/upgrade", requireAnyAuth, async (req, res) => {
   const language = String(req.body.language || "").trim();
   const age = Number(req.body.age);
   const preferences = String(req.body.preferences || "").trim();
-  if (!name || !whatsapp || !country || !language || !preferences || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma, idade e preferências de viagem." });
+  if (!name || !whatsapp || !country || !language || !Number.isFinite(age) || age <= 0) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma e idade." });
   }
 
   const mergedMetadata = { ...(user.app_metadata || {}), isTourist: true };
@@ -4272,9 +4556,7 @@ async function provisionPartnerLogin(
   // actionLink is always returned above as a manual fallback either way.
   let emailSent = false;
   if (resend && actionLink) {
-    try {
-      await resend.emails.send({
-        from: "EcoSafari Brasil <onboarding@resend.dev>",
+    const sent = await sendEmail({
         to: email,
         subject: "Seu acesso de parceiro EcoSafari",
         html: `
@@ -4286,10 +4568,7 @@ async function provisionPartnerLogin(
           </div>
         `,
       });
-      emailSent = true;
-    } catch (err: any) {
-      log.warn("Acesso criado, mas falha ao enviar email via Resend:", err.message);
-    }
+    emailSent = sent.ok;
   }
 
   return { userId, actionLink, emailSent };
@@ -4681,6 +4960,247 @@ app.delete("/api/pousadas/:id/gestores/:userId", requirePartnerAccess("pousada")
 
   await logAdminAction(res.locals.actorUser, "update", "pousada", id, `gestor removido: ${target?.email || userId}`);
   res.json({ success: true });
+});
+
+// Emails de todos os gestores de uma pousada (vínculo principal no
+// app_metadata + vínculos extras em partner_links).
+async function getPousadaGestorEmails(pousadaId: string): Promise<string[]> {
+  if (!supabaseAdminAuth) return [];
+  const [{ data: usersData }, { data: links }] = await Promise.all([
+    supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 }),
+    supabase.from("partner_links").select('"userId"').eq("partnerType", "pousada").eq("partnerId", pousadaId),
+  ]);
+  const linked = new Set(((links || []) as any[]).map(l => l.userId));
+  return ((usersData?.users || []) as any[])
+    .filter(u => u.email && u.app_metadata?.role === "partner" && ((u.app_metadata?.partnerType === "pousada" && u.app_metadata?.partnerId === pousadaId) || linked.has(u.id)))
+    .map(u => u.email as string);
+}
+
+// ---------------- CAIXA (vendas no balcão) ----------------
+const PAYMENT_METHODS = ["dinheiro", "pix", "cartao_credito", "cartao_debito", "outro"] as const;
+const ACTIVE_BOOKING_STATUSES = ["confirmado_total", "confirmado_pousada", "confirmado_guia", "pago"];
+
+app.get("/api/pousadas/:id/vendas", requirePartnerAccess("pousada"), async (req, res) => {
+  const date = ISO_DATE.test(String(req.query.date || "")) ? String(req.query.date) : new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+  const start = `${date}T00:00:00-03:00`;
+  const end = `${shiftDays(date, 1)}T00:00:00-03:00`;
+  const { data, error } = await supabase
+    .from("vendas")
+    .select("*")
+    .eq("pousadaId", req.params.id)
+    .gte("createdAt", start)
+    .lt("createdAt", end)
+    .order("createdAt", { ascending: false });
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") return res.status(503).json({ error: "O Caixa precisa da migração SQL scripts/migracao-2026-10-melhorias.sql rodada no Supabase." });
+    return res.status(500).json({ error: "Erro ao buscar vendas." });
+  }
+  const vendas = (data || []).map((v: any) => ({ ...v, items: parseJSONSafe(v.items) || [] }));
+  const totals: Record<string, number> = {};
+  for (const v of vendas) totals[v.paymentMethod] = (totals[v.paymentMethod] || 0) + Number(v.total);
+  res.json({ date, vendas, totals, total: vendas.reduce((sum: number, v: any) => sum + Number(v.total), 0) });
+});
+
+// Venda do balcão: os preços vêm sempre do catálogo de produtos da pousada.
+// destino "conta_hospede" lança como consumo da reserva (paga no
+// check-out); "pagamento" registra uma venda já paga no meio escolhido.
+app.post("/api/pousadas/:id/vendas", requirePartnerAccess("pousada"), async (req, res) => {
+  const pousadaId = req.params.id;
+  const rawItems = Array.isArray(req.body.items) ? req.body.items.slice(0, 50) : [];
+  const wanted = rawItems
+    .map((i: any) => ({ produtoId: clip(i?.produtoId, 100), quantity: Math.trunc(Number(i?.quantity)) }))
+    .filter((i: any) => i.produtoId && i.quantity >= 1 && i.quantity <= 999);
+  if (wanted.length === 0) return res.status(400).json({ error: "Adicione pelo menos um produto." });
+
+  const { data: produtos } = await supabase.from("produtos").select("*").eq("pousadaId", pousadaId).eq("active", true).in("id", wanted.map((i: any) => i.produtoId));
+  const byId = new Map(((produtos || []) as any[]).map(p => [p.id, p]));
+  if (wanted.some((i: any) => !byId.has(i.produtoId))) return res.status(400).json({ error: "Algum produto não existe mais ou está inativo — atualize a tela." });
+  const items = wanted.map((i: any) => {
+    const p = byId.get(i.produtoId);
+    return { produtoId: p.id, name: p.name, quantity: i.quantity, unitPrice: Number(p.price), totalPrice: Number(p.price) * i.quantity };
+  });
+  const total = items.reduce((sum: number, i: any) => sum + i.totalPrice, 0);
+
+  if (req.body.destino === "conta_hospede") {
+    const bookingId = clip(req.body.bookingId, 100);
+    const { data: booking } = await supabase.from("bookings").select("id, pousadaId, status, customerName").eq("id", bookingId).maybeSingle();
+    if (!booking || booking.pousadaId !== pousadaId || !ACTIVE_BOOKING_STATUSES.includes(booking.status)) {
+      return res.status(400).json({ error: "Escolha um hóspede com reserva ativa nesta pousada." });
+    }
+    const now = new Date().toISOString();
+    const rows = items.map((i: any) => ({
+      id: `cs_${randomUUID()}`, bookingId, pousadaId, produtoId: i.produtoId, produtoName: i.name,
+      quantity: i.quantity, unitPrice: i.unitPrice, totalPrice: i.totalPrice, status: "pendente", createdAt: now,
+    }));
+    const { error } = await supabase.from("consumos").insert(rows);
+    if (error) return res.status(500).json({ error: "Erro ao lançar na conta do hóspede." });
+    await logAdminAction(res.locals.actorUser, "create", "consumo", bookingId, `Caixa: R$ ${total.toFixed(2)} na conta de ${booking.customerName}`);
+    return res.status(201).json({ destino: "conta_hospede", total, customerName: booking.customerName });
+  }
+
+  const paymentMethod = String(req.body.paymentMethod || "");
+  if (!(PAYMENT_METHODS as readonly string[]).includes(paymentMethod)) return res.status(400).json({ error: "Escolha a forma de pagamento." });
+  const venda = {
+    id: `vd_${randomUUID()}`,
+    pousadaId,
+    items: JSON.stringify(items),
+    total,
+    paymentMethod,
+    customerName: clip(req.body.customerName, 120) || null,
+    notes: clip(req.body.notes, 300) || null,
+    createdBy: res.locals.actorUser?.email || null,
+    createdAt: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("vendas").insert(venda);
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") return res.status(503).json({ error: "O Caixa precisa da migração SQL scripts/migracao-2026-10-melhorias.sql rodada no Supabase." });
+    log.error("Erro ao registrar venda:", error.message);
+    return res.status(500).json({ error: "Erro ao registrar a venda." });
+  }
+  await logAdminAction(res.locals.actorUser, "create", "venda", venda.id, `Caixa: R$ ${total.toFixed(2)} (${paymentMethod})`);
+  res.status(201).json({ ...venda, items });
+});
+
+// ---------------- COLABORADORES ----------------
+const COLAB_SERVICES_MAX = 15;
+const toCleanList = (v: unknown, maxItems: number, maxLen: number) =>
+  (Array.isArray(v) ? v : []).map(x => clip(x, maxLen)).filter(Boolean).slice(0, maxItems);
+
+// Cadastro público de colaborador (camareira, cozinheira, piloteiro,
+// cantor, fotógrafo...). A conta nasce sem acesso a nada: só vira
+// "aprovado" quando um gestor da pousada escolhida aprovar.
+app.post("/api/colaboradores/signup", publicFormLimiter, async (req, res) => {
+  if (!supabaseAdminAuth) return res.status(503).json({ error: "Cadastro indisponível no momento." });
+  if (!(await verifyRecaptcha(req.body.recaptchaToken))) return res.status(400).json({ error: "Não foi possível validar o envio. Recarregue a página e tente de novo." });
+
+  const name = clip(req.body.name, 120);
+  const email = clip(req.body.email, 200).toLowerCase();
+  const phone = clip(req.body.phone, 40);
+  const password = String(req.body.password || "");
+  const age = Math.trunc(Number(req.body.age));
+  const bio = clip(req.body.bio, 1500);
+  const pousadaId = clip(req.body.pousadaId, 100);
+  const services = toCleanList(req.body.services, COLAB_SERVICES_MAX, 60);
+  const languages = toCleanList(req.body.languages, 15, 40);
+  const specialties = toCleanList(req.body.specialties, 15, 60);
+
+  if (!name || !phone || !pousadaId || services.length === 0) return res.status(400).json({ error: "Preencha nome, telefone, pousada e pelo menos um serviço." });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Informe um email válido." });
+  if (!Number.isInteger(age) || age < 16 || age > 100) return res.status(400).json({ error: "Informe uma idade válida." });
+  if (password.length < 8 || isWeakPassword(password)) return res.status(400).json({ error: "Use uma senha com pelo menos 8 caracteres, misturando letras e números." });
+  if (password !== String(req.body.confirmPassword || "")) return res.status(400).json({ error: "As senhas não coincidem." });
+
+  const { data: pousada } = await supabase.from("pousadas").select("id, name").eq("id", pousadaId).maybeSingle();
+  if (!pousada) return res.status(400).json({ error: "Pousada não encontrada." });
+
+  const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: { role: "colaborador", colaboradorStatus: "pendente", pousadaId },
+    user_metadata: { name },
+  });
+  if (createErr || !created.user) {
+    return res.status(400).json({ error: "Não foi possível concluir o cadastro com esse email. Se você já tem conta, use outro email ou fale com a equipe." });
+  }
+
+  const row = {
+    id: `col_${randomUUID()}`, userId: created.user.id, pousadaId, name, email, phone, age,
+    services: JSON.stringify(services), languages: JSON.stringify(languages), specialties: JSON.stringify(specialties),
+    bio, status: "pendente", createdAt: new Date().toISOString(),
+  };
+  const { error: insertErr } = await supabase.from("colaboradores").insert(row);
+  if (insertErr) {
+    await supabaseAdminAuth.auth.admin.deleteUser(created.user.id).catch(() => {});
+    log.error("Erro ao salvar colaborador:", insertErr.message);
+    const pending = insertErr.code === "PGRST205" || insertErr.code === "42P01";
+    return res.status(pending ? 503 : 500).json({ error: pending ? "Cadastro de colaboradores ainda não está ativo. Tente novamente mais tarde." : "Erro ao salvar seu cadastro." });
+  }
+
+  for (const gestorEmail of await getPousadaGestorEmails(pousadaId)) {
+    await sendEmail({
+      to: gestorEmail,
+      subject: `Novo colaborador aguardando aprovação — ${pousada.name}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #101B4C;">Novo cadastro de colaborador</h2>
+          <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(services.join(", "))}) quer trabalhar com a <strong>${escapeHtml(pousada.name)}</strong>.</p>
+          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Analisar no portal</a></p>
+        </div>
+      `,
+    });
+  }
+  res.status(201).json({ success: true });
+});
+
+const mapColaborador = (c: any) => ({
+  ...c,
+  services: parseJSONSafe(c.services) || [],
+  languages: parseJSONSafe(c.languages) || [],
+  specialties: parseJSONSafe(c.specialties) || [],
+});
+
+app.get("/api/pousadas/:id/colaboradores", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data, error } = await supabase.from("colaboradores").select("*").eq("pousadaId", req.params.id).order("createdAt", { ascending: false });
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") return res.status(503).json({ error: "Colaboradores precisa da migração SQL scripts/migracao-2026-10-melhorias.sql rodada no Supabase." });
+    return res.status(500).json({ error: "Erro ao buscar colaboradores." });
+  }
+  res.json((data || []).map(mapColaborador));
+});
+
+app.post("/api/pousadas/:id/colaboradores/:colabId/decisao", requirePartnerAccess("pousada"), async (req, res) => {
+  const decision = req.body.decision;
+  if (decision !== "aprovado" && decision !== "reprovado") return res.status(400).json({ error: "Decisão inválida." });
+  const note = clip(req.body.note, 500);
+  const { data: colab } = await supabase.from("colaboradores").select("*").eq("id", req.params.colabId).eq("pousadaId", req.params.id).maybeSingle();
+  if (!colab) return res.status(404).json({ error: "Colaborador não encontrado nesta pousada." });
+
+  const { error } = await supabase.from("colaboradores").update({
+    status: decision, decisionNote: note || null, decidedBy: res.locals.actorUser?.email || null, decidedAt: new Date().toISOString(),
+  }).eq("id", colab.id);
+  if (error) return res.status(500).json({ error: "Erro ao registrar a decisão." });
+
+  if (supabaseAdminAuth) {
+    const { data: authUser } = await supabaseAdminAuth.auth.admin.getUserById(colab.userId);
+    await supabaseAdminAuth.auth.admin.updateUserById(colab.userId, {
+      app_metadata: { ...(authUser?.user?.app_metadata || {}), role: "colaborador", colaboradorStatus: decision, pousadaId: colab.pousadaId },
+    });
+  }
+
+  const { data: pousada } = await supabase.from("pousadas").select("name").eq("id", colab.pousadaId).maybeSingle();
+  const pousadaName = pousada?.name || "a pousada";
+  const approved = decision === "aprovado";
+  const message = approved
+    ? `Olá, ${colab.name}! Seu cadastro como colaborador(a) da ${pousadaName} foi APROVADO. Acesse com seu email e senha: ${SITE_URL}/parceiro`
+    : `Olá, ${colab.name}. Seu cadastro como colaborador(a) da ${pousadaName} não foi aprovado desta vez.${note ? ` Motivo: ${note}` : ""}`;
+  const mail = await sendEmail({
+    to: colab.email,
+    subject: approved ? `Cadastro aprovado — ${pousadaName}` : `Sobre seu cadastro — ${pousadaName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #101B4C;">${approved ? "Cadastro aprovado! 🌿" : "Sobre seu cadastro"}</h2>
+        <p>${escapeHtml(message.replace(` Acesse com seu email e senha: ${SITE_URL}/parceiro`, ""))}</p>
+        ${approved ? `<p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Entrar no sistema</a></p>` : ""}
+      </div>
+    `,
+  });
+  await logAdminAction(res.locals.actorUser, "update", "colaborador", colab.id, `${colab.name}: ${decision}`);
+
+  // Sem API oficial de WhatsApp configurada, devolve o link pronto para o
+  // gestor enviar a mesma mensagem com um clique.
+  const digits = String(colab.phone || "").replace(/\D/g, "");
+  const whatsappLink = digits ? `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}?text=${encodeURIComponent(message)}` : null;
+  res.json({ success: true, emailSent: mail.ok, whatsappLink });
+});
+
+app.get("/api/colaborador/me", authLimiter, async (req, res) => {
+  const user = await getPartnerUserFromRequest(req);
+  if (!user || user.app_metadata?.role !== "colaborador") return res.status(403).json({ error: "Esta conta não é de colaborador." });
+  const { data } = await supabase.from("colaboradores").select("*").eq("userId", user.id).maybeSingle();
+  if (!data) return res.status(404).json({ error: "Cadastro de colaborador não encontrado." });
+  const { data: pousada } = await supabase.from("pousadas").select("name").eq("id", data.pousadaId).maybeSingle();
+  res.json({ ...mapColaborador(data), pousadaName: pousada?.name || "" });
 });
 
 // SUPABASE SYSTEM STATUS & AUTO-CONFIGURATION ENDPOINTS

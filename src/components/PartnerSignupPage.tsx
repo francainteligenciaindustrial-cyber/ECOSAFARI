@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Users, Building2, MapPin, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet } from "lucide-react";
+import { Compass, Users, Building2, MapPin, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet, ChefHat, LoaderCircle } from "lucide-react";
 import { trackMetaEvent } from "../lib/metaPixel";
 
 const WHATSAPP_NUMBER = "5565999868334";
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
-type PartnerType = "guia" | "pousada" | "atracao";
+type PartnerType = "guia" | "pousada" | "atracao" | "colaborador";
+
+const COLAB_SERVICE_OPTIONS = ["Camareira", "Cozinheiro(a)", "Piloteiro", "Garçom/Garçonete", "Diarista", "Cantor(a)/Músico", "Fotógrafo(a)", "Guia local", "Recepção", "Manutenção", "Motorista"];
 
 const LANGUAGE_OPTIONS = ["Português", "Inglês", "Espanhol", "Francês", "Alemão", "Italiano", "Mandarim", "Japonês", "Russo", "Árabe", "Libras"];
 const SPECIALTY_OPTIONS = ["Observação de aves", "Safári fotográfico", "Trilhas", "Pesca esportiva", "Passeio de barco", "Focagem noturna", "Cavalgada", "Flora e plantas medicinais", "Cultura indígena", "Turismo de aventura"];
@@ -78,7 +80,8 @@ function useRecaptcha() {
 }
 
 export default function PartnerSignupPage() {
-  const [type, setType] = useState<PartnerType>("guia");
+  const initialParams = new URLSearchParams(window.location.search);
+  const [type, setType] = useState<PartnerType>(initialParams.get("tipo") === "colaborador" ? "colaborador" : "guia");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -280,7 +283,7 @@ export default function PartnerSignupPage() {
         </div>
 
         {/* Type toggle */}
-        <div className="flex gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <button
             type="button"
             onClick={() => setType("guia")}
@@ -308,7 +311,20 @@ export default function PartnerSignupPage() {
           >
             <MapPin className="h-4 w-4" /> Represento uma Atração
           </button>
+          <button
+            type="button"
+            onClick={() => setType("colaborador")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
+              type === "colaborador" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+            }`}
+          >
+            <ChefHat className="h-4 w-4" /> Sou Colaborador(a)
+          </button>
         </div>
+
+        {type === "colaborador" ? (
+          <ColaboradorSignupForm getRecaptchaToken={getRecaptchaToken} presetPousadaId={initialParams.get("pousada") || ""} />
+        ) : (
 
         <form onSubmit={handleSubmit} className="bg-white border border-editorial-border p-6 md:p-8 rounded-lg space-y-4">
           {type === "guia" ? (
@@ -414,6 +430,7 @@ export default function PartnerSignupPage() {
             {submitting ? "Enviando..." : "Enviar Cadastro"}
           </button>
         </form>
+        )}
         </main>
       </div>
     </div>
@@ -437,4 +454,93 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} rows={3} className="w-full border border-editorial-border px-3 py-2.5 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />;
+}
+
+// Cadastro de colaborador: cria o login (email + senha) já na hora, mas a
+// conta só passa a valer depois que o gestor da pousada escolhida aprovar.
+function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId }: { getRecaptchaToken: (action: string) => Promise<string | undefined>; presetPousadaId: string }) {
+  const [pousadas, setPousadas] = useState<{ id: string; name: string }[]>([]);
+  const [form, setForm] = useState({ name: "", age: "", phone: "", email: "", password: "", confirmPassword: "", bio: "", pousadaId: presetPousadaId });
+  const [services, setServices] = useState<string[]>([]);
+  const [languages, setLanguages] = useState<string[]>(["Português"]);
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/pousadas")
+      .then(res => (res.ok ? res.json() : []))
+      .then((list: { id: string; name: string }[]) => setPousadas((Array.isArray(list) ? list : []).map(p => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => setPousadas([]));
+  }, []);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    setError("");
+    if (services.length === 0) return setError("Selecione pelo menos um serviço que você presta.");
+    if (form.password.length < 8) return setError("A senha precisa ter pelo menos 8 caracteres.");
+    if (form.password !== form.confirmPassword) return setError("As senhas não coincidem.");
+    setSubmitting(true);
+    try {
+      const recaptchaToken = await getRecaptchaToken("cadastro_colaborador");
+      const res = await fetch("/api/colaboradores/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, age: Number(form.age), services, languages, specialties, recaptchaToken }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(body.error || "Não foi possível enviar seu cadastro.");
+      trackMetaEvent("Lead", { content_name: "cadastro_colaborador" });
+      setDone(true);
+    } catch {
+      setError("Sem conexão com o servidor. Tente novamente.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="bg-white border border-editorial-border p-8 rounded-lg text-center">
+        <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto mb-3" />
+        <h2 className="font-serif text-2xl font-bold text-editorial-primary mb-2">Cadastro enviado!</h2>
+        <p className="text-sm text-editorial-muted max-w-md mx-auto">O gestor da pousada vai analisar seu perfil. Você recebe a resposta por email e, se aprovado, já entra no sistema com o email e a senha que acabou de criar.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-white border border-editorial-border p-6 md:p-8 rounded-lg space-y-4">
+      <Field label="Pousada onde quer trabalhar" required>
+        <select required value={form.pousadaId} onChange={set("pousadaId")} className="w-full border border-editorial-border bg-white px-3 py-2.5 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary">
+          <option value="">Selecione...</option>
+          {pousadas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4">
+        <Field label="Nome completo" required><Input required maxLength={120} value={form.name} onChange={set("name")} /></Field>
+        <Field label="Idade" required><Input required type="number" min={16} max={100} value={form.age} onChange={set("age")} /></Field>
+      </div>
+      <ChipMultiSelect label="Serviços que presta" required options={COLAB_SERVICE_OPTIONS} value={services} onChange={setServices} otherPlaceholder="Outro serviço..." />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Telefone / WhatsApp" required><Input required maxLength={40} value={form.phone} onChange={set("phone")} /></Field>
+        <Field label="Email" required><Input required type="email" maxLength={200} autoComplete="email" value={form.email} onChange={set("email")} /></Field>
+        <Field label="Senha" required><Input required type="password" minLength={8} autoComplete="new-password" value={form.password} onChange={set("password")} /></Field>
+        <Field label="Confirme a senha" required><Input required type="password" minLength={8} autoComplete="new-password" value={form.confirmPassword} onChange={set("confirmPassword")} /></Field>
+      </div>
+      <ChipMultiSelect label="Idiomas que fala" options={LANGUAGE_OPTIONS} value={languages} onChange={setLanguages} otherPlaceholder="Outro idioma..." />
+      <ChipMultiSelect label="Especialidades" options={["Culinária regional", "Peixes e frutos do rio", "Música ao vivo", "Fotografia de natureza", "Pilotagem em rio", "Pesca esportiva", "Limpeza e organização", "Atendimento bilíngue"]} value={specialties} onChange={setSpecialties} otherPlaceholder="Outra especialidade..." />
+      <Field label="Resumo pessoal">
+        <Textarea maxLength={1500} value={form.bio} onChange={set("bio")} placeholder="Conte sua experiência, onde já trabalhou, disponibilidade..." />
+      </Field>
+      {error && <p role="alert" className="text-red-600 text-xs font-medium">{error}</p>}
+      <button type="submit" disabled={submitting} className="w-full bg-editorial-primary text-white text-xs uppercase tracking-widest font-bold py-3 rounded-md hover:opacity-90 transition disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2">
+        {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Enviar para análise"}
+      </button>
+    </form>
+  );
 }

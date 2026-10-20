@@ -40,6 +40,7 @@ const PartnerPortalPage = lazy(() => import("./components/PartnerPortalPage"));
 const PartnerOAuthConsentPage = lazy(() => import("./components/PartnerOAuthConsentPage"));
 const TuristaAuthPage = lazy(() => import("./components/TuristaAuthPage"));
 const AuthPage = lazy(() => import("./components/AuthPage"));
+const ReservaOnlinePage = lazy(() => import("./components/ReservaOnlinePage"));
 
 function LazyFallback() {
   return (
@@ -84,6 +85,7 @@ export default function App() {
   const officialSiteMatch = path.match(/^\/site\/(.+)$/);
   const atracaoRouteMatch = path.match(/^\/atracoes\/(.+)$/);
   const guiaRouteMatch = path.match(/^\/guias\/(.+)$/);
+  const reservaRouteMatch = path.match(/^\/reservar\/([^/]+)$/);
 
   // Supabase Auth: the "Gestão" tab is only shown to authenticated users whose
   // account has app_metadata.isAdmin === true (concedido via a votação dos 3
@@ -194,7 +196,7 @@ export default function App() {
 
   useEffect(() => {
     // Standalone info/partner pages are self-contained and don't need the portal's data.
-    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch) return;
+    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch || reservaRouteMatch) return;
     fetchData();
     // Refreshes the public catalog periodically so new pousadas/reviews/
     // sightings show up without a manual reload. This runs in every visitor's
@@ -269,6 +271,14 @@ export default function App() {
 
   if (guiaRouteMatch) {
     return <GuiaDetailsView id={guiaRouteMatch[1]} />;
+  }
+
+  if (reservaRouteMatch) {
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <ReservaOnlinePage pousadaId={decodeURIComponent(reservaRouteMatch[1])} />
+      </Suspense>
+    );
   }
 
   // /entrar precisa ficar fora de STANDALONE_ROUTES (que só suporta

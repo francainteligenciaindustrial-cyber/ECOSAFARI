@@ -6,6 +6,8 @@ import { adminFetch } from "../lib/adminFetch";
 import { isTouristUser } from "../lib/authRoles";
 import { Turista } from "../types";
 import { navigate } from "../lib/router";
+import { consumeReturnTo } from "../lib/returnTo";
+import MinhasReservas from "./MinhasReservas";
 
 // Miolo do login/cadastro de turista, sem cabeçalho/rodapé próprio — usado
 // tanto pela aba "Turista" da tela unificada /entrar (AuthPage.tsx) quanto
@@ -43,8 +45,8 @@ export default function TuristaAuthPanel() {
   const [country, setCountry] = useState("");
   const [language, setLanguage] = useState("");
   const [age, setAge] = useState("");
-  const [preferences, setPreferences] = useState("");
   const [signupError, setSignupError] = useState("");
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const [signingUp, setSigningUp] = useState(false);
   // Depois do cadastro, se o site conseguiu mandar o email de confirmação
   // (Resend configurado), a conta fica pendente até a pessoa clicar no link
@@ -68,6 +70,14 @@ export default function TuristaAuthPanel() {
     });
     return () => subscription?.unsubscribe();
   }, []);
+
+  // Voltou da confirmação de email no meio de uma reserva: segue pra ela.
+  // Na própria página de reserva o painel é embutido — nada a redirecionar.
+  useEffect(() => {
+    if (!isTourist || window.location.pathname.startsWith("/reservar/")) return;
+    const returnTo = consumeReturnTo();
+    if (returnTo) navigate(returnTo);
+  }, [isTourist]);
 
   useEffect(() => {
     if (!isTourist) {
@@ -121,7 +131,7 @@ export default function TuristaAuthPanel() {
       const res = await adminFetch("/api/turista/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, whatsapp, country, language, age: Number(age), preferences }),
+        body: JSON.stringify({ name, whatsapp, country, language, age: Number(age) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -158,7 +168,7 @@ export default function TuristaAuthPanel() {
       const res = await fetch("/api/turista/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language, age: Number(age), preferences }),
+        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language, age: Number(age) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -204,6 +214,22 @@ export default function TuristaAuthPanel() {
           Mandamos um link de confirmação pra <span className="font-semibold text-editorial-text">{email}</span>. Clique nele pra ativar seu perfil de turista — você vai cair de volta bem aqui, já logado.
         </p>
         <p className="text-editorial-muted text-[11px] mt-3">Não chegou? Confira também a caixa de spam.</p>
+        <button
+          type="button"
+          disabled={resendState !== "idle"}
+          onClick={async () => {
+            setResendState("sending");
+            await fetch("/api/turista/resend-confirmation", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email }),
+            }).catch(() => {});
+            setResendState("sent");
+          }}
+          className="mt-4 text-[11px] uppercase tracking-widest font-bold text-editorial-primary hover:underline disabled:opacity-60 cursor-pointer"
+        >
+          {resendState === "sending" ? "Reenviando..." : resendState === "sent" ? "Link reenviado — confira seu email" : "Reenviar email de confirmação"}
+        </button>
       </div>
     );
   }
@@ -245,11 +271,6 @@ export default function TuristaAuthPanel() {
             type="text" required placeholder="Idioma preferido (ex: Português, English, Español)" value={language} onChange={e => setLanguage(e.target.value)}
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
-          <textarea
-            required rows={2} placeholder="O que você gosta de fazer em viagens? (ex: trilhas, observação de aves, gastronomia...)"
-            value={preferences} onChange={e => setPreferences(e.target.value)}
-            className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none"
-          />
           {upgradeError && <p className="text-red-600 text-xs font-medium">{upgradeError}</p>}
           <button
             type="submit" disabled={upgrading}
@@ -285,12 +306,13 @@ export default function TuristaAuthPanel() {
             {profile.language && <p><span className="text-editorial-muted text-xs block">Idioma</span> {profile.language}</p>}
             <p><span className="text-editorial-muted text-xs block">Idade</span> {profile.age}</p>
             {typeof profile.coins === "number" && <p><span className="text-editorial-muted text-xs block">Jaguars</span> {profile.coins}</p>}
-            <p><span className="text-editorial-muted text-xs block">Preferências</span> {profile.preferences}</p>
-            <p className="text-emerald-700 text-xs font-semibold pt-2">✓ Você já pode avaliar pousadas, guias e atrações.</p>
+            {profile.preferences && <p><span className="text-editorial-muted text-xs block">Preferências</span> {profile.preferences}</p>}
+            <p className="text-emerald-700 text-xs font-semibold pt-2">✓ Você já pode reservar e avaliar pousadas, guias e atrações.</p>
           </div>
         ) : (
           <p className="text-editorial-muted text-xs mt-5">Não foi possível carregar seu perfil agora. Tente novamente em instantes.</p>
         )}
+        <MinhasReservas />
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="mt-6 inline-flex items-center gap-2 text-editorial-primary text-[11px] uppercase tracking-widest font-bold hover:opacity-80 transition cursor-pointer">
           <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao catálogo
         </a>
@@ -304,7 +326,7 @@ export default function TuristaAuthPanel() {
         <User className="h-4 w-4 text-editorial-primary" />
         <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary">Perfil de Turista</h1>
       </div>
-      <p className="text-editorial-muted text-xs mb-6">Crie seu perfil (ou entre com um já existente) para poder avaliar pousadas, guias e atrações. Cadastro liberado na hora, sem espera de aprovação.</p>
+      <p className="text-editorial-muted text-xs mb-6">Crie seu perfil (ou entre com um já existente) para reservar e avaliar pousadas, guias e atrações.</p>
 
       <div className="flex border border-editorial-border rounded-md overflow-hidden mb-5 text-[11px] uppercase tracking-widest font-bold">
         <button
@@ -376,11 +398,6 @@ export default function TuristaAuthPanel() {
           <input
             type="text" required placeholder="Idioma preferido (ex: Português, English, Español)" value={language} onChange={e => setLanguage(e.target.value)}
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-          />
-          <textarea
-            required rows={2} placeholder="O que você gosta de fazer em viagens? (ex: trilhas, observação de aves, gastronomia...)"
-            value={preferences} onChange={e => setPreferences(e.target.value)}
-            className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none"
           />
           {signupError && <p className="text-red-600 text-xs font-medium">{signupError}</p>}
           <button

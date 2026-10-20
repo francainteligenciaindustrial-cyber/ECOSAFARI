@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe } from "lucide-react";
+import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe, Receipt, UserRoundCheck } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
@@ -19,6 +19,10 @@ import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
 import PousadaReservasAgenda from "./PousadaReservasAgenda";
 import GestorPousadaPanel from "./GestorPousadaPanel";
 import PousadaGestoresManager from "./PousadaGestoresManager";
+import PousadaCaixa from "./PousadaCaixa";
+import PousadaColaboradoresManager from "./PousadaColaboradoresManager";
+import ColaboradorPanel from "./ColaboradorPanel";
+import { parseVideoUrl } from "../lib/videoEmbed";
 import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import PartnerLoginPanel from "./PartnerLoginPanel";
 import PousadaOfficialSite from "./PousadaOfficialSite";
@@ -45,13 +49,14 @@ function FormSection({ title, children }: { title: string; children: React.React
 function menuByCategory(menu: Pousada["menu"] | undefined, category: string): ExperienceDraft[] {
   return (menu || [])
     .filter(m => (m.category || "prato") === category)
-    .map(m => ({ title: m.item, price: m.price }));
+    .map(m => ({ title: m.item, price: m.price, description: m.description || "" }));
 }
 
-type PousadaTab = "gestor" | "agenda" | "sobre" | "servicos" | "acomodacoes" | "galeria" | "redes" | "bar" | "produtos" | "recompensas" | "gestores" | "editar-site";
+type PousadaTab = "gestor" | "agenda" | "caixa" | "colaboradores" | "sobre" | "servicos" | "acomodacoes" | "galeria" | "redes" | "bar" | "produtos" | "recompensas" | "gestores" | "editar-site";
 
 const POUSADA_TABS: { id: PousadaTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "agenda", label: "Agenda de Reservas", icon: CalendarDays },
+  { id: "caixa", label: "Caixa", icon: Receipt },
   { id: "sobre", label: "Sobre", icon: Info },
   { id: "servicos", label: "Serviços", icon: ConciergeBell },
   { id: "acomodacoes", label: "Acomodações", icon: BedDouble },
@@ -61,6 +66,7 @@ const POUSADA_TABS: { id: PousadaTab; label: string; icon: React.ComponentType<{
   { id: "produtos", label: "Produtos", icon: Package },
   { id: "recompensas", label: "Recompensas", icon: Award },
   { id: "gestores", label: "Gestores", icon: Users },
+  { id: "colaboradores", label: "Colaboradores", icon: UserRoundCheck },
   { id: "editar-site", label: "Editar Site", icon: Globe },
 ];
 
@@ -78,6 +84,7 @@ export default function PartnerPortalPage() {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [isPartner, setIsPartner] = useState(false);
+  const [isColaborador, setIsColaborador] = useState(false);
 
   const [profile, setProfile] = useState<PartnerProfileResponse | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -85,6 +92,7 @@ export default function PartnerPortalPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [saveWarning, setSaveWarning] = useState("");
   const [form, setForm] = useState<any>(null);
   // Só a edição de pousada usa abas (menu lateral) — atração/guia continuam
   // num formulário único de coluna simples.
@@ -118,11 +126,13 @@ export default function PartnerPortalPage() {
       client.auth.getSession().then(({ data }) => {
         const user = data.session?.user;
         setIsPartner(user?.app_metadata?.role === "partner");
+        setIsColaborador(user?.app_metadata?.role === "colaborador");
         if (user) setUserInfo({ email: user.email || "", name: user.user_metadata?.name || "", phone: user.user_metadata?.phone || "", partnerType: user.app_metadata?.partnerType || "" });
         setCheckingSession(false);
       });
       const { data } = client.auth.onAuthStateChange((event, session) => {
         setIsPartner(session?.user?.app_metadata?.role === "partner");
+        setIsColaborador(session?.user?.app_metadata?.role === "colaborador");
         if (session?.user) setUserInfo({ email: session.user.email || "", name: session.user.user_metadata?.name || "", phone: session.user.user_metadata?.phone || "", partnerType: session.user.app_metadata?.partnerType || "" });
         if (event === "PASSWORD_RECOVERY") setNeedsNewPassword(true);
       });
@@ -315,6 +325,7 @@ export default function PartnerPortalPage() {
     e.preventDefault();
     if (!profile || !form) return;
     setSaveError("");
+    setSaveWarning("");
     if (profile.partnerType === "pousada") {
       const semTipo = form.rooms.filter((r: RoomDraft) => !r.type.trim()).length;
       if (semTipo > 0) {
@@ -358,7 +369,7 @@ export default function PartnerPortalPage() {
             ...form.menuOutros.map((m: ExperienceDraft) => ({ ...m, category: "outro" })),
           ] as (ExperienceDraft & { category: string })[])
             .filter(m => m.title.trim())
-            .map(m => ({ item: m.title.trim(), price: m.price || 0, category: m.category })),
+            .map(m => ({ item: m.title.trim(), price: m.price || 0, description: m.description?.trim() || undefined, category: m.category })),
           cuisineTypes: form.cuisineTypes,
           transportOptions: form.transportOptions,
           entertainmentOptions: form.entertainmentOptions,
@@ -407,6 +418,9 @@ export default function PartnerPortalPage() {
       if (res.ok) {
         const updated = await res.json().catch(() => null);
         if (updated && profile.partnerType === "pousada") setProfile(p => (p ? { ...p, pousada: updated } : p));
+        if (Array.isArray(updated?.skippedFields) && updated.skippedFields.length > 0) {
+          setSaveWarning(`Salvo, mas alguns campos ainda não puderam ser gravados porque o banco de dados está aguardando uma atualização (${updated.skippedFields.join(", ")}). Avise o administrador para rodar a migração SQL pendente.`);
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       } else {
@@ -476,7 +490,7 @@ export default function PartnerPortalPage() {
         </div>
         <span className="font-serif italic font-bold text-editorial-primary">EcoSafari<span className="text-zinc-400 not-italic">.</span></span>
       </a>
-      {isPartner && (
+      {(isPartner || isColaborador) && (
         <button onClick={handleLogout} className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer">
           <LogOut className="h-3.5 w-3.5" /> Sair
         </button>
@@ -513,6 +527,18 @@ export default function PartnerPortalPage() {
               </button>
             </form>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isColaborador) {
+    return (
+      <div className="min-h-screen bg-editorial-bg font-sans">
+        {header}
+        <div className="max-w-2xl mx-auto px-4 md:px-6 py-10">
+          <h1 className="text-2xl font-serif font-bold text-editorial-primary mb-6">Área do Colaborador</h1>
+          <ColaboradorPanel />
         </div>
       </div>
     );
@@ -719,22 +745,22 @@ export default function PartnerPortalPage() {
 
                 {pousadaTab === "bar" && (
                   <FormSection title="Bar/Restaurantes">
-                    <p className="text-editorial-muted text-[11px] -mt-1">Opcional — só preencha se a pousada tiver bar/restaurante próprio. Cada item entra com o preço.</p>
+                    <p className="text-editorial-muted text-[11px] -mt-1">Opcional — só preencha se a pousada tiver bar/restaurante próprio. Cada item tem nome, descrição e preço.</p>
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Pratos</label>
-                      <ExperienceListEditor value={form.menuPratos} onChange={menuPratos => setForm((p: any) => ({ ...p, menuPratos }))} />
+                      <ExperienceListEditor value={form.menuPratos} onChange={menuPratos => setForm((p: any) => ({ ...p, menuPratos }))} addLabel="Adicionar" withDescription namePlaceholder="Nome do prato" descriptionPlaceholder="Composição do prato (ex: tambaqui assado, arroz, farofa de banana)" />
                     </div>
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Sobremesas</label>
-                      <ExperienceListEditor value={form.menuSobremesas} onChange={menuSobremesas => setForm((p: any) => ({ ...p, menuSobremesas }))} />
+                      <ExperienceListEditor value={form.menuSobremesas} onChange={menuSobremesas => setForm((p: any) => ({ ...p, menuSobremesas }))} addLabel="Adicionar" withDescription namePlaceholder="Nome da sobremesa" descriptionPlaceholder="Descrição (ingredientes, porção...)" />
                     </div>
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Bebidas</label>
-                      <ExperienceListEditor value={form.menuBebidas} onChange={menuBebidas => setForm((p: any) => ({ ...p, menuBebidas }))} />
+                      <ExperienceListEditor value={form.menuBebidas} onChange={menuBebidas => setForm((p: any) => ({ ...p, menuBebidas }))} addLabel="Adicionar" withDescription namePlaceholder="Nome da bebida" descriptionPlaceholder="Descrição (ex: 350 ml, com ou sem açúcar)" />
                     </div>
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Outros Produtos</label>
-                      <ExperienceListEditor value={form.menuOutros} onChange={menuOutros => setForm((p: any) => ({ ...p, menuOutros }))} />
+                      <ExperienceListEditor value={form.menuOutros} onChange={menuOutros => setForm((p: any) => ({ ...p, menuOutros }))} addLabel="Adicionar" withDescription namePlaceholder="Nome do produto" descriptionPlaceholder="Descrição" />
                     </div>
                   </FormSection>
                 )}
@@ -745,7 +771,11 @@ export default function PartnerPortalPage() {
                     <ImageListEditor label="Fotos" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
                     <div className="text-xs border-t border-editorial-border pt-4">
                       <label className="block text-editorial-text font-semibold mb-1.5">Vídeo (link do YouTube ou Instagram)</label>
-                      <input type="text" placeholder="https://youtube.com/watch?v=..." value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <p className="text-editorial-muted text-[11px] mb-2">Cole o link do YouTube ou do Google Drive (no Drive, deixe o compartilhamento como "Qualquer pessoa com o link"). Esse vídeo aparece na tela de contato e no site oficial.</p>
+                      <input type="text" placeholder="https://youtube.com/watch?v=... ou https://drive.google.com/file/d/..." value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      {form.videoUrl.trim() && !parseVideoUrl(form.videoUrl) && (
+                        <p role="alert" className="text-amber-800 text-[11px] mt-1.5">Esse link não pode ser exibido no site. Use um link do YouTube, do Google Drive ou de um arquivo .mp4 (https).</p>
+                      )}
                     </div>
                   </FormSection>
                 )}
@@ -1012,6 +1042,7 @@ export default function PartnerPortalPage() {
               {saved && <span className="text-emerald-700 text-xs font-semibold flex items-center gap-1"><Check className="h-4 w-4" /> Salvo!</span>}
             </div>
             {saveError && <p role="alert" className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-md">{saveError}</p>}
+            {saveWarning && <p role="status" className="bg-amber-50 border border-amber-200 text-amber-900 text-xs px-3 py-2 rounded-md">{saveWarning}</p>}
           </form>
 
           {pousadaTab === "editar-site" && previewPousada && (
@@ -1048,6 +1079,16 @@ export default function PartnerPortalPage() {
         {profile?.partnerType === "pousada" && form && pousadaTab === "recompensas" && (
           <ErrorBoundary variant="section" sectionLabel="as recompensas">
             <PousadaRecompensasManager pousadaId={profile.partnerId} />
+          </ErrorBoundary>
+        )}
+        {profile?.partnerType === "pousada" && form && pousadaTab === "caixa" && (
+          <ErrorBoundary variant="section" sectionLabel="o caixa">
+            <PousadaCaixa pousadaId={profile.partnerId} />
+          </ErrorBoundary>
+        )}
+        {profile?.partnerType === "pousada" && form && pousadaTab === "colaboradores" && (
+          <ErrorBoundary variant="section" sectionLabel="os colaboradores">
+            <PousadaColaboradoresManager pousadaId={profile.partnerId} />
           </ErrorBoundary>
         )}
         {profile?.partnerType === "pousada" && form && pousadaTab === "gestores" && (

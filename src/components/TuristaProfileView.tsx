@@ -377,7 +377,7 @@ export default function TuristaProfileView() {
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                 />
                 <textarea
-                  required rows={2} placeholder="O que você gosta de fazer em viagens?" value={form.preferences}
+                  rows={2} placeholder="O que você gosta de fazer em viagens? (opcional)" value={form.preferences}
                   onChange={e => setForm(p => ({ ...p, preferences: e.target.value }))}
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none"
                 />

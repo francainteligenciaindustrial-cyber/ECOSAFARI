@@ -278,7 +278,27 @@ export default function PousadaReservasAgenda({ pousadaId, unavailableDates = []
                 {selected.specialNeeds && <li className="flex items-start gap-2"><Accessibility className="h-3.5 w-3.5 text-editorial-primary mt-0.5" /> {selected.specialNeeds}</li>}
                 {selected.guideName && <li className="text-editorial-muted">Guia: {selected.guideName}</li>}
                 <li className="font-semibold">Valor da reserva: R$ {Number(selected.totalPrice || 0).toLocaleString("pt-BR")}</li>
+                {selected.origem === "site" && <li className="text-[10px] uppercase tracking-widest font-bold text-editorial-accent">Reserva feita pelo site</li>}
               </ul>
+
+              {(() => {
+                let d: Record<string, unknown> = {};
+                try { d = selected.guestDetails ? JSON.parse(selected.guestDetails) : {}; } catch { d = {}; }
+                const rows = [
+                  ["Chegada prevista", d.arrivalTime],
+                  ["Motivo da viagem", d.occasion],
+                  ["Transfer", d.needsTransfer ? "Precisa de transfer" : ""],
+                  ["Interesses", d.interests],
+                  ["Observações", d.notes],
+                ].filter(([, v]) => typeof v === "string" && v);
+                if (rows.length === 0) return null;
+                return (
+                  <div className="bg-editorial-secondary/60 border border-editorial-border rounded-md p-3 space-y-1.5">
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-editorial-primary">Informado pelo hóspede</p>
+                    {rows.map(([k, v]) => <p key={k as string}><span className="text-editorial-muted">{k as string}:</span> {v as string}</p>)}
+                  </div>
+                );
+              })()}
 
               <div className="flex flex-wrap gap-2">
                 {selected.status === "pago" && (

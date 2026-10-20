@@ -1,13 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Sparkles, ExternalLink, MapPin } from "lucide-react";
 import { Pousada } from "../types";
+import { parseVideoUrl } from "../lib/videoEmbed";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
-
-// Placeholder nature clip shown before handing off to the real WhatsApp.
-// TODO: replace with a real branded EcoSafari video (drop the file in /public/videos/
-// and point this at "/videos/your-file.mp4") once one is available.
-const GATE_VIDEO_SRC = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
 interface WhatsAppGateViewProps {
   pousada: Pousada | null;
@@ -19,7 +15,11 @@ function agencyWhatsappLink(message: string) {
 }
 
 export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewProps) {
-  const [videoEnded, setVideoEnded] = useState(false);
+  // Vídeo de apresentação da própria pousada (cadastrado pelo gestor na
+  // Galeria de Fotos). Sem vídeo, ou com vídeo do YouTube/Drive (onde não dá
+  // pra saber quando terminou), o botão do WhatsApp já aparece direto.
+  const video = parseVideoUrl(pousada?.videoUrl);
+  const [videoEnded, setVideoEnded] = useState(!video || video.kind === "iframe");
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -52,17 +52,30 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
         </div>
 
         {/* Video */}
+        {video && (
         <div className="relative aspect-video bg-black border border-[#FBF8F1]/10 shadow-2xl overflow-hidden mb-8">
+          {video.kind === "iframe" ? (
+            <iframe
+              src={video.src}
+              title={`Vídeo de apresentação — ${pousada?.name || "EcoSafari"}`}
+              className="w-full h-full"
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
           <video
             ref={videoRef}
-            src={GATE_VIDEO_SRC}
-            muted
+            src={video.src}
+            controls
             playsInline
             className="w-full h-full object-cover"
             onEnded={() => setVideoEnded(true)}
             onError={() => setVideoEnded(true)}
           />
+          )}
 
+          {video.kind === "file" && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 flex flex-col justify-between p-6 pointer-events-none">
             <div>
               <h2 className="font-serif font-bold text-lg tracking-tight">Expedições EcoSafari Brasil</h2>
@@ -73,7 +86,9 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
               )}
             </div>
           </div>
+          )}
         </div>
+        )}
 
         {/* Call to action card */}
         <div className="bg-[#FBF8F1]/10 border border-[#FBF8F1]/25 p-8 text-center">
@@ -93,9 +108,13 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
               </a>
             </>
           ) : (
-            <p className="text-[#FBF8F1]/70 text-xs uppercase tracking-widest font-bold animate-pulse">
-              Preparando sua expedição...
-            </p>
+            <button
+              type="button"
+              onClick={() => setVideoEnded(true)}
+              className="text-[#FBF8F1]/80 hover:text-white text-xs uppercase tracking-widest font-bold underline underline-offset-4 cursor-pointer"
+            >
+              Pular vídeo e falar com a equipe
+            </button>
           )}
         </div>
 

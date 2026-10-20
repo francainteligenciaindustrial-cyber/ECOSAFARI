@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users, UtensilsCrossed, Facebook, Youtube, Music2, Wifi, ParkingSquare } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Check, Coffee, MessageSquare, BadgeCheck, Eye, ExternalLink, X, ChevronLeft, ChevronRight, Images, Instagram, Bed, Users, UtensilsCrossed, Facebook, Youtube, Music2, Wifi, ParkingSquare, CalendarCheck } from "lucide-react";
+import { navigate } from "../lib/router";
 import { Pousada, Review } from "../types";
 import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
@@ -387,9 +388,12 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                         <h4 className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-2">{label}</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {items.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between border border-editorial-border p-3 text-xs">
-                              <span className="text-editorial-text">{item.item}</span>
-                              <span className="font-bold text-editorial-primary">R$ {item.price.toLocaleString('pt-BR')}</span>
+                            <div key={idx} className="border border-editorial-border p-3 text-xs">
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="text-editorial-text font-semibold">{item.item}</span>
+                                <span className="font-bold text-editorial-primary whitespace-nowrap">R$ {item.price.toLocaleString('pt-BR')}</span>
+                              </div>
+                              {item.description && <p className="text-editorial-muted text-[11px] mt-1 leading-relaxed">{item.description}</p>}
                             </div>
                           ))}
                         </div>
@@ -468,7 +472,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             <div className="bg-white p-6 rounded-none border border-editorial-border shadow-sm sticky top-6 space-y-6">
               <div>
                 <h3 className="font-serif font-bold text-editorial-primary text-lg mb-1">Reserve sua Expedição</h3>
-                <p className="text-editorial-muted text-xs">Fale com nossa equipe para confirmar datas e fechar sua reserva.</p>
+                <p className="text-editorial-muted text-xs">Reserve online em poucos minutos ou, se preferir, fale com nossa equipe.</p>
               </div>
 
               {/* Price info */}
@@ -489,11 +493,19 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 </div>
               </div>
 
+              <a
+                href={`/reservar/${encodeURIComponent(pousada.id)}`}
+                onClick={e => { e.preventDefault(); navigate(`/reservar/${encodeURIComponent(pousada.id)}`); }}
+                className="w-full bg-editorial-primary hover:opacity-90 text-white font-bold py-3 rounded-none text-xs uppercase tracking-widest transition duration-200 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              >
+                <CalendarCheck className="h-4.5 w-4.5" /> Reservar online
+              </a>
+
               <button
                 onClick={() => onOpenBot(pousada, selectedExperience)}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-none text-xs transition duration-200 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                className="w-full bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold py-3 rounded-none text-xs transition duration-200 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <MessageSquare className="h-4.5 w-4.5" /> Reservar pelo WhatsApp
+                <MessageSquare className="h-4.5 w-4.5" /> Tirar dúvidas pelo WhatsApp
               </button>
 
               <p className="text-[10px] text-editorial-muted text-center leading-normal">

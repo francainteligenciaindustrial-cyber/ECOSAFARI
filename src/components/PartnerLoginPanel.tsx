@@ -38,7 +38,7 @@ export default function PartnerLoginPanel() {
       setLoggingIn(false);
       return;
     }
-    if (data.user.app_metadata?.role !== "partner") {
+    if (data.user.app_metadata?.role !== "partner" && data.user.app_metadata?.role !== "colaborador") {
       await supabase.auth.signOut();
       setLoginError("Esta conta não tem acesso de parceiro. Fale com a equipe EcoSafari.");
       setLoggingIn(false);
@@ -56,9 +56,13 @@ export default function PartnerLoginPanel() {
     if (!supabase || forgotSubmitting) return;
     setForgotSubmitting(true);
     try {
-      await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
-        redirectTo: `${window.location.origin}/parceiro`,
-      });
+      // Pelo servidor (Resend) — o envio nativo do Supabase sem SMTP
+      // próprio só entrega para membros do projeto.
+      await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      }).catch(() => {});
     } finally {
       setForgotSubmitting(false);
       setForgotSent(true);

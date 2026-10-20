@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, MessageSquare, Compass, Eye, MapPin, Sparkles } from "lucide-react";
 import { Pousada } from "../types";
+import { parseVideoUrl } from "../lib/videoEmbed";
 
 interface VideoPlayerViewProps {
   pousada: Pousada | null;
@@ -14,9 +15,8 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
   const [activeChapter, setActiveChapter] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Plays this pousada's own video when set by the admin; falls back to a
-  // generic placeholder clip otherwise.
-  const videoSource = pousada?.videoUrl || "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+  // Vídeo da própria pousada (YouTube, Google Drive ou arquivo direto).
+  const video = parseVideoUrl(pousada?.videoUrl);
 
   const chapters = [
     { time: 0, title: "Rastreamento da Onça-Pintada", duration: "0:00 - 1:15", desc: "Acompanhe nossos guias na busca pela soberana do Pantanal ao longo dos rios Clarinho e Negro." },
@@ -78,9 +78,19 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
           <div className="lg:col-span-8 flex flex-col gap-6">
             <div className="relative aspect-video bg-black border border-[#FBF8F1]/10 shadow-2xl group overflow-hidden">
               
+              {video?.kind === "iframe" ? (
+                <iframe
+                  src={video.src}
+                  title={`Vídeo — ${pousada?.name || "EcoSafari"}`}
+                  className="absolute inset-0 w-full h-full z-10"
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              ) : video ? (
               <video
                 ref={videoRef}
-                src={videoSource}
+                src={video.src}
                 loop
                 muted={isMuted}
                 autoPlay
@@ -88,6 +98,11 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
               />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[#FBF8F1]/60 text-xs uppercase tracking-widest font-bold">
+                  Vídeo em breve
+                </div>
+              )}
 
               {/* Video Overlay controls */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-6">
