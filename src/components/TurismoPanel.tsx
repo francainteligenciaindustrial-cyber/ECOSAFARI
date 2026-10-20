@@ -237,7 +237,7 @@ function TuristasSection({ items, showAddForm, onAdded, onDelete }: {
             {pagination.pageItems.map(t => (
               <tr key={t.id} className="border-t border-editorial-border/60">
                 <Td>{t.name}</Td><Td>{t.email}</Td><Td>{t.whatsapp}</Td><Td>{t.country}</Td><Td>{t.age}</Td><Td>{t.preferences}</Td>
-                <Td><button onClick={() => onDelete(t.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
+                <Td><button aria-label="Excluir" onClick={() => onDelete(t.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
               </tr>
             ))}
           </tbody>
@@ -291,7 +291,7 @@ function RoteirosSection({ items, showAddForm, onAdded, onDelete }: {
             {pagination.pageItems.map(r => (
               <tr key={r.id} className="border-t border-editorial-border/60">
                 <Td>{r.name}</Td><Td>{r.duration}</Td><Td>R$ {r.price.toLocaleString('pt-BR')}</Td><Td className="capitalize">{r.difficulty}</Td><Td>{r.capacity}</Td><Td>{r.description}</Td>
-                <Td><button onClick={() => onDelete(r.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
+                <Td><button aria-label="Excluir" onClick={() => onDelete(r.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
               </tr>
             ))}
           </tbody>
@@ -352,7 +352,7 @@ function ReservasSection({ items, turistas, roteiros, showAddForm, onAdded, onDe
             {pagination.pageItems.map(r => (
               <tr key={r.id} className="border-t border-editorial-border/60">
                 <Td>{turistaName(r.turistaId)}</Td><Td>{roteiroName(r.roteiroId)}</Td><Td>{r.date}</Td><Td className="capitalize">{r.status}</Td><Td>R$ {r.totalPrice.toLocaleString('pt-BR')}</Td>
-                <Td><button onClick={() => onDelete(r.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
+                <Td><button aria-label="Excluir" onClick={() => onDelete(r.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
               </tr>
             ))}
           </tbody>
@@ -415,7 +415,7 @@ function PagamentosSection({ items, reservas, showAddForm, onAdded, onDelete, re
             {pagination.pageItems.map(p => (
               <tr key={p.id} className="border-t border-editorial-border/60">
                 <Td>{reservaLabel(p.reservaId)}</Td><Td>R$ {p.amount.toLocaleString('pt-BR')}</Td><Td>{p.date}</Td><Td className="capitalize">{p.method}</Td><Td className="capitalize">{p.status}</Td>
-                <Td><button onClick={() => onDelete(p.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
+                <Td><button aria-label="Excluir" onClick={() => onDelete(p.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
               </tr>
             ))}
           </tbody>
@@ -468,7 +468,7 @@ function GuiasSection({ items, showAddForm, onAdded, onDelete }: {
               <tr key={g.id} className="border-t border-editorial-border/60">
                 <Td>{g.name}</Td><Td>{g.specialty}</Td><Td>{g.phone}</Td>
                 <Td>{g.availability ? "Disponível" : "Indisponível"}</Td><Td>⭐ {g.rating}</Td>
-                <Td><button onClick={() => onDelete(g.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
+                <Td><button aria-label="Excluir" onClick={() => onDelete(g.id)} className="text-red-600 hover:text-red-800 cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button></Td>
               </tr>
             ))}
           </tbody>

@@ -120,13 +120,13 @@ export default function PousadaProdutosManager({ pousadaId }: Props) {
                 {p.description && <p className="text-editorial-muted text-[11px] truncate">{p.description}</p>}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={() => handleShowQr(p)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title="Ver QR code">
+                <button aria-label="Ver QR code" onClick={() => handleShowQr(p)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title="Ver QR code">
                   <QrCode className="h-4 w-4" />
                 </button>
-                <button onClick={() => handleToggleActive(p)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title={p.active ? "Desativar" : "Ativar"}>
+                <button aria-label={p.active ? "Desativar" : "Ativar"} onClick={() => handleToggleActive(p)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title={p.active ? "Desativar" : "Ativar"}>
                   {p.active ? <ToggleRight className="h-5 w-5 text-emerald-600" /> : <ToggleLeft className="h-5 w-5" />}
                 </button>
-                <button onClick={() => handleDelete(p)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer" title="Excluir">
+                <button aria-label="Excluir" onClick={() => handleDelete(p)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer" title="Excluir">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -167,7 +167,7 @@ export default function PousadaProdutosManager({ pousadaId }: Props) {
       {qrFor && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setQrFor(null)}>
           <div className="bg-white rounded-lg p-6 max-w-xs w-full text-center relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setQrFor(null)} className="absolute top-3 right-3 text-editorial-muted hover:text-editorial-text cursor-pointer"><X className="h-4 w-4" /></button>
+            <button aria-label="Fechar" onClick={() => setQrFor(null)} className="absolute top-3 right-3 text-editorial-muted hover:text-editorial-text cursor-pointer"><X className="h-4 w-4" /></button>
             <p className="text-sm font-bold text-editorial-text mb-1">{qrFor.name}</p>
             <p className="text-editorial-muted text-[11px] mb-4">Imprima e cole perto do produto — a recepção escaneia isso pra lançar o consumo.</p>
             {loadingQr ? (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "react";
 import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User, Lock, LoaderCircle, Search } from "lucide-react";
 import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
@@ -11,101 +11,35 @@ import { extractLocationRegions, SortOption } from "../lib/catalogFilters";
 import { useToast } from "../lib/ToastProvider";
 import ErrorBoundary from "./ErrorBoundary";
 import { SkeletonPousadaGrid } from "./Skeleton";
+import { useI18n } from "../i18n/I18nProvider";
+import { WILD_SPECIES, findWildSpecies, SeasonLevel } from "../data/wildSpecies";
+import SpeciesSeasonCalendar from "./SpeciesSeasonCalendar";
+import SeasonCalendarSection from "./SeasonCalendarSection";
+import PacotesSection from "./PacotesSection";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
 const MobileSimulator = lazy(() => import("./MobileSimulator"));
+// Leaflet (~150 KB) só baixa quando o mapa entra na tela.
+const PantanalMap = lazy(() => import("./PantanalMap"));
 
-// Educational fallback content shown only while the admin hasn't registered
-// any real species yet (see displaySpecies below). Deliberately has no
-// bestPousadaId/bestPousadaName of its own — those used to be hardcoded to
-// fake demo lodge names ("Araras Eco Lodge", "Cristalino Lodge", etc.) that
-// don't exist in the real database, which silently mismatched whatever real
-// pousada the "Conhecer Pousada Ideal" button actually opened (it always
-// fell back to pousadas[0] since the fake id never matched). Real pousadas
-// are bound in dynamically at render time instead.
-const WILD_SPECIES_INFO = [
-  {
-    id: "capivara",
-    name: "Capivara",
-    scientificName: "Hydrochoerus hydrochaeris",
-    category: "MAMÍFERO TERRESTRE",
-    description: "O maior roedor do mundo vive harmoniosamente em grandes grupos familiares ao longo das margens ensolaradas do Rio Cuiabá.",
-    details: "As capivaras são animais extremamente sociáveis e excelentes nadadoras. No Pantanal, elas desempenham um papel crucial no ecossistema, servindo como uma das principais presas para jacarés e onças-pintadas. Podem permanecer submersas por até 5 minutos para escapar de predadores.",
-    sightings: "95%+ AVISTAMENTOS",
-    image: "/species/capivara.png"
-  },
-  {
-    id: "jacare",
-    name: "Jacaré-do-Pantanal",
-    scientificName: "Caiman yacare",
-    category: "RÉPTIL PREDADOR",
-    description: "Soberano das águas calmas, é comumente visto regulando sua temperatura sob o sol quente nas praias de areia branca.",
-    details: "O jacaré-do-pantanal alimenta-se principalmente de peixes e moluscos. Após quase serem extintos devido à caça ilegal nas décadas de 1970 e 1980, hoje a população está totalmente recuperada e estimada em milhões de indivíduos, sendo um dos maiores casos de sucesso em conservação ambiental no Brasil.",
-    sightings: "95%+ AVISTAMENTOS",
-    image: "/species/jacare-do-pantanal.png"
-  },
-  {
-    id: "tucano",
-    name: "Tucano-Toco",
-    scientificName: "Ramphastos toco",
-    category: "AVE ICÔNICA",
-    description: "Com seu bico laranja vibrante, é a ave mais reconhecível do Pantanal, avistada com frequência nas copas das árvores à beira-rio.",
-    details: "O bico do tucano, embora pareça pesado, é extremamente leve pois sua estrutura interna é esponjosa. Ele funciona como um sofisticado regulador térmico, dissipando o calor do corpo em dias quentes. Alimentam-se de frutos, mas também de ovos e filhotes de outras aves.",
-    sightings: "90%+ AVISTAMENTOS",
-    image: "/species/tucano-toco.png"
-  },
-  {
-    id: "cardeal",
-    name: "Cardeal-de-crista-vermelha",
-    scientificName: "Paroaria coronata",
-    category: "AVE CANTORA",
-    description: "Reconhecível por seu topete vermelho vibrante contrastando com o peito branco, é presença certa nas margens arborizadas do Pantanal.",
-    details: "Esta pequena ave destaca-se pela crista vermelha pontiaguda e canto melodioso. Vivem em pares ou pequenos bandos familiares e habitam vegetações arbustivas próximas à água, onde alimentam-se de sementes, insetos e pequenos frutos caídos.",
-    sightings: "85%+ AVISTAMENTOS",
-    image: "/species/cardeal.png"
-  },
-  {
-    id: "arara",
-    name: "Arara-Canindé",
-    scientificName: "Ara ararauna",
-    category: "AVE ICÔNICA",
-    description: "Com plumagem azul e amarela vibrante, voa em casais que permanecem juntos por toda a vida, um símbolo de fidelidade na natureza pantaneira.",
-    details: "As araras-canindé utilizam seus bicos fortes como um terceiro membro para escaladas e para quebrar sementes duras de palmeiras. Elas nidificam em troncos ocos de palmeiras mortas e o casal divide todas as tarefas de cuidado com os ovos e filhotes.",
-    sightings: "95%+ AVISTAMENTOS",
-    image: "/species/arara-caninde.png"
-  },
-  {
-    id: "onca",
-    name: "Onça-Pintada",
-    scientificName: "Panthera onca",
-    category: "PREDADOR TOPO",
-    description: "A rainha indiscutível do Pantanal, observada espreitando entre a folhagem densa — o avistamento mais desejado de toda expedição.",
-    details: "A onça-pintada é o maior felino das Américas. No Pantanal, devido à abundância de presas e proteção estrita, elas atingem quase o dobro do peso de suas parentes amazônicas. São excelentes nadadoras e caçam jacarés e capivaras diretamente nas margens dos rios.",
-    sightings: "95%+ AVISTAMENTOS",
-    image: "/species/onca-pintada.png"
-  },
-  {
-    id: "coruja",
-    name: "Coruja-Buraqueira",
-    scientificName: "Athene cunicularia",
-    category: "AVE NOTURNA",
-    description: "Ao contrário da maioria das corujas, é ativa também durante o dia e vive em tocas no chão, observando o campo com seus olhos amarelos atentos.",
-    details: "As corujas-buraqueiras escavam seus próprios ninhos no solo ou aproveitam buracos abandonados de tatu. Elas acumulam esterco ao redor de suas tocas para atrair besouros, que servem de alimento fácil, demonstrando um comportamento incrivelmente astuto de uso de ferramentas.",
-    sightings: "90%+ AVISTAMENTOS",
-    image: "/species/coruja-buraqueira.png"
-  },
-  {
-    id: "curicaca",
-    name: "Curicaca",
-    scientificName: "Theristicus caudatus",
-    category: "AVE RÚSTICA",
-    description: "De canto forte e característico ao amanhecer, é vista em campos abertos e praias fluviais com seu bico longo e curvado perfeito para alimentação.",
-    details: "A curicaca possui um grito metálico muito alto e inconfundível, frequentemente ouvido no raiar do dia. Seu bico longo e curvado é perfeitamente adaptado para sondar o solo úmido e lodo em busca de insetos, aranhas, anfíbios e pequenos répteis.",
-    sightings: "95%+ AVISTAMENTOS",
-    image: "/species/curicaca.png"
-  }
-];
+// Conteúdo educativo de fallback (enquanto o admin não cadastra espécies
+// reais) vem de src/data/wildSpecies.ts — já traduzido e com o calendário de
+// melhor época. Sem pousada própria: cada espécie é ligada a uma pousada
+// real na hora de renderizar (ver displaySpecies).
+interface DisplaySpecies {
+  id: string;
+  name: string;
+  scientificName: string;
+  category: string;
+  description: string;
+  details: string;
+  sightings: string;
+  image: string;
+  bestPousadaId: string;
+  bestPousadaName: string;
+  season?: SeasonLevel[];
+}
 
 interface PousadaCatalogProps {
   pousadas: Pousada[];
@@ -134,20 +68,31 @@ export default function PousadaCatalog({
   onAddReview,
   onOpenBotWithPousada
 }: PousadaCatalogProps) {
+  const { t, lang, formatMoney } = useI18n();
   // Binds each fallback species to a real partner pousada (round-robin) so
   // "Onde avistar esta espécie" always names a lodge that actually exists —
   // and that the "Conhecer Pousada Ideal" button actually opens — instead of
-  // a fixed fake name from demo data.
-  const displaySpecies = species.length > 0
-    ? species
-    : WILD_SPECIES_INFO.map((s, idx) => {
+  // a fixed fake name from demo data. Espécies do banco ganham o calendário
+  // de melhor época quando o nome casa com uma de src/data/wildSpecies.ts.
+  const displaySpecies: DisplaySpecies[] = useMemo(() => species.length > 0
+    ? species.map(s => ({ ...s, season: findWildSpecies(s.name)?.season }))
+    : WILD_SPECIES.map((s, idx) => {
         const realPousada = pousadas.length > 0 ? pousadas[idx % pousadas.length] : null;
+        const text = s.text[lang];
         return {
-          ...s,
+          id: s.id,
+          name: text.name,
+          scientificName: s.scientificName,
+          category: text.category,
+          description: text.description,
+          details: text.details,
+          sightings: s.sightingRate,
+          image: s.image,
+          season: s.season,
           bestPousadaId: realPousada?.id || "",
-          bestPousadaName: realPousada?.name || "Pousadas parceiras EcoSafari"
+          bestPousadaName: realPousada?.name || t("species.partnerFallback"),
         };
-      });
+      }), [species, pousadas, lang, t]);
   const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
   const { showToast } = useToast();
   const [filterLocation, setFilterLocation] = useState("all");
@@ -176,7 +121,7 @@ export default function PousadaCatalog({
   }, []);
 
   // Wildlife Showcase species details and carousel navigation
-  const [selectedSpecies, setSelectedSpecies] = useState<any | null>(null);
+  const [selectedSpecies, setSelectedSpecies] = useState<DisplaySpecies | null>(null);
   const speciesCarouselRef = useRef<HTMLDivElement>(null);
 
   const scrollSpeciesLeft = () => {
@@ -191,33 +136,23 @@ export default function PousadaCatalog({
     }
   };
 
-  const faqs = [
-    {
-      question: "Como chego à pousada no interior do Mato Grosso?",
-      answer: "A maioria dos hóspedes chega de avião via Aeroporto de Cuiabá (CGB). Nós providenciamos translados privativos em picapes 4x4 robustas e climatizadas com motorista diretamente até a pousada. O trajeto passa pela famosa Rodovia Transpantaneira, onde você já avista jacarés e tuiuiús das janelas."
-    },
-    {
-      question: "Quão segura é a expedição? Há suporte de saúde próximo?",
-      answer: "Extremamente segura. Nossos barcos de duralumínio são largos e estáveis, equipados com motores Yamaha duplos, coletes salva-vidas premium e comunicadores via satélite. Os guias são certificados Cadastur, treinados em primeiros socorros de áreas remotas e carregam estojos de atendimento contendo epinefrina. Analisamos detalhadamente as alergias e medicamentos no nosso formulário de agendamento antes da sua vinda."
-    },
-    {
-      question: "Qual é o melhor período do ano para ver as Onças-Pintadas?",
-      answer: "A melhor época é a estação seca do Mato Grosso, que vai de Junho até o final de Novembro. Nesse período, a água do Pantanal baixa, forçando os animais (como onças, ariranhas e aves exóticas) a se reunirem na beira dos rios principais em busca de água e peixes, permitindo mais de 95% de sucesso de avistamento."
-    },
-    {
-      question: "Vocês atendem alergias alimentares severas e medicamentos especiais?",
-      answer: "Sim! Seguimos padrões rigorosos de alimentação e saúde. Nosso formulário de agendamento inclui perguntas de saúde física. Compartilhamos estas informações com os chefes da cozinha para prevenção total de contaminação cruzada para celíacos ou alérgicos a amendoins, e nossa recepção dispõe de geladeiras de respaldo clínico exclusivas para armazenar medicamentos sensíveis (como insulina)."
-    }
-  ];
+  const faqs = ([1, 2, 3, 4] as const).map(n => ({
+    question: t(`faq.q${n}`),
+    answer: t(`faq.a${n}`),
+  }));
 
-  // Set default selected pousada for review once pousadas load
+  // Set default selected pousada for review once pousadas load. O e-mail
+  // pós-estadia linka /?avaliar=<pousadaId>#avaliacoes — já chega com a
+  // pousada certa escolhida e rola até o formulário.
   useEffect(() => {
-    if (pousadas.length > 0 && !selectedPousadaForReview) {
-      setSelectedPousadaForReview(pousadas[0]?.id || "");
-    }
+    if (pousadas.length === 0 || selectedPousadaForReview) return;
+    const fromEmail = new URLSearchParams(window.location.search).get("avaliar");
+    const target = fromEmail && pousadas.some(p => p.id === fromEmail) ? fromEmail : pousadas[0]?.id || "";
+    setSelectedPousadaForReview(target);
+    if (fromEmail) setTimeout(() => document.getElementById("avaliacoes")?.scrollIntoView({ behavior: "smooth" }), 300);
   }, [pousadas, selectedPousadaForReview]);
 
-  const completePousadas = pousadas.filter(isCompletePousadaProfile);
+  const completePousadas = useMemo(() => pousadas.filter(isCompletePousadaProfile), [pousadas]);
 
   // Regiões (estado/cidade/bioma) extraídas do texto livre que o admin
   // digitou em cada pousada.location (ex: "Pantanal Norte, Mato Grosso") —
@@ -299,7 +234,7 @@ export default function PousadaCatalog({
 
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setReviewError(body.error || "Erro ao enviar avaliação.");
+        setReviewError(body.error || t("reviews.error"));
         return;
       }
       onAddReview(body);
@@ -311,7 +246,7 @@ export default function PousadaCatalog({
       setTimeout(() => setReviewSuccess(false), 4000);
     } catch (err) {
       console.error(err);
-      setReviewError("Erro ao enviar avaliação.");
+      setReviewError(t("reviews.error"));
     } finally {
       setSubmittingReview(false);
     }
@@ -323,28 +258,28 @@ export default function PousadaCatalog({
       {/* Hero Section */}
       <section className="relative h-[550px] flex items-center justify-center bg-editorial-primary text-white overflow-hidden">
         {/* Ambient video-like image background with darker overlay */}
-        <div className="absolute inset-0 opacity-25 bg-[url('/hero-pantanal-fauna.jpg')] bg-cover bg-center"></div>
+        <div className="absolute inset-0 opacity-25 bg-[url('/hero-pantanal-fauna.webp')] bg-cover bg-center"></div>
         
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-editorial-primary/45"></div>
         
         <div className="relative max-w-5xl mx-auto px-6 text-center z-10 flex flex-col items-center">
           <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#F6EEDC]/80 mb-4">
-            Cada turista é único aqui na EcoSafari
-          </span>
-          <span lang="en" translate="no" className="text-[10px] uppercase tracking-[0.3em] font-semibold text-[#F6EEDC]/60 -mt-3 mb-4">
-            Every traveler is unique here at EcoSafari
+            {t("catalog.hero.kicker")}
           </span>
           <span aria-hidden="true" className="block w-14 h-[3px] bg-arara-yellow -mt-2 mb-6" />
           <h1 className="text-4xl md:text-6xl font-serif tracking-tight mb-6 max-w-4xl text-balance leading-tight">
-            Seja um dos primeiros a descobrir a <span className="italic font-normal opacity-90">fauna e flora escondida</span> no interior de Mato Grosso
+            {t("catalog.hero.title1")} <span className="italic font-normal opacity-90">{t("catalog.hero.titleEm")}</span> {t("catalog.hero.title2")}
           </h1>
           <p className="text-sm md:text-base text-[#F6EEDC] mb-8 max-w-2xl text-balance font-light leading-relaxed tracking-wide">
-            Conectamos você às pousadas de selva mais conceituadas e sustentáveis do Mato Grosso. Viva safáris inesquecíveis guiados por biólogos locais.
+            {t("catalog.hero.subtitle")}
           </p>
           <div className="flex flex-wrap gap-4 justify-center text-[11px] uppercase tracking-[0.2em] font-semibold">
             <a href="#catalogo" className="bg-arara-yellow text-arara-black hover:bg-arara-orange px-6 py-3 rounded-none transition duration-200 shadow-sm flex items-center gap-2">
-              <Compass className="h-4 w-4" /> Explorar Catálogo
+              <Compass className="h-4 w-4" /> {t("catalog.hero.cta")}
+            </a>
+            <a href="#mapa" className="border border-[#F6EEDC]/60 text-[#FBF8F1] hover:bg-white/10 px-6 py-3 rounded-none transition duration-200 flex items-center gap-2">
+              <MapPin className="h-4 w-4" /> {t("catalog.hero.ctaMap")}
             </a>
           </div>
         </div>
@@ -355,9 +290,9 @@ export default function PousadaCatalog({
       <section id="catalogo" className="max-w-7xl mx-auto px-6 py-16 scroll-mt-10">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-6 gap-6">
           <div>
-            <span className="text-[10px] uppercase tracking-[0.3em] text-editorial-primary font-bold">Acomodações Exclusivas</span>
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">Nossas Pousadas Parceiras</h2>
-            <p className="text-editorial-muted text-xs mt-2 max-w-xl">Hospedagens selecionadas que respeitam o meio ambiente e promovem a conservação local.</p>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-editorial-primary font-bold">{t("catalog.kicker")}</span>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">{t("catalog.title")}</h2>
+            <p className="text-editorial-muted text-xs mt-2 max-w-xl">{t("catalog.subtitle")}</p>
           </div>
 
           {/* Location Filters — biomas mostrados como atalhos rápidos
@@ -374,7 +309,7 @@ export default function PousadaCatalog({
                     : "bg-white text-editorial-text hover:bg-editorial-secondary border-editorial-border"
                 }`}
               >
-                Todas as Regiões
+                {t("catalog.allRegions")}
               </button>
               {uniqueLocations.map((loc, idx) => (
                 <button
@@ -394,10 +329,10 @@ export default function PousadaCatalog({
             <select
               value={filterLocation}
               onChange={e => setFilterLocation(e.target.value)}
-              aria-label="Filtrar por estado, cidade ou região"
+              aria-label={t("catalog.filterRegion")}
               className="px-4 py-2.5 text-[10px] uppercase tracking-widest font-bold border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary cursor-pointer"
             >
-              <option value="all">Todas as Regiões</option>
+              <option value="all">{t("catalog.allRegions")}</option>
               {uniqueLocations.map((loc, idx) => (
                 <option key={idx} value={loc}>{loc}</option>
               ))}
@@ -415,23 +350,23 @@ export default function PousadaCatalog({
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar por nome, localização ou comodidade..."
-              aria-label="Buscar por nome, localização ou comodidade"
+              placeholder={t("catalog.search")}
+              aria-label={t("catalog.searchLabel")}
               className="w-full pl-9 pr-3 py-2.5 text-xs border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary"
             />
           </div>
 
           <div className="flex items-center gap-1.5 text-xs">
             <input
-              type="number" min={0} inputMode="numeric" placeholder="R$ mín."
-              aria-label="Preço mínimo por noite"
+              type="number" min={0} inputMode="numeric" placeholder={t("catalog.priceMin")}
+              aria-label={t("catalog.priceMinLabel")}
               value={priceMin} onChange={e => setPriceMin(e.target.value)}
               className="w-24 px-3 py-2.5 border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary"
             />
             <span className="text-editorial-muted">–</span>
             <input
-              type="number" min={0} inputMode="numeric" placeholder="R$ máx."
-              aria-label="Preço máximo por noite"
+              type="number" min={0} inputMode="numeric" placeholder={t("catalog.priceMax")}
+              aria-label={t("catalog.priceMaxLabel")}
               value={priceMax} onChange={e => setPriceMax(e.target.value)}
               className="w-24 px-3 py-2.5 border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary"
             />
@@ -440,13 +375,13 @@ export default function PousadaCatalog({
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as SortOption)}
-            aria-label="Ordenar por"
+            aria-label={t("catalog.sortBy")}
             className="px-4 py-2.5 text-xs uppercase tracking-widest font-bold border border-editorial-border bg-white rounded-full focus:outline-none focus:ring-1 focus:ring-editorial-primary cursor-pointer"
           >
-            <option value="relevance">Mais relevantes</option>
-            <option value="price-asc">Menor preço</option>
-            <option value="price-desc">Maior preço</option>
-            <option value="rating-desc">Melhor avaliadas</option>
+            <option value="relevance">{t("catalog.sort.relevance")}</option>
+            <option value="price-asc">{t("catalog.sort.priceAsc")}</option>
+            <option value="price-desc">{t("catalog.sort.priceDesc")}</option>
+            <option value="rating-desc">{t("catalog.sort.rating")}</option>
           </select>
 
           {hasActiveFilters && (
@@ -455,7 +390,7 @@ export default function PousadaCatalog({
               onClick={() => { setSearchQuery(""); setPriceMin(""); setPriceMax(""); setSortBy("relevance"); setFilterLocation("all"); }}
               className="text-editorial-muted hover:text-editorial-primary text-[10px] uppercase tracking-widest font-bold transition cursor-pointer whitespace-nowrap"
             >
-              Limpar filtros
+              {t("catalog.clearFilters")}
             </button>
           )}
         </div>
@@ -482,13 +417,13 @@ export default function PousadaCatalog({
                   className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
                 />
                 <div className="absolute top-4 left-4 bg-editorial-primary/95 text-[#FBF8F1] px-3 py-1 text-[9px] uppercase tracking-wider font-bold flex items-center gap-1 shadow-sm">
-                  <MapPin className="h-3 w-3" /> {pousada.location || "Localização não disponível"}
+                  <MapPin className="h-3 w-3" /> {pousada.location || t("catalog.locationUnknown")}
                 </div>
                 <div className="absolute top-4 right-4 bg-[#FBF8F1] text-editorial-text px-2.5 py-1 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-editorial-border">
                   {pousada.rating > 0 ? (
                     <><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> {pousada.rating}</>
                   ) : (
-                    <><Star className="h-3.5 w-3.5 text-editorial-muted" /> Novo</>
+                    <><Star className="h-3.5 w-3.5 text-editorial-muted" /> {t("common.new")}</>
                   )}
                 </div>
               </div>
@@ -498,20 +433,20 @@ export default function PousadaCatalog({
                 <div>
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <h3 className="text-2xl font-serif text-editorial-primary group-hover:text-editorial-primary/80 transition font-bold">
-                      {pousada.name || "Pousada Parceira"}
+                      {pousada.name || t("catalog.partnerFallback")}
                     </h3>
                     {pousada.verified && (
-                      <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" title="Pousada verificada pela nossa equipe">
-                        <BadgeCheck className="h-3 w-3" /> Verificada
+                      <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" title={t("catalog.verifiedTitle")}>
+                        <BadgeCheck className="h-3 w-3" /> {t("common.verified")}
                       </span>
                     )}
                   </div>
                   <p className="text-editorial-muted text-xs leading-relaxed mb-4 line-clamp-2">
-                    {pousada.description || "Sem descrição disponível."}
+                    {pousada.description || t("catalog.noDescription")}
                   </p>
                   {!!pousada.viewCount && pousada.viewCount > 0 && (
                     <p className="flex items-center gap-1.5 text-editorial-muted text-[10px] font-semibold mb-4 -mt-2">
-                      <Eye className="h-3 w-3" /> {pousada.viewCount} {pousada.viewCount === 1 ? "pessoa já visualizou" : "pessoas já visualizaram"} esta pousada
+                      <Eye className="h-3 w-3" /> {t(pousada.viewCount === 1 ? "catalog.views.one" : "catalog.views.other", { n: pousada.viewCount })}
                     </p>
                   )}
 
@@ -523,8 +458,8 @@ export default function PousadaCatalog({
                       </span>
                     ))}
                     {pousada.features && pousada.features.length > 3 && (
-                      <span className="text-editorial-dark-muted text-[9px] px-1 py-0.5 font-bold uppercase tracking-wider">
-                        +{pousada.features.length - 3} mais
+                      <span className="text-editorial-muted text-[9px] px-1 py-0.5 font-bold uppercase tracking-wider">
+                        {t("catalog.moreFeatures", { n: pousada.features.length - 3 })}
                       </span>
                     )}
                   </div>
@@ -533,15 +468,15 @@ export default function PousadaCatalog({
                 {/* Footer and CTA Actions */}
                 <div className="border-t border-editorial-border pt-4 flex items-center justify-between mt-auto">
                   <div>
-                    <span className="block text-editorial-dark-muted text-[9px] uppercase font-bold tracking-widest">A partir de</span>
-                    <span className="text-xl font-serif font-bold text-editorial-primary">R$ {pousada.pricePerNight}</span>
-                    <span className="text-editorial-muted text-xs">/noite</span>
+                    <span className="block text-editorial-muted text-[9px] uppercase font-bold tracking-widest">{t("catalog.from")}</span>
+                    <span className="text-xl font-serif font-bold text-editorial-primary">{formatMoney(pousada.pricePerNight)}</span>
+                    <span className="text-editorial-muted text-xs">{t("common.perNight")}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
+                    <button aria-label={t("catalog.videoCta")}
                       onClick={(e) => { e.stopPropagation(); onSelectVideo(pousada); }}
                       className="bg-editorial-beige hover:bg-editorial-border/60 text-editorial-primary p-2.5 rounded-none border border-editorial-border transition flex items-center gap-1 cursor-pointer"
-                      title="Saiba Mais (Vídeo do Safári)"
+                      title={t("catalog.videoCta")}
                     >
                       <PlayCircle className="h-4 w-4" />
                     </button>
@@ -549,7 +484,7 @@ export default function PousadaCatalog({
                       onClick={(e) => { e.stopPropagation(); onSelectPousada(pousada); }}
                       className="bg-editorial-primary hover:bg-editorial-primary/90 text-white px-4 py-2.5 rounded-none text-xs uppercase tracking-wider font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
                     >
-                      Detalhes <ChevronRight className="h-3 w-3" />
+                      {t("common.details")} <ChevronRight className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
@@ -566,12 +501,10 @@ export default function PousadaCatalog({
           <div className="text-center py-20 border border-dashed border-editorial-border bg-white/40">
             <Compass className="h-8 w-8 text-editorial-muted mx-auto mb-3" />
             <p className="text-editorial-text font-serif text-lg font-bold mb-1">
-              {pousadas.length === 0 ? "Nossas pousadas parceiras chegam em breve" : "Nenhuma pousada encontrada para este filtro"}
+              {pousadas.length === 0 ? t("catalog.empty.soonTitle") : t("catalog.empty.filterTitle")}
             </p>
             <p className="text-editorial-muted text-sm max-w-md mx-auto">
-              {pousadas.length === 0
-                ? "Estamos selecionando as melhores pousadas do Pantanal para você. Volte em breve para conferir o catálogo completo."
-                : "Tente ajustar a busca, o preço ou a localização — ou fale com a gente pelo WhatsApp para indicações personalizadas."}
+              {pousadas.length === 0 ? t("catalog.empty.soonText") : t("catalog.empty.filterText")}
             </p>
           </div>
         )}
@@ -581,7 +514,7 @@ export default function PousadaCatalog({
             nova requisição, não um corte de um array já carregado. */}
         {catalogTotalPages > 1 && (
           <div className="flex items-center justify-between gap-3 mt-8 pt-6 border-t border-editorial-border text-[11px] uppercase tracking-widest font-bold text-editorial-muted">
-            <span>Página {catalogPage} de {catalogTotalPages} · {catalogTotal} {catalogTotal === 1 ? "pousada" : "pousadas"}</span>
+            <span>{t("catalog.pagination", { page: catalogPage, pages: catalogTotalPages, total: catalogTotal, unit: t(catalogTotal === 1 ? "catalog.unit.one" : "catalog.unit.other") })}</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -589,7 +522,7 @@ export default function PousadaCatalog({
                 onClick={() => { setCatalogPage(p => Math.max(1, p - 1)); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
                 className="flex items-center gap-1 border border-editorial-border rounded-full px-4 py-2 hover:bg-editorial-secondary disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
               >
-                <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                <ChevronLeft className="h-3.5 w-3.5" /> {t("common.previous")}
               </button>
               <button
                 type="button"
@@ -597,12 +530,16 @@ export default function PousadaCatalog({
                 onClick={() => { setCatalogPage(p => Math.min(catalogTotalPages, p + 1)); document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
                 className="flex items-center gap-1 border border-editorial-border rounded-full px-4 py-2 hover:bg-editorial-secondary disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
               >
-                Próxima <ChevronRight className="h-3.5 w-3.5" />
+                {t("common.next")} <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
         )}
       </section>
+      </ErrorBoundary>
+
+      <ErrorBoundary variant="section" sectionLabel="os pacotes">
+        <PacotesSection />
       </ErrorBoundary>
 
       {/* Atrações Parceiras & Nossos Guias — public discovery for the other
@@ -615,9 +552,9 @@ export default function PousadaCatalog({
           {atracoes.length > 0 && (
             <div>
               <div className="text-center mb-10">
-                <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold">Ecossistema EcoSafari</span>
-                <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">Atrações Parceiras</h2>
-                <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">Paradas legais e restaurantes selecionados para completar sua experiência no Pantanal.</p>
+                <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold">{t("catalog.ecosystem")}</span>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">{t("catalog.attractions.title")}</h2>
+                <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">{t("catalog.attractions.subtitle")}</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {atracoes.map(atracao => (
@@ -633,7 +570,7 @@ export default function PousadaCatalog({
                         <div className="w-full h-full flex items-center justify-center text-editorial-muted"><UtensilsCrossed className="h-8 w-8" /></div>
                       )}
                       <span className="absolute top-3 left-3 bg-white/95 text-editorial-primary text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full">
-                        {atracao.type === "restaurante" ? "Restaurante" : "Parada Legal"}
+                        {atracao.type === "restaurante" ? t("catalog.attraction.restaurant") : t("catalog.attraction.stop")}
                       </span>
                       {atracao.verified && (
                         <span className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-500/90 text-white text-[9px] uppercase tracking-widest font-bold px-2 py-1 rounded-full"><BadgeCheck className="h-3 w-3" /></span>
@@ -646,7 +583,7 @@ export default function PousadaCatalog({
                         {atracao.rating > 0 ? (
                           <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {atracao.rating}</span>
                         ) : (
-                          <span className="flex items-center gap-1"><Star className="h-3 w-3" /> Novo</span>
+                          <span className="flex items-center gap-1"><Star className="h-3 w-3" /> {t("common.new")}</span>
                         )}
                       </div>
                     </div>
@@ -659,9 +596,9 @@ export default function PousadaCatalog({
           {guiasPublicos.length > 0 && (
             <div>
               <div className="text-center mb-10">
-                <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold">Ecossistema EcoSafari</span>
-                <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">Nossos Guias</h2>
-                <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">Conheça os guias locais que conduzem as expedições — cada um com seu próprio perfil.</p>
+                <span className="text-editorial-primary text-[11px] uppercase tracking-[0.2em] font-bold">{t("catalog.ecosystem")}</span>
+                <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-text mt-2">{t("catalog.guides.title")}</h2>
+                <p className="text-editorial-muted text-sm mt-2 max-w-xl mx-auto">{t("catalog.guides.subtitle")}</p>
               </div>
               {/* flex-wrap + justify-center (not a plain grid) so an odd
                   leftover card on the last row centers itself instead of
@@ -689,7 +626,7 @@ export default function PousadaCatalog({
                     )}
                     <h3 className="font-serif font-bold text-editorial-text text-sm group-hover:text-editorial-primary transition">{guia.name}</h3>
                     <p className="text-editorial-muted text-[11px] mt-0.5 flex items-center justify-center gap-1">
-                      {guia.rating ? <><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {guia.rating}</> : <><Star className="h-3 w-3" /> Novo</>}
+                      {guia.rating ? <><Star className="h-3 w-3 fill-amber-500 text-amber-500" /> {guia.rating}</> : <><Star className="h-3 w-3" /> {t("common.new")}</>}
                     </p>
                     {guia.bio && (
                       <p className="text-editorial-muted text-[11px] mt-1 line-clamp-2 leading-snug">{guia.bio}</p>
@@ -714,13 +651,13 @@ export default function PousadaCatalog({
           {/* Section Header */}
           <div className="text-center mb-16 max-w-3xl mx-auto">
             <span className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3 block">
-              EXPEDIÇÃO FOTOGRÁFICA
+              {t("species.kicker")}
             </span>
             <h2 className="text-3xl md:text-5xl font-serif font-bold text-white tracking-tight leading-tight">
-              Veja o que você tem a chance de avistar em um passeio conosco
+              {t("species.title")}
             </h2>
             <p className="text-zinc-400 text-xs md:text-sm mt-4 font-light leading-relaxed max-w-2xl mx-auto">
-              Use as setas ou deslize para o lado para conhecer as espécies mais icônicas que encontramos diariamente nos rios do Mato Grosso.
+              {t("species.subtitle")}
             </p>
           </div>
 
@@ -734,7 +671,7 @@ export default function PousadaCatalog({
             <button
               onClick={scrollSpeciesLeft}
               className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0A1133]/85 hover:bg-amber-500 hover:text-[#0A1133] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
-              aria-label="Anterior"
+              aria-label={t("common.previous")}
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
@@ -743,7 +680,7 @@ export default function PousadaCatalog({
             <button
               onClick={scrollSpeciesRight}
               className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0A1133]/85 hover:bg-amber-500 hover:text-[#0A1133] hover:border-amber-500 text-amber-500 flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
-              aria-label="Próximo"
+              aria-label={t("common.next")}
             >
               <ChevronRight className="h-6 w-6" />
             </button>
@@ -795,7 +732,7 @@ export default function PousadaCatalog({
                           onClick={() => setSelectedSpecies(specie)}
                           className="text-amber-500 hover:text-amber-400 transition flex items-center gap-1 cursor-pointer font-bold uppercase tracking-wider"
                         >
-                          Quero Ver <ChevronRight className="h-3.5 w-3.5" />
+                          {t("species.cta")} <ChevronRight className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </div>
@@ -810,6 +747,28 @@ export default function PousadaCatalog({
       </section>
       </ErrorBoundary>
 
+      <ErrorBoundary variant="section" sectionLabel="o calendário de melhor época">
+        <SeasonCalendarSection
+          species={displaySpecies}
+          onOpenSpecies={id => setSelectedSpecies(displaySpecies.find(s => s.id === id) || null)}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary variant="section" sectionLabel="o mapa">
+        <section id="mapa" className="bg-white py-20 border-t border-editorial-border scroll-mt-10">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-10">
+              <span className="text-[10px] uppercase tracking-[0.3em] text-editorial-primary font-bold">{t("map.kicker")}</span>
+              <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">{t("map.title")}</h2>
+              <p className="text-editorial-muted text-xs mt-2">{t("map.subtitle")}</p>
+            </div>
+            <Suspense fallback={<div className="h-[520px] flex items-center justify-center border border-editorial-border text-editorial-muted text-xs">{t("map.loading")}</div>}>
+              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} />
+            </Suspense>
+          </div>
+        </section>
+      </ErrorBoundary>
+
       {/* App Promotion & Interactive Simulator Section */}
       <section className="bg-gradient-to-br from-[#0e120f] via-[#161d18] to-[#0e120f] text-white py-20 border-t border-white/5 relative overflow-hidden">
         {/* Background ambient light */}
@@ -821,38 +780,36 @@ export default function PousadaCatalog({
           {/* Left Column: Advertising Copy */}
           <div className="lg:col-span-7 flex flex-col justify-center text-left">
             <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight mb-6 text-balance text-white">
-              Baixe o App Oficial <br className="hidden md:inline" />
+              {t("promo.title")} <br className="hidden md:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400">
                 EcoSafari Go
               </span>
             </h2>
             <p className="text-zinc-300 text-xs md:text-sm leading-relaxed mb-8 font-light max-w-xl">
-              Maximize sua expedição no Pantanal com nosso aplicativo exclusivo para hóspedes. 
-              Monitore avistamentos de animais ao vivo, faça check-in autônomo por GPS e receba 
-              alertas ecológicos de extrema relevância emitidos pelos nossos guias e biólogos credenciados.
+              {t("promo.text")}
             </p>
 
             {/* Feature list */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 max-w-2xl">
               <div className="bg-[#1A201C]/60 border border-white/5 p-4 rounded-none">
                 <span className="text-lg mb-2 block">📸</span>
-                <h4 className="font-serif font-semibold text-white text-xs mb-1">Feed de Fauna</h4>
+                <h4 className="font-serif font-semibold text-white text-xs mb-1">{t("promo.feed.title")}</h4>
                 <p className="text-zinc-400 text-[10px] leading-relaxed">
-                  Poste e veja fotos de animais avistados em tempo real na região.
+                  {t("promo.feed.text")}
                 </p>
               </div>
               <div className="bg-[#1A201C]/60 border border-white/5 p-4 rounded-none">
                 <span className="text-lg mb-2 block">🛰️</span>
-                <h4 className="font-serif font-semibold text-white text-xs mb-1">Check-in Satélite</h4>
+                <h4 className="font-serif font-semibold text-white text-xs mb-1">{t("promo.checkin.title")}</h4>
                 <p className="text-zinc-400 text-[10px] leading-relaxed">
-                  Homologue sua chegada fisicamente via geofencing sem pegar filas.
+                  {t("promo.checkin.text")}
                 </p>
               </div>
               <div className="bg-[#1A201C]/60 border border-white/5 p-4 rounded-none">
                 <span className="text-lg mb-2 block">🚨</span>
-                <h4 className="font-serif font-semibold text-white text-xs mb-1">Alertas Ecológicos</h4>
+                <h4 className="font-serif font-semibold text-white text-xs mb-1">{t("promo.alerts.title")}</h4>
                 <p className="text-zinc-400 text-[10px] leading-relaxed">
-                  Avisos sonoros imediatos de onças e animais vistos nos arredores.
+                  {t("promo.alerts.text")}
                 </p>
               </div>
             </div>
@@ -863,7 +820,7 @@ export default function PousadaCatalog({
                 href="#download-ios"
                 onClick={(e) => {
                   e.preventDefault();
-                  showToast("Simulação de download iniciada! O arquivo .IPA do EcoSafari Go seria baixado no seu iPhone.", "info");
+                  showToast(t("promo.iosToast"), "info");
                 }}
                 className="flex items-center gap-3 bg-black hover:bg-zinc-900 border border-white/10 px-5 py-2.5 rounded-xl transition shadow-lg group shrink-0"
               >
@@ -880,7 +837,7 @@ export default function PousadaCatalog({
                 href="#download-android"
                 onClick={(e) => {
                   e.preventDefault();
-                  showToast("Simulação de download iniciada! O arquivo .APK do EcoSafari Go para Android foi gerado com sucesso.", "info");
+                  showToast(t("promo.androidToast"), "info");
                 }}
                 className="flex items-center gap-3 bg-black hover:bg-zinc-900 border border-white/10 px-5 py-2.5 rounded-xl transition shadow-lg group shrink-0"
               >
@@ -934,7 +891,7 @@ export default function PousadaCatalog({
 
             {/* Float badge */}
             <div className="absolute -bottom-4 bg-emerald-500 text-black text-[9px] font-bold uppercase tracking-widest px-4 py-1.5 shadow-xl rotate-1">
-              ✓ SIMULAÇÃO INTERATIVA 100% REAL
+              {t("promo.badge")}
             </div>
           </div>
 
@@ -943,14 +900,14 @@ export default function PousadaCatalog({
 
       {/* Species Detail Modal */}
       {selectedSpecies && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-6 z-50 animate-fadeIn">
+        <div role="dialog" aria-modal="true" aria-label={selectedSpecies.name} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-6 z-50 animate-fadeIn">
           <div className="bg-[#0A1133] text-[#FBF8F1] border border-white/10 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
             
             {/* Close Button */}
             <button
               onClick={() => setSelectedSpecies(null)}
               className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#0A1133] border border-white/10 text-[#FBF8F1] p-2 rounded-full transition cursor-pointer"
-              aria-label="Fechar"
+              aria-label={t("common.close")}
             >
               <X className="h-5 w-5" />
             </button>
@@ -988,16 +945,22 @@ export default function PousadaCatalog({
                 </span>
                 
                 <h4 className="text-xs uppercase font-bold tracking-widest text-zinc-400 mb-2">
-                  História Natural & Comportamento
+                  {t("species.naturalHistory")}
                 </h4>
                 <p className="text-zinc-300 text-xs md:text-sm leading-relaxed font-light mb-6">
                   {selectedSpecies.details}
                 </p>
 
+                {selectedSpecies.season && (
+                  <div className="mb-6">
+                    <SpeciesSeasonCalendar season={selectedSpecies.season} pousadaId={selectedSpecies.bestPousadaId} variant="dark" />
+                  </div>
+                )}
+
                 {/* Best Lodge Card */}
                 <div className="bg-[#1A201C] border border-white/5 p-4 rounded-none mb-6">
                   <span className="text-amber-500 text-[9px] font-bold uppercase tracking-widest block mb-1">
-                    ONDE AVISTAR ESTA ESPÉCIE
+                    {t("species.whereToSee")}
                   </span>
                   <div className="flex justify-between items-center">
                     <div>
@@ -1005,7 +968,7 @@ export default function PousadaCatalog({
                         {selectedSpecies.bestPousadaName}
                       </h5>
                       <span className="text-xs text-zinc-400">
-                        Pousada com maior taxa de sucesso de rastreamento
+                        {t("species.bestLodgeNote")}
                       </span>
                     </div>
                   </div>
@@ -1024,7 +987,7 @@ export default function PousadaCatalog({
                   }}
                   className="flex-1 bg-white hover:bg-amber-500 hover:text-[#0A1133] text-[#0A1133] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
                 >
-                  Conhecer Pousada Ideal
+                  {t("species.visitLodge")}
                 </button>
                 <button
                   onClick={() => {
@@ -1036,7 +999,7 @@ export default function PousadaCatalog({
                   }}
                   className="flex-1 bg-transparent hover:bg-white/5 border border-white/20 text-[#FBF8F1] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition text-center cursor-pointer"
                 >
-                  Solicitar Guia Especializado
+                  {t("species.requestGuide")}
                 </button>
               </div>
 
@@ -1048,15 +1011,15 @@ export default function PousadaCatalog({
 
       {/* Reviews Section */}
       <ErrorBoundary variant="section" sectionLabel="as avaliações">
-      <section className="bg-editorial-primary text-white py-20 border-t border-editorial-border">
+      <section id="avaliacoes" className="bg-editorial-primary text-white py-20 border-t border-editorial-border scroll-mt-10">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12">
           
           {/* Write a review column */}
           <div className="lg:col-span-5 flex flex-col justify-center">
-            <span className="text-[#F6EEDC] font-bold uppercase text-[9px] tracking-[0.3em] mb-2 inline-block">Sua opinião importa</span>
-            <h2 className="text-3xl md:text-4xl font-serif font-bold tracking-tight mb-4 text-balance">O que nossos aventureiros andam dizendo</h2>
+            <span className="text-[#F6EEDC] font-bold uppercase text-[9px] tracking-[0.3em] mb-2 inline-block">{t("reviews.kicker")}</span>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold tracking-tight mb-4 text-balance">{t("reviews.title")}</h2>
             <p className="text-[#F6EEDC]/80 text-xs leading-relaxed mb-6 font-light">
-              Todos os relatos ao lado vêm de hóspedes reais que viveram expedições de conservação em nossas pousadas parceiras. Escreva sua avaliação e ajude outros viajantes!
+              {t("reviews.text")}
             </p>
 
             {/* Avaliar exige perfil de turista — sem ele, mostramos um
@@ -1068,30 +1031,31 @@ export default function PousadaCatalog({
             ) : !isTourist ? (
               <div className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border text-center space-y-3">
                 <Lock className="h-6 w-6 text-editorial-muted mx-auto" />
-                <h3 className="font-serif font-bold text-editorial-primary text-lg">Crie seu perfil para avaliar</h3>
-                <p className="text-editorial-muted text-xs leading-relaxed">Para avaliar uma pousada, você precisa ter um perfil de turista EcoSafari — é rápido e gratuito.</p>
+                <h3 className="font-serif font-bold text-editorial-primary text-lg">{t("reviews.createTitle")}</h3>
+                <p className="text-editorial-muted text-xs leading-relaxed">{t("reviews.createText")}</p>
                 <button
                   type="button"
                   onClick={() => navigate("/turista")}
                   className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
                 >
-                  Criar perfil / Entrar
+                  {t("reviews.createCta")}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmitReview} className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border space-y-4">
                 {reviewSuccess && (
                   <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 p-3 rounded-none text-xs text-center font-bold">
-                    ✓ Avaliação enviada com sucesso e nota recalculada!
+                    {t("reviews.success")}
                   </div>
                 )}
                 {touristProfile && (
-                  <p className="text-editorial-muted text-[11px]">Avaliando como <span className="font-semibold text-editorial-text">{touristProfile.name}</span></p>
+                  <p className="text-editorial-muted text-[11px]">{t("reviews.as")} <span className="font-semibold text-editorial-text">{touristProfile.name}</span></p>
                 )}
 
                 <div>
-                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Qual pousada você visitou?</label>
+                  <label htmlFor="review-pousada" className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">{t("reviews.whichLodge")}</label>
                   <select
+                    id="review-pousada"
                     value={selectedPousadaForReview}
                     onChange={e => setSelectedPousadaForReview(e.target.value)}
                     className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
@@ -1103,10 +1067,10 @@ export default function PousadaCatalog({
                 </div>
 
                 <div>
-                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Sua Nota</label>
-                  <div className="flex items-center gap-1 mt-1">
+                  <span id="review-rating-label" className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">{t("reviews.yourRating")}</span>
+                  <div className="flex items-center gap-1 mt-1" role="radiogroup" aria-labelledby="review-rating-label">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <button
+                      <button aria-label={t("reviews.ratingLabel", { n: star })} role="radio" aria-checked={ratingInput === star}
                         type="button"
                         key={star}
                         onClick={() => setRatingInput(star)}
@@ -1119,27 +1083,29 @@ export default function PousadaCatalog({
                 </div>
 
                 <div>
-                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Sua Avaliação</label>
+                  <label htmlFor="review-comment" className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">{t("reviews.yourReview")}</label>
                   <textarea
+                    id="review-comment"
                     value={commentInput}
                     onChange={e => setCommentInput(e.target.value)}
                     required
                     rows={3}
-                    placeholder="Conte como foi sua expedição, a pousada, os guias turísticos..."
+                    placeholder={t("reviews.placeholder")}
                     className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary resize-none"
                   ></textarea>
                 </div>
 
                 <div>
-                  <label className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">Link de uma Foto Sua na Expedição (opcional)</label>
+                  <label htmlFor="review-photo" className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">{t("reviews.photoLabel")}</label>
                   <input
+                    id="review-photo"
                     type="url"
                     value={photoUrlInput}
                     onChange={e => setPhotoUrlInput(e.target.value)}
-                    placeholder="https://... (cole o link de uma foto real sua no passeio)"
+                    placeholder={t("reviews.photoPlaceholder")}
                     className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
                   />
-                  <p className="text-editorial-muted text-[9px] mt-1">Depoimentos com foto real ajudam outros viajantes a confiar mais na experiência.</p>
+                  <p className="text-editorial-muted text-[9px] mt-1">{t("reviews.photoHint")}</p>
                 </div>
 
                 {reviewError && <p className="text-red-600 text-xs font-medium">{reviewError}</p>}
@@ -1149,7 +1115,7 @@ export default function PousadaCatalog({
                   className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
                   disabled={submittingReview}
                 >
-                  {submittingReview ? "Enviando..." : "Enviar Avaliação"}
+                  {submittingReview ? t("reviews.sending") : t("reviews.submit")}
                 </button>
               </form>
             )}
@@ -1160,8 +1126,8 @@ export default function PousadaCatalog({
             {reviews.length === 0 && (
               <div className="text-center py-16 border border-dashed border-editorial-border">
                 <Star className="h-7 w-7 text-editorial-muted mx-auto mb-3" />
-                <p className="text-editorial-text font-serif font-bold mb-1">Seja o primeiro a avaliar</p>
-                <p className="text-editorial-muted text-xs max-w-xs mx-auto">Ainda não recebemos avaliações — a sua pode ser a primeira a aparecer aqui ao lado.</p>
+                <p className="text-editorial-text font-serif font-bold mb-1">{t("reviews.emptyTitle")}</p>
+                <p className="text-editorial-muted text-xs max-w-xs mx-auto">{t("reviews.emptyText")}</p>
               </div>
             )}
             {reviews.map((review) => {
@@ -1173,7 +1139,7 @@ export default function PousadaCatalog({
               const matchedA = review.atracaoId ? atracoes.find(a => a.id === review.atracaoId) : undefined;
               const matchedG = review.guideId ? guiasPublicos.find(g => g.id === review.guideId) : undefined;
 
-              const targetLabel = matchedP ? `Pousada ${matchedP.name}` : matchedA ? `Atração ${matchedA.name}` : matchedG ? `Guia ${matchedG.name}` : null;
+              const targetLabel = matchedP ? t("reviews.target.pousada", { name: matchedP.name }) : matchedA ? t("reviews.target.atracao", { name: matchedA.name }) : matchedG ? t("reviews.target.guia", { name: matchedG.name }) : null;
               const handleOpenTarget = () => {
                 if (matchedP) onSelectPousada(matchedP);
                 else if (matchedA) navigate(`/atracoes/${matchedA.id}`);
@@ -1202,9 +1168,9 @@ export default function PousadaCatalog({
                           <button
                             onClick={handleOpenTarget}
                             className="text-[9px] text-editorial-muted hover:text-editorial-primary font-bold uppercase tracking-widest mt-0.5 block transition cursor-pointer"
-                            title="Ver perfil completo"
+                            title={t("reviews.viewProfile")}
                           >
-                            avaliou {targetLabel}
+                            {t("reviews.reviewed", { target: targetLabel })}
                           </button>
                         )}
                       </div>
@@ -1218,7 +1184,7 @@ export default function PousadaCatalog({
                   <p className="text-editorial-muted text-xs leading-relaxed italic font-serif">
                     "{review.comment}"
                   </p>
-                  <span className="text-editorial-dark-muted text-[9px] font-mono block mt-4 text-right">{review.date}</span>
+                  <span className="text-editorial-muted text-[9px] font-mono block mt-4 text-right">{review.date}</span>
                 </div>
               );
             })}
@@ -1232,9 +1198,9 @@ export default function PousadaCatalog({
       <section id="faq" className="bg-white py-20 border-t border-editorial-border">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-12">
-            <span className="text-[10px] uppercase tracking-[0.3em] text-editorial-primary font-bold">Dúvidas Comuns</span>
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">Perguntas Frequentes</h2>
-            <p className="text-editorial-muted text-xs mt-2">Tudo o que você precisa saber para planejar sua jornada de conservação e aventura.</p>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-editorial-primary font-bold">{t("faq.kicker")}</span>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">{t("faq.title")}</h2>
+            <p className="text-editorial-muted text-xs mt-2">{t("faq.subtitle")}</p>
           </div>
 
           <div className="space-y-4">
@@ -1244,6 +1210,8 @@ export default function PousadaCatalog({
                 <div key={index} className="border-b border-editorial-border pb-4">
                   <button
                     onClick={() => setOpenFaq(isOpen ? null : index)}
+                    aria-expanded={isOpen}
+                    aria-controls={`faq-answer-${index}`}
                     className="w-full flex justify-between items-center text-left py-4 focus:outline-none group cursor-pointer"
                   >
                     <span className="font-serif font-bold text-base md:text-lg text-editorial-primary group-hover:text-editorial-primary/80 transition duration-150">
@@ -1254,6 +1222,8 @@ export default function PousadaCatalog({
                     </span>
                   </button>
                   <div
+                    id={`faq-answer-${index}`}
+                    hidden={!isOpen}
                     className={`overflow-hidden transition-all duration-300 ${
                       isOpen ? "max-h-[500px] opacity-100 mt-2" : "max-h-0 opacity-0"
                     }`}

@@ -1,4 +1,5 @@
 import React from "react";
+import PictureImg from "./PictureImg";
 
 interface Highlight {
   image: string;
@@ -45,7 +46,7 @@ export default function PousadaHighlights({ pousadaId }: { pousadaId: string }) 
         return (
           <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div className={`aspect-[4/3] overflow-hidden border border-editorial-border ${imageFirst ? "md:order-1" : "md:order-2"}`}>
-              <img
+              <PictureImg
                 src={h.image}
                 alt={h.title}
                 referrerPolicy="no-referrer"

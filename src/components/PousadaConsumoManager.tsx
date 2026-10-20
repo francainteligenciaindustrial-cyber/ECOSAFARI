@@ -195,7 +195,7 @@ export default function PousadaConsumoManager({ pousadaId, bookingId, guestName 
                     type="number" min={1} value={quantity} onChange={e => setQuantity(e.target.value)}
                     className="w-16 border border-editorial-border rounded-md p-2 text-xs focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                   />
-                  <button type="button"
+                  <button aria-label="Adicionar consumo" type="button"
                     onClick={() => manualProdutoId && handleAddConsumo(manualProdutoId)}
                     disabled={!manualProdutoId || adding}
                     className="bg-editorial-secondary border border-editorial-border text-editorial-text text-xs font-bold px-3 py-2 rounded-md disabled:opacity-60 cursor-pointer flex items-center gap-1"
@@ -217,7 +217,7 @@ export default function PousadaConsumoManager({ pousadaId, bookingId, guestName 
                           {c.status === "pago" ? (
                             <span className="text-emerald-700 text-[9px] uppercase font-bold flex items-center gap-1"><Check className="h-3 w-3" /> Pago</span>
                           ) : (
-                            <button type="button" onClick={() => handleRemove(c.id)} className="text-editorial-muted hover:text-red-600 cursor-pointer"><Trash2 className="h-3 w-3" /></button>
+                            <button aria-label="Remover consumo" type="button" onClick={() => handleRemove(c.id)} className="text-editorial-muted hover:text-red-600 cursor-pointer"><Trash2 className="h-3 w-3" /></button>
                           )}
                         </div>
                       </div>

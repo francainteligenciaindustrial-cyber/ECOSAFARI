@@ -163,7 +163,7 @@ export default function AdminYearCalendarPanel({ bookings, pousadas }: Props) {
         <div className="bg-editorial-secondary/40 border border-editorial-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-bold text-editorial-text">{new Date(`${selectedDate}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</h4>
-            <button onClick={() => setSelectedDate(null)} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
+            <button aria-label="Fechar" onClick={() => setSelectedDate(null)} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
               <X className="h-4 w-4" />
             </button>
           </div>

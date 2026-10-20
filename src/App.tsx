@@ -16,6 +16,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { isAdminUser, isTouristUser, isPartnerUser } from "./lib/authRoles";
 import { useRoute, navigate } from "./lib/router";
+import { useI18n } from "./i18n/I18nProvider";
+import InstallPrompt from "./components/InstallPrompt";
+import { useCustomSite } from "./lib/useCustomSite";
 import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./types";
 
 // Code-split: AdminDashboard (~2000 lines) is dead weight in the bundle for
@@ -76,6 +79,8 @@ const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
 
 export default function App() {
   const path = useRoute();
+  const { t } = useI18n();
+  const customSite = useCustomSite();
   const [currentModule, setCurrentModule] = useState<"portal" | "admin">("portal");
   const [isMobileNative, setIsMobileNative] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -253,6 +258,20 @@ export default function App() {
     openWhatsAppGate(pousada);
   };
 
+  // Domínio próprio de pousada (ex.: pousadavagalume.com): a raiz mostra o
+  // site oficial dela; qualquer outra página (reserva, conta, pagamento)
+  // continua no domínio principal do EcoSafari.
+  if (customSite === undefined) {
+    return <LazyFallback />;
+  }
+  if (customSite) {
+    if (path === "/" || path === `/site/${customSite.slug}`) {
+      return <PousadaOfficialSite slug={customSite.slug} mainUrl={customSite.mainUrl} />;
+    }
+    window.location.replace(`${customSite.mainUrl}${path}${window.location.search}`);
+    return <LazyFallback />;
+  }
+
   if (StandalonePage) {
     return (
       <Suspense fallback={<LazyFallback />}>
@@ -328,6 +347,7 @@ export default function App() {
     <div className="min-h-screen bg-editorial-bg flex flex-col font-sans text-editorial-text">
       
       {/* Top Demo Header & Nav (Editorial Aesthetic) */}
+      <a href="#conteudo" className="skip-link">{t("app.skip")}</a>
       <header className="arara-edge-bottom h-20 bg-editorial-bg flex items-center justify-between px-6 md:px-10 z-30 select-none">
         
         {/* Brand logo */}
@@ -359,8 +379,21 @@ export default function App() {
                 : "border-transparent hover:text-editorial-text"
             }`}
           >
-            Portal
+            {t("app.portal")}
           </button>
+          <a
+            href="/#mapa"
+            onClick={e => {
+              e.preventDefault();
+              setCurrentModule("portal");
+              setPortalView("catalog");
+              if (path !== "/") navigate("/");
+              setTimeout(() => document.getElementById("mapa")?.scrollIntoView({ behavior: "smooth" }), 50);
+            }}
+            className="transition duration-200 pb-1 border-b-2 border-transparent hover:text-editorial-text"
+          >
+            {t("app.map")}
+          </a>
           {isAdmin && (
             <button
               onClick={() => setCurrentModule("admin")}
@@ -370,7 +403,7 @@ export default function App() {
                   : "border-transparent hover:text-editorial-text"
               }`}
             >
-              Gestão
+              {t("app.admin")}
             </button>
           )}
         </div>
@@ -389,7 +422,7 @@ export default function App() {
           <button
             onClick={() => setShowMobileMenu(v => !v)}
             className="md:hidden text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-            aria-label={showMobileMenu ? "Fechar menu" : "Abrir menu"}
+            aria-label={showMobileMenu ? t("app.closeMenu") : t("app.openMenu")}
             aria-expanded={showMobileMenu}
           >
             {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -404,31 +437,31 @@ export default function App() {
             <button
               onClick={handleAdminLogout}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-              title="Sair do modo administrador"
-              aria-label="Sair do modo administrador"
+              title={t("app.logoutAdmin")}
+              aria-label={t("app.logoutAdmin")}
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Sair</span>
+              <span className="hidden md:inline">{t("app.logout")}</span>
             </button>
           ) : isTouristSession ? null : isPartnerSession ? (
             <button
               onClick={() => navigate("/parceiro")}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-              title="Meu painel de parceiro"
-              aria-label="Meu painel de parceiro"
+              title={t("app.partnerPanelTitle")}
+              aria-label={t("app.partnerPanelTitle")}
             >
               <User className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Meu Painel</span>
+              <span className="hidden md:inline">{t("app.partnerPanel")}</span>
             </button>
           ) : (
             <button
               onClick={() => navigate("/entrar")}
               className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-              title="Entrar"
-              aria-label="Entrar"
+              title={t("app.login")}
+              aria-label={t("app.login")}
             >
               <User className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Entrar</span>
+              <span className="hidden md:inline">{t("app.login")}</span>
             </button>
           )}
         </div>
@@ -447,14 +480,14 @@ export default function App() {
             }}
             className={`text-left text-xs uppercase tracking-widest font-bold cursor-pointer ${currentModule === "portal" ? "text-editorial-primary" : "text-editorial-muted"}`}
           >
-            Portal
+            {t("app.portal")}
           </button>
           {isAdmin && (
             <button
               onClick={() => { setCurrentModule("admin"); setShowMobileMenu(false); }}
               className={`text-left text-xs uppercase tracking-widest font-bold cursor-pointer ${currentModule === "admin" ? "text-editorial-primary" : "text-editorial-muted"}`}
             >
-              Gestão
+              {t("app.admin")}
             </button>
           )}
           <div className="pt-2 border-t border-editorial-border">
@@ -464,11 +497,11 @@ export default function App() {
       )}
 
       {/* MAIN LAYOUT */}
-      <main className="flex-1 bg-editorial-secondary">
+      <main id="conteudo" tabIndex={-1} className="flex-1 bg-editorial-secondary focus:outline-none">
         {loading ? (
           <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3 bg-editorial-bg">
             <div className="w-10 h-10 border-2 border-editorial-primary border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-editorial-muted text-xs uppercase tracking-widest font-bold animate-pulse">Carregando ecossistema EcoSafari...</p>
+            <p className="text-editorial-muted text-xs uppercase tracking-widest font-bold animate-pulse">{t("app.loading")}</p>
           </div>
         ) : (
           <>
@@ -591,7 +624,7 @@ export default function App() {
           <div className="text-center md:text-right text-[9px] text-[#FBF8F1]/60 font-bold">
             <span className="block mb-1">© 2026 EcoSafari Brasil • WildStay Systems</span>
             <span className="text-editorial-dark-muted font-normal italic font-serif tracking-normal capitalize text-xs block mt-1">
-              Conservação e Turismo Sustentável
+              {t("app.footer.tagline")}
             </span>
           </div>
 
@@ -599,11 +632,11 @@ export default function App() {
 
         {/* Institutional links */}
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-white/10 text-[9px] text-[#FBF8F1]/70 font-bold">
-          <a href="/sobre" onClick={(e) => { e.preventDefault(); navigate("/sobre"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Sobre Nós</a>
-          <a href="/faq" onClick={(e) => { e.preventDefault(); navigate("/faq"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Perguntas Frequentes</a>
-          <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Política de Privacidade</a>
-          <a href="/termos" onClick={(e) => { e.preventDefault(); navigate("/termos"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Termos de Uso e Cancelamento</a>
-          <a href="/status-candidatura" onClick={(e) => { e.preventDefault(); navigate("/status-candidatura"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">Status da Candidatura</a>
+          <a href="/sobre" onClick={(e) => { e.preventDefault(); navigate("/sobre"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.about")}</a>
+          <a href="/faq" onClick={(e) => { e.preventDefault(); navigate("/faq"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.faq")}</a>
+          <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.privacy")}</a>
+          <a href="/termos" onClick={(e) => { e.preventDefault(); navigate("/termos"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.terms")}</a>
+          <a href="/status-candidatura" onClick={(e) => { e.preventDefault(); navigate("/status-candidatura"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.candidate")}</a>
         </div>
 
         {/* Institutional identity — required for a public booking/payment
@@ -616,6 +649,7 @@ export default function App() {
       </footer>
 
       <CookieConsentBanner />
+      <InstallPrompt />
     </div>
   );
 }

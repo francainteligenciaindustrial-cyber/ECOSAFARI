@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Globe, Check } from "lucide-react";
+import { useI18n, LANG_KEY, Lang, SUPPORTED_LANGS } from "../i18n/I18nProvider";
 
-const LANG_KEY = "ecosafari_lang";
-
+// pt/en/es: tradução própria (src/i18n). de/fr: ainda pelo Google Tradutor
+// por cima do português, marcados como "tradução automática".
 const LANGS = [
-  { code: "pt", label: "Português" },
-  { code: "en", label: "English" },
-  { code: "es", label: "Español" },
-  { code: "de", label: "Deutsch" },
-  { code: "fr", label: "Français" },
+  { code: "pt", label: "Português", native: true },
+  { code: "en", label: "English", native: true },
+  { code: "es", label: "Español", native: true },
+  { code: "de", label: "Deutsch", native: false },
+  { code: "fr", label: "Français", native: false },
 ];
+
+const isNative = (code: string): code is Lang => (SUPPORTED_LANGS as string[]).includes(code);
 
 declare global {
   interface Window {
@@ -90,18 +93,20 @@ function waitForTranslateSelect(onFound: (select: HTMLSelectElement) => void, on
 // localStorage (for our UI) and the googtrans cookie (drives the actual
 // translation on every subsequent page load, including new tabs).
 export default function LanguageSwitcher() {
+  const { t, lang, setLang } = useI18n();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState<string>(() => {
     try {
-      return localStorage.getItem(LANG_KEY) || "pt";
+      const saved = localStorage.getItem(LANG_KEY);
+      return saved && !isNative(saved) ? saved : lang;
     } catch {
-      return "pt";
+      return lang;
     }
   });
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (current === "pt") return;
+    if (isNative(current)) return;
     // O cookie googtrans já devia bastar pro widget se auto-aplicar ao
     // carregar, mas na prática isso nem sempre acontece (daí o bug relatado:
     // o dropdown mostrava o idioma marcado, mas a página continuava em
@@ -128,22 +133,30 @@ export default function LanguageSwitcher() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const applyLanguage = (lang: string) => {
+  const applyLanguage = (code: string) => {
     setOpen(false);
-    try {
-      localStorage.setItem(LANG_KEY, lang);
-    } catch {
-      // ignore
-    }
-    setCurrent(lang);
+    const wasMachine = !isNative(current);
+    setCurrent(code);
 
-    if (lang === "pt") {
-      clearGoogTransCookie();
-      window.location.reload();
+    if (isNative(code)) {
+      setLang(code);
+      // Saindo de de/fr: o Google Tradutor já reescreveu o DOM, só um
+      // reload limpo devolve o texto original.
+      if (wasMachine) {
+        clearGoogTransCookie();
+        window.location.reload();
+      }
       return;
     }
 
-    setGoogTransCookie(lang);
+    // de/fr traduzem a partir do português.
+    setLang("pt");
+    try {
+      localStorage.setItem(LANG_KEY, code);
+    } catch {
+      // ignore
+    }
+    setGoogTransCookie(code);
     loadGoogleTranslate(() => {
       waitForTranslateSelect(
         select => {
@@ -164,21 +177,30 @@ export default function LanguageSwitcher() {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-editorial-muted hover:text-editorial-text transition cursor-pointer"
-        title="Traduzir site / Translate site"
+        className="flex items-center gap-1 text-editorial-muted hover:text-editorial-text transition cursor-pointer text-[10px] uppercase tracking-widest font-bold"
+        title={t("lang.button")}
+        aria-label={t("lang.button")}
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
-        <Globe className="h-3.5 w-3.5" />
+        <Globe className="h-3.5 w-3.5" /> <span aria-hidden="true">{current.toUpperCase()}</span>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-2 bg-white border border-editorial-border rounded-lg shadow-lg py-1 w-36 z-50">
+        <div role="menu" className="absolute right-0 top-full mt-2 bg-white border border-editorial-border rounded-lg shadow-lg py-1 w-48 z-50">
           {LANGS.map(l => (
             <button
               key={l.code}
               type="button"
+              role="menuitemradio"
+              aria-checked={current === l.code}
+              lang={l.code}
               onClick={() => applyLanguage(l.code)}
               className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left text-zinc-700 hover:bg-zinc-50 transition cursor-pointer"
             >
-              {l.label}
+              <span>
+                {l.label}
+                {!l.native && <span className="block text-[9px] text-editorial-muted">{t("lang.auto")}</span>}
+              </span>
               {current === l.code && <Check className="h-3 w-3 text-emerald-600" />}
             </button>
           ))}

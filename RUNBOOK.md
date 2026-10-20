@@ -59,6 +59,13 @@ foram criados (data no `git log` do arquivo) — a maioria usa
 | `GEMINI_API_KEY` | Google AI Studio | Nenhum |
 | `GOOGLE_CLIENT_SECRET` | Google Cloud Console | Precisa reconectar o Google Calendar no painel de Gestão |
 | `APP_COINS_SYNC_SECRET` | Gerado por você | O trigger do app mobile precisa ser atualizado com o novo valor |
+| `CRON_SECRET` | Gerado por você (`openssl rand -hex 32`) | Nenhum — a Vercel envia o valor novo no próximo disparo do cron |
+
+**Pendência conhecida (out/2026):** as transcrições das reuniões dos sócios
+têm uma senha de e-mail falada em voz alta (ver o comentário no `.gitignore`).
+Mesmo fora do git, troque essa senha, ative a verificação em duas etapas
+nessa conta e confira se as chaves do `.env` local nunca foram enviadas por
+WhatsApp/e-mail/print — se tiverem sido, gire-as pela tabela acima.
 
 Depois de trocar qualquer uma na Vercel (**Settings → Environment Variables**), é preciso fazer um novo deploy (redeploy) pra pegar o valor novo — a env var não recarrega sozinha.
 
@@ -67,6 +74,33 @@ Depois de trocar qualquer uma na Vercel (**Settings → Environment Variables**)
 - **Produção**: o deploy da branch `main`, `VERCEL_ENV=production`.
 - **Preview**: qualquer outro deploy (PR/branch), `VERCEL_ENV=preview`. Stripe e Resend ficam **desativados por padrão** nesses deploys (ver `ALLOW_LIVE_INTEGRATIONS_IN_PREVIEW` no `.env.example`) — um teste num preview não gera cobrança nem email real, a menos que essa variável seja explicitamente ligada.
 
-## 8. Backup e recuperação de dados
+## 8. Jobs diários (cron)
+
+`GET /api/cron/lembretes-cancelamento` roda todo dia às 12h UTC (ver
+`vercel.json`) e faz três coisas: lembretes de cancelamento para pousada/guia,
+pedido de avaliação por e-mail para quem fez check-out de 1 a 3 dias atrás, e
+limpeza da lixeira vencida. Sem `CRON_SECRET` configurada ele responde 503 e
+não faz nada — confira em **Vercel → Settings → Cron Jobs** se as execuções
+estão com status 200.
+
+## 9. Domínio próprio de uma pousada (ex.: pousadavagalume.com)
+
+O domínio abre o site oficial da pousada (`/site/<slug>`) na raiz; reserva,
+cadastro e pagamento continuam no domínio principal (`SITE_URL`).
+
+1. Supabase: rode `scripts/add-dominio-proprio-pousada.sql` (uma vez só).
+2. Vercel → projeto → **Settings → Domains**: adicione `pousadavagalume.com`
+   e `www.pousadavagalume.com` (este redirecionando para o primeiro).
+   **Nenhum domínio da plataforma pode redirecionar para o da pousada** —
+   senão a reserva entra em loop entre os dois.
+3. No DNS do domínio (GoDaddy etc.): registro `A` em `@` → o IP que a Vercel
+   mostrar (hoje `216.198.79.1`) e `CNAME` em `www` → `cname.vercel-dns.com`.
+   Não mexa nos registros de e-mail (`send`, `rsend`, `resend._domainkey`).
+4. Gestão → Pousadas → Editar → "Domínio próprio do site oficial":
+   `pousadavagalume.com`.
+5. `SITE_URL` na Vercel precisa ser o domínio principal do EcoSafari (hoje
+   `https://ecosafari.vercel.app`) — é para onde o botão Reservar leva.
+
+## 10. Backup e recuperação de dados
 
 O Supabase faz backup automático do Postgres (frequência depende do plano — confira em **Database → Backups** no dashboard). Não existe backup próprio deste projeto além disso. Antes de rodar qualquer `DELETE`/`UPDATE` manual direto no SQL Editor do Supabase (fora dos scripts em `scripts/`), prefira fazer um `SELECT` primeiro pra conferir o que vai ser afetado.

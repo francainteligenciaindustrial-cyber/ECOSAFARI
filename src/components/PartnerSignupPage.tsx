@@ -237,7 +237,7 @@ export default function PartnerSignupPage() {
           consistent with what the rest of the site actually shows. */}
       <div
         className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none"
-        style={{ backgroundImage: "url('/pousadas/vagalume-lago-deck.png')" }}
+        style={{ backgroundImage: "url('/pousadas/vagalume-lago-deck.webp')" }}
         aria-hidden="true"
       />
 

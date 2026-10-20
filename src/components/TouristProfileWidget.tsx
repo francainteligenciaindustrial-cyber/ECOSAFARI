@@ -179,7 +179,7 @@ export default function TouristProfileWidget() {
                             {r.status === "usado" ? "Usado" : "Pendente"}
                           </span>
                           {r.status === "pendente" && (
-                            <button onClick={() => handleCopyCode(r.code)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title="Copiar código">
+                            <button aria-label="Copiar código" onClick={() => handleCopyCode(r.code)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title="Copiar código">
                               {copiedCode === r.code ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                             </button>
                           )}

@@ -70,7 +70,7 @@ export default function RoomsEditor({ value, onChange }: { value: RoomDraft[]; o
                 onChange={e => update(idx, { capacity: Number(e.target.value) })}
                 className="w-16 bg-zinc-50 border border-zinc-200 rounded p-2 text-xs focus:outline-none focus:border-emerald-500"
               />
-              <button
+              <button aria-label="Remover tipo de quarto"
                 type="button"
                 onClick={() => onChange(value.filter((_, i) => i !== idx))}
                 className="text-zinc-400 hover:text-red-600 transition cursor-pointer flex-shrink-0"
@@ -100,7 +100,7 @@ export default function RoomsEditor({ value, onChange }: { value: RoomDraft[]; o
                     onChange={e => updateBeds(idx, beds.map((b, i) => (i === bedIdx ? { ...b, count: Number(e.target.value) } : b)))}
                     className="w-14 bg-zinc-50 border border-zinc-200 rounded p-1.5 text-xs focus:outline-none focus:border-emerald-500"
                   />
-                  <button
+                  <button aria-label="Remover cama"
                     type="button"
                     onClick={() => updateBeds(idx, beds.filter((_, i) => i !== bedIdx))}
                     className="text-zinc-400 hover:text-red-600 transition cursor-pointer flex-shrink-0"

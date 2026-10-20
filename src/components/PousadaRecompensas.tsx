@@ -83,7 +83,7 @@ export default function PousadaRecompensas({ pousadaId }: Props) {
               {isRedeemed ? (
                 <div className="mt-1 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-2 flex items-center justify-between gap-2">
                   <span className="font-mono font-bold text-emerald-800 text-sm">{redeemedCode.code}</span>
-                  <button
+                  <button aria-label="Copiar código"
                     onClick={() => { navigator.clipboard.writeText(redeemedCode.code); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
                     className="text-emerald-700 hover:text-emerald-900 transition cursor-pointer"
                     title="Copiar código"

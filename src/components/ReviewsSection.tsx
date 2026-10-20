@@ -96,7 +96,7 @@ export default function ReviewsSection({ targetType, targetId }: ReviewsSectionP
               <label className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1">Nota</label>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map(n => (
-                  <button key={n} type="button" onClick={() => setRating(n)} className="cursor-pointer">
+                  <button aria-label={`Nota ${n} de 5`} key={n} type="button" onClick={() => setRating(n)} className="cursor-pointer">
                     <Star className={`h-6 w-6 ${n <= rating ? "text-amber-500 fill-amber-500" : "text-zinc-200"}`} />
                   </button>
                 ))}

@@ -144,7 +144,7 @@ export default function MobileSimulator({
         <span className="font-extrabold text-sm text-emerald-400 tracking-tight flex items-center gap-1">
           <Compass className="h-4.5 w-4.5 animate-spin" /> EcoSafari Go
         </span>
-        <button
+        <button aria-label="Notificações"
           onClick={() => setActiveScreen("alerts")}
           className="relative p-1.5 hover:bg-zinc-850 rounded-full transition"
         >
@@ -163,7 +163,7 @@ export default function MobileSimulator({
                 {/* Intro and post action */}
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest block">Avistamentos Recentes</span>
-                  <button
+                  <button aria-label="Postar registro"
                     onClick={() => setShowAddSighting(true)}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full p-2 flex items-center justify-center transition shadow shadow-emerald-950"
                   >
@@ -291,7 +291,7 @@ export default function MobileSimulator({
               <form onSubmit={handleCreateSighting} className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full p-4 space-y-4">
                 <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
                   <h4 className="font-bold text-xs text-zinc-200">Postar Registro</h4>
-                  <button type="button" onClick={() => setShowAddSighting(false)} className="text-zinc-500 hover:text-white">
+                  <button aria-label="Fechar" type="button" onClick={() => setShowAddSighting(false)} className="text-zinc-500 hover:text-white">
                     <X className="h-4.5 w-4.5" />
                   </button>
                 </div>

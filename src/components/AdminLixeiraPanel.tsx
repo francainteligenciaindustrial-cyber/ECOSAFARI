@@ -119,7 +119,7 @@ export default function AdminLixeiraPanel() {
                   >
                     <RotateCcw className="h-3.5 w-3.5" /> Restaurar
                   </button>
-                  <button
+                  <button aria-label="Apagar definitivamente"
                     onClick={() => handlePurge(entry)}
                     disabled={actingOn === entry.id}
                     className="flex items-center gap-1 text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition disabled:opacity-60 cursor-pointer"

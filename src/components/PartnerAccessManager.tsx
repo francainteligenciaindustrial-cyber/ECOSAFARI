@@ -93,7 +93,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
       <div className="bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
           <h3 className="font-bold text-base text-zinc-900">Acesso de parceiro — {partnerLabel}</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
+          <button aria-label="Fechar" onClick={onClose} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -144,7 +144,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
                 </p>
                 <div className="flex items-center gap-2">
                   <input readOnly value={newAccessLink} onFocus={e => e.target.select()} className="flex-1 min-w-0 bg-white border border-emerald-200 px-2 py-1.5 rounded font-mono text-[10px] truncate" />
-                  <button
+                  <button aria-label={linkCopied ? "Link copiado" : "Copiar link"}
                     type="button"
                     onClick={() => { navigator.clipboard.writeText(newAccessLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
                     className="flex-shrink-0 bg-emerald-600 text-white font-bold px-2.5 py-1.5 rounded hover:bg-emerald-700 transition cursor-pointer flex items-center gap-1"
@@ -160,7 +160,7 @@ export default function PartnerAccessManager({ partnerType, partnerId, partnerLa
               {users.map(u => (
                 <div key={u.id} className="flex items-center justify-between bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 text-xs">
                   <span className="flex items-center gap-1.5 font-semibold text-zinc-800"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> {u.email}</span>
-                  <button onClick={() => handleRevoke(u)} className="text-red-500 hover:text-red-700 transition cursor-pointer" title="Revogar acesso">
+                  <button aria-label="Revogar acesso" onClick={() => handleRevoke(u)} className="text-red-500 hover:text-red-700 transition cursor-pointer" title="Revogar acesso">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>

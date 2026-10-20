@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe, Receipt, UserRoundCheck } from "lucide-react";
+import { TrendingUp, Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe, Receipt, UserRoundCheck } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
@@ -27,6 +27,11 @@ import GuideAvailabilityCalendar from "./GuideAvailabilityCalendar";
 import PartnerLoginPanel from "./PartnerLoginPanel";
 import PousadaOfficialSite from "./PousadaOfficialSite";
 import ErrorBoundary from "./ErrorBoundary";
+import PousadaResultadosPanel from "./PousadaResultadosPanel";
+import CoordinatesInput from "./CoordinatesInput";
+import RemetenteEmailStatus from "./RemetenteEmailStatus";
+import PedidoSiteCard from "./PedidoSiteCard";
+import { slugify } from "../lib/slug";
 
 // Agrupa os campos do formulário em cartões com título em vez de uma pilha
 // só de inputs soltos — mesma ideia visual usada no resto do admin, só
@@ -52,10 +57,11 @@ function menuByCategory(menu: Pousada["menu"] | undefined, category: string): Ex
     .map(m => ({ title: m.item, price: m.price, description: m.description || "" }));
 }
 
-type PousadaTab = "gestor" | "agenda" | "caixa" | "colaboradores" | "sobre" | "servicos" | "acomodacoes" | "galeria" | "redes" | "bar" | "produtos" | "recompensas" | "gestores" | "editar-site";
+type PousadaTab = "gestor" | "agenda" | "resultados" | "caixa" | "colaboradores" | "sobre" | "servicos" | "acomodacoes" | "galeria" | "redes" | "bar" | "produtos" | "recompensas" | "gestores" | "editar-site";
 
 const POUSADA_TABS: { id: PousadaTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "agenda", label: "Agenda de Reservas", icon: CalendarDays },
+  { id: "resultados", label: "Resultados", icon: TrendingUp },
   { id: "caixa", label: "Caixa", icon: Receipt },
   { id: "sobre", label: "Sobre", icon: Info },
   { id: "servicos", label: "Serviços", icon: ConciergeBell },
@@ -241,6 +247,9 @@ export default function PartnerPortalPage() {
             logoUrl: data.pousada.logoUrl || "",
             themeColorPrimary: data.pousada.themeColorPrimary || "",
             themeColorAccent: data.pousada.themeColorAccent || "",
+            latitude: data.pousada.latitude ?? null,
+            longitude: data.pousada.longitude ?? null,
+            emailContato: data.pousada.emailContato || "",
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
           setForm({
@@ -250,6 +259,8 @@ export default function PartnerPortalPage() {
             images: [...(data.atracao.images || [])],
             menu: (data.atracao.menu || []).map(m => ({ title: m.item, price: m.price })) as ExperienceDraft[],
             availability: data.atracao.availability || "",
+            latitude: data.atracao.latitude ?? null,
+            longitude: data.atracao.longitude ?? null,
           });
         } else if (data.partnerType === "guia" && data.guia) {
           setForm({
@@ -385,6 +396,10 @@ export default function PartnerPortalPage() {
           // não vai pro servidor (undefined some do payload por completo).
           themeColorPrimary: form.themeColorPrimary.trim(),
           themeColorAccent: form.themeColorAccent.trim(),
+          latitude: form.latitude,
+          longitude: form.longitude,
+          // String vazia de propósito: limpar volta ao e-mail de login do gestor.
+          emailContato: form.emailContato.trim().toLowerCase(),
         };
       } else if (profile.partnerType === "atracao") {
         endpoint = `/api/atracoes/${profile.partnerId}`;
@@ -395,6 +410,8 @@ export default function PartnerPortalPage() {
           images: form.images.map((i: string) => i.trim()).filter(Boolean),
           menu: form.menu.filter((m: ExperienceDraft) => m.title.trim()).map((m: ExperienceDraft) => ({ item: m.title.trim(), price: m.price || 0 })),
           availability: form.availability.trim() || undefined,
+          latitude: form.latitude,
+          longitude: form.longitude,
         };
       } else {
         endpoint = `/api/guides/${profile.partnerId}`;
@@ -444,7 +461,7 @@ export default function PartnerPortalPage() {
   // Sem preview (nem a coluna de duas telas) quando a pousada já tem site
   // próprio — não existe /site/:slug nosso pra mostrar nesse caso.
   const previewPousada: Pousada | null =
-    profile?.partnerType === "pousada" && profile.pousada && form && !form.hasOwnWebsite
+    profile?.partnerType === "pousada" && profile.pousada && form && !form.hasOwnWebsite && profile.pousada.sitePublicado
       ? {
           ...profile.pousada,
           description: form.description,
@@ -595,7 +612,14 @@ export default function PartnerPortalPage() {
           {isPousadaGestor && (
             <aside className="w-full md:w-60 md:flex-shrink-0 md:sticky md:top-6">
               <nav className="bg-white border border-editorial-border rounded-lg p-2 flex md:flex-col gap-1 overflow-x-auto">
-                {[{ id: "gestor" as PousadaTab, label: "Gestor de Pousada", icon: UserRound }, ...(profile?.pousada && form ? POUSADA_TABS : [])].map((tab, i) => {
+                {/* Primeiro a lista de pousadas (aba "gestor"); o menu de uma
+                    pousada só aparece depois que o gestor abre uma delas. */}
+                {[
+                  pousadaTab === "gestor"
+                    ? { id: "gestor" as PousadaTab, label: "Gestor de Pousada", icon: UserRound }
+                    : { id: "gestor" as PousadaTab, label: "Minhas pousadas", icon: ArrowLeft },
+                  ...(profile?.pousada && form && pousadaTab !== "gestor" ? POUSADA_TABS : []),
+                ].map((tab, i) => {
                   const Icon = tab.icon;
                   return (
                     <React.Fragment key={tab.id}>
@@ -677,6 +701,13 @@ export default function PartnerPortalPage() {
                       <textarea rows={4} value={form.longDescription} onChange={e => setForm((p: any) => ({ ...p, longDescription: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
                     </div>
                     <p className="text-editorial-muted text-[11px]">Esse texto compõe a página da pousada no catálogo e o site oficial.</p>
+                    <CoordinatesInput latitude={form.latitude} longitude={form.longitude} onChange={pos => setForm((p: any) => ({ ...p, ...pos }))} />
+                    <div className="text-xs">
+                      <label htmlFor="email-contato" className="block text-editorial-text font-semibold mb-1.5">E-mail para respostas dos hóspedes</label>
+                      <input id="email-contato" type="email" placeholder="contato@suapousada.com.br" value={form.emailContato} onChange={e => setForm((p: any) => ({ ...p, emailContato: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <p className="text-editorial-muted text-[11px] mt-1">A confirmação de reserva e o pedido de avaliação saem do EcoSafari com o nome da sua pousada; quando o hóspede responde, a mensagem chega neste e-mail.</p>
+                    </div>
+                    <RemetenteEmailStatus pousadaId={profile.partnerId} reloadKey={saved} />
                   </FormSection>
                 )}
 
@@ -839,11 +870,13 @@ export default function PartnerPortalPage() {
                 {pousadaTab === "editar-site" && (
                   <FormSection title="Editar Site">
                     <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Você já tem um site próprio?</label>
+                      <label className="block text-editorial-text font-semibold mb-1.5">Site da sua pousada</label>
                       <p className="text-editorial-muted text-[11px] mb-3">
                         {form.hasOwnWebsite
                           ? "O botão \"Ver site oficial\" no catálogo vai levar direto pro seu site."
-                          : "Sem site próprio, a EcoSafari monta um pra você com as fotos e informações abaixo — a pré-via ao lado atualiza conforme você edita."}
+                          : profile.pousada?.sitePublicado
+                            ? "Seu site foi criado pela equipe EcoSafari. Você pode ajustar textos, fotos e cores abaixo — a prévia ao lado atualiza conforme você edita."
+                            : "A equipe EcoSafari cria um site profissional para a sua pousada. Peça abaixo e entraremos em contato."}
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -851,14 +884,14 @@ export default function PartnerPortalPage() {
                           onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: false }))}
                           className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${!form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
                         >
-                          Não, criar um pra mim
+                          Site feito pela EcoSafari
                         </button>
                         <button
                           type="button"
                           onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: true }))}
                           className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
                         >
-                          Sim, já tenho
+                          Já tenho site próprio
                         </button>
                       </div>
                     </div>
@@ -868,8 +901,22 @@ export default function PartnerPortalPage() {
                         <label className="block text-editorial-text font-semibold mb-1.5">Link do seu site</label>
                         <input type="text" placeholder="https://..." value={form.ownWebsiteUrl} onChange={e => setForm((p: any) => ({ ...p, ownWebsiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                       </div>
+                    ) : !profile.pousada?.sitePublicado ? (
+                      <PedidoSiteCard pousadaId={profile.partnerId} />
                     ) : (
                       <>
+                        <p className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md px-3 py-2">
+                          Seu site está no ar em{" "}
+                          <a
+                            href={profile.pousada?.customDomain ? `https://${profile.pousada.customDomain}` : `/site/${slugify(profile.pousada?.name || "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold underline"
+                          >
+                            {profile.pousada?.customDomain || `/site/${slugify(profile.pousada?.name || "")}`}
+                          </a>
+                          . Para mudanças maiores (layout, novas seções), fale com a equipe.
+                        </p>
                         <ImageListEditor label="Galeria do Site Oficial (opcional — se vazia, usa as imagens do catálogo)" value={form.officialSiteImages} onChange={officialSiteImages => setForm((p: any) => ({ ...p, officialSiteImages }))} />
                         <div className="text-xs border-t border-editorial-border pt-4">
                           <label className="block text-editorial-text font-semibold mb-1.5">Foto da Equipe / Família</label>
@@ -949,6 +996,7 @@ export default function PartnerPortalPage() {
                   <textarea rows={4} value={form.description} onChange={e => setForm((p: any) => ({ ...p, description: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />
                 </div>
                 <ImageListEditor label="Imagens" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
+                <CoordinatesInput latitude={form.latitude} longitude={form.longitude} onChange={pos => setForm((p: any) => ({ ...p, ...pos }))} />
                 <div className="text-xs">
                   <label className="block text-editorial-text font-semibold mb-1.5">Disponibilidade / Horário de Funcionamento</label>
                   <input type="text" value={form.availability} onChange={e => setForm((p: any) => ({ ...p, availability: e.target.value }))} placeholder="Ex: Terça a domingo, 11h às 22h" className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
@@ -1081,6 +1129,11 @@ export default function PartnerPortalPage() {
             <PousadaRecompensasManager pousadaId={profile.partnerId} />
           </ErrorBoundary>
         )}
+        {profile?.partnerType === "pousada" && form && pousadaTab === "resultados" && (
+          <ErrorBoundary variant="section" sectionLabel="os resultados">
+            <PousadaResultadosPanel pousadaId={profile.partnerId} />
+          </ErrorBoundary>
+        )}
         {profile?.partnerType === "pousada" && form && pousadaTab === "caixa" && (
           <ErrorBoundary variant="section" sectionLabel="o caixa">
             <PousadaCaixa pousadaId={profile.partnerId} />
@@ -1125,7 +1178,7 @@ export default function PartnerPortalPage() {
                       <p className="text-[10px] text-editorial-muted">Conectado em {new Date(g.granted_at).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
-                  <button
+                  <button aria-label="Remover acesso"
                     onClick={() => handleRevokeGrant(g.client.id, g.client.name)}
                     disabled={revokingClientId === g.client.id}
                     className="text-red-600 hover:text-red-800 transition cursor-pointer flex-shrink-0 disabled:opacity-60"

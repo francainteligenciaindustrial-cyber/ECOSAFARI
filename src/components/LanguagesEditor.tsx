@@ -38,7 +38,7 @@ export default function LanguagesEditor({ value, onChange }: { value: GuideLangu
               <option key={level} value={level}>{LEVEL_LABELS[level]}</option>
             ))}
           </select>
-          <button
+          <button aria-label="Remover idioma"
             type="button"
             onClick={() => onChange(value.filter((_, i) => i !== idx))}
             className="text-zinc-400 hover:text-red-600 transition cursor-pointer flex-shrink-0"

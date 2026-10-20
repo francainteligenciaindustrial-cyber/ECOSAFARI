@@ -123,14 +123,14 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                 {/* Bottom Bar Controls */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <button
+                    <button aria-label={isPlaying ? "Pausar" : "Reproduzir"}
                       onClick={handlePlayPause}
                       className="bg-[#FBF8F1] text-editorial-primary p-2.5 rounded-none hover:scale-105 transition cursor-pointer"
                     >
                       {isPlaying ? <Pause className="h-4 w-4 fill-editorial-primary" /> : <Play className="h-4 w-4 fill-editorial-primary" />}
                     </button>
                     
-                    <button
+                    <button aria-label={isMuted ? "Ativar som" : "Silenciar"}
                       onClick={handleMuteUnmute}
                       className="text-white hover:text-[#FBF8F1] p-2 transition cursor-pointer"
                     >

@@ -135,10 +135,10 @@ export default function PousadaRecompensasManager({ pousadaId }: Props) {
                 {r.description && <p className="text-editorial-muted text-[11px] truncate">{r.description}</p>}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={() => handleToggleActive(r)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title={r.active ? "Desativar" : "Ativar"}>
+                <button aria-label={r.active ? "Desativar" : "Ativar"} onClick={() => handleToggleActive(r)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title={r.active ? "Desativar" : "Ativar"}>
                   {r.active ? <ToggleRight className="h-5 w-5 text-emerald-600" /> : <ToggleLeft className="h-5 w-5" />}
                 </button>
-                <button onClick={() => handleDelete(r)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer" title="Excluir">
+                <button aria-label="Excluir" onClick={() => handleDelete(r)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer" title="Excluir">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>

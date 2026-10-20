@@ -1,7 +1,8 @@
 {
-  "name": "react-example",
+  "name": "ecosafari-brasil",
+  "version": "1.0.0",
+  "description": "Plataforma de ecoturismo no Pantanal: pousadas, guias, atrações, reservas online com Stripe e painel de gestão.",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -23,6 +24,7 @@
     "express-rate-limit": "^7.4.1",
     "googleapis": "^173.0.0",
     "jsqr": "^1.4.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.0.1",
@@ -31,6 +33,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "resend": "^6.18.0",
+    "sharp": "^0.34.3",
     "stripe": "^22.3.2",
     "vite": "^6.2.3"
   },
@@ -39,6 +42,7 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
+    "@types/leaflet": "^1.9.12",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.14.0",
     "@types/pdfkit": "^0.17.6",

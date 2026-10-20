@@ -196,7 +196,7 @@ export default function AdminAuditLogPanel() {
           >
             <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">CSV</span>
           </button>
-          <button
+          <button aria-label="Atualizar"
             onClick={() => fetchLog(true)}
             disabled={refreshing}
             className="flex-shrink-0 p-2 text-zinc-400 hover:text-editorial-primary transition cursor-pointer disabled:opacity-50"

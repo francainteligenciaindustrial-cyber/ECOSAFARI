@@ -15,7 +15,12 @@
   --color-editorial-beige: #F6EEDC;
   --color-editorial-text: #16181A;
   --color-editorial-muted: #5E6670;
+  /* Só para texto sobre fundo escuro (4,8:1 no azul-marinho). Sobre o creme
+     dá 3,2:1 — abaixo do mínimo de 4,5:1; lá use editorial-muted. */
   --color-editorial-dark-muted: #848C94;
+  /* Anel de foco do teclado: passa 3:1 tanto no creme quanto no
+     azul-marinho, então funciona em qualquer seção. */
+  --color-focus-ring: #1580B5;
   --color-editorial-border: #DDE1EB;
 
   /* Cores puras da arara — amarelo/laranja só como preenchimento (com texto
@@ -71,6 +76,39 @@
 /* Listras finas do rosto da arara — textura discreta para fundos escuros. */
 .arara-stripes {
   background-image: repeating-linear-gradient(-28deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 14px);
+}
+
+/* Foco visível para quem navega pelo teclado. Muitos campos usam
+   focus:outline-none (só trocam a borda, que some no foco por Tab em
+   botões e links) — o !important garante o anel só no :focus-visible,
+   que o navegador não aciona no clique do mouse. */
+:where(a, button, input, select, textarea, summary, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 100;
+  background: var(--color-editorial-primary);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.skip-link:focus { top: 1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes fadeIn {

@@ -438,7 +438,7 @@ export default function TuristaProfileView() {
                         {r.status === "usado" ? "Usado" : "Pendente"}
                       </span>
                       {r.status === "pendente" && (
-                        <button onClick={() => handleCopyCode(r.code)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title="Copiar código">
+                        <button aria-label="Copiar código" onClick={() => handleCopyCode(r.code)} className="text-editorial-muted hover:text-editorial-primary transition cursor-pointer" title="Copiar código">
                           {copiedCode === r.code ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                         </button>
                       )}
@@ -543,7 +543,7 @@ export default function TuristaProfileView() {
               {postPhotoUrl && (
                 <div className="relative ml-[52px]">
                   <img src={postPhotoUrl} alt="Foto do post" className="max-h-48 rounded-md border border-editorial-border" />
-                  <button type="button" onClick={() => setPostPhotoUrl("")} className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition cursor-pointer">
+                  <button aria-label="Remover foto" type="button" onClick={() => setPostPhotoUrl("")} className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full p-1 hover:bg-black/80 transition cursor-pointer">
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -588,7 +588,7 @@ export default function TuristaProfileView() {
                         <p className="text-editorial-muted text-[11px]">{formatPostDate(post.createdAt)}</p>
                       </div>
                     </div>
-                    <button onClick={() => handleDeletePost(post.id)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer flex-shrink-0" title="Excluir post">
+                    <button aria-label="Excluir post" onClick={() => handleDeletePost(post.id)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer flex-shrink-0" title="Excluir post">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -624,7 +624,7 @@ export default function TuristaProfileView() {
                         <span className="block text-[11px] text-editorial-muted truncate">{p.location}</span>
                       </span>
                     </button>
-                    <button
+                    <button aria-label="Remover dos favoritos"
                       onClick={() => handleRemoveFavorite(p.id)}
                       title="Remover dos favoritos"
                       className="text-editorial-muted hover:text-red-600 transition cursor-pointer flex-shrink-0 p-1"

@@ -118,7 +118,7 @@ export default function PousadaGestoresManager({ pousadaId, pousadaName }: { pou
                 {g.isPrimary && <span className="text-[9px] uppercase tracking-widest font-bold text-editorial-primary">Gestor principal</span>}
               </div>
               {gestores.length > 1 && (
-                <button type="button" onClick={() => removeGestor(g)} disabled={removingId === g.userId} title="Remover acesso" className="text-editorial-muted hover:text-red-600 transition cursor-pointer disabled:opacity-60">
+                <button aria-label="Remover acesso" type="button" onClick={() => removeGestor(g)} disabled={removingId === g.userId} title="Remover acesso" className="text-editorial-muted hover:text-red-600 transition cursor-pointer disabled:opacity-60">
                   {removingId === g.userId ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 </button>
               )}

@@ -30,6 +30,9 @@ import {
   Map as MapIcon,
   Lock,
   ScrollText,
+  Package,
+  Tag,
+  Globe,
   type LucideIcon
 } from "lucide-react";
 import { Pousada, Guide, Booking, Notification, Species, GuideLanguage } from "../types";
@@ -56,7 +59,17 @@ import EcosystemAvailabilityPanel from "./EcosystemAvailabilityPanel";
 import AdminConfiabilidadePanel from "./AdminConfiabilidadePanel";
 import AdminLixeiraPanel from "./AdminLixeiraPanel";
 import AdminYearCalendarPanel from "./AdminYearCalendarPanel";
+import PacotesPanel from "./PacotesPanel";
+import CoordinatesInput from "./CoordinatesInput";
+import RemetenteEmailStatus from "./RemetenteEmailStatus";
+import CuponsPanel from "./CuponsPanel";
+import PedidosSitePanel from "./PedidosSitePanel";
 import { usePagination } from "../lib/usePagination";
+import AdminReservasTab from "./AdminReservasTab";
+import AdminPousadasTab from "./AdminPousadasTab";
+import AdminGuiasTab from "./AdminGuiasTab";
+import AdminEspeciesTab from "./AdminEspeciesTab";
+import AdminAgendaTab from "./AdminAgendaTab";
 
 interface AdminDashboardProps {
   pousadas: Pousada[];
@@ -64,7 +77,7 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira";
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira" | "pacotes" | "cupons" | "pedidos-site";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
 // hand-written <button> per tab. Grouped into sections (rather than one flat
@@ -75,6 +88,9 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "bookings", icon: ClipboardList, label: "Reservas & Confirmações", group: "Operação" },
   { id: "agenda", icon: CalendarClock, label: "Agenda Integrada", group: "Operação" },
   { id: "history", icon: HistoryIcon, label: "Histórico de Clientes", group: "Operação" },
+  { id: "pacotes", icon: Package, label: "Pacotes", group: "Vendas" },
+  { id: "cupons", icon: Tag, label: "Cupons", group: "Vendas" },
+  { id: "pedidos-site", icon: Globe, label: "Pedidos de site", group: "Vendas" },
   { id: "pousadas", icon: Building2, label: "Pousadas", group: "Parceiros" },
   { id: "guides", icon: Compass, label: "Guias", group: "Parceiros" },
   { id: "atracoes", icon: MapPin, label: "Atrações", group: "Parceiros" },
@@ -85,7 +101,7 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "auditlog", icon: ScrollText, label: "Log de Auditoria", group: "Sistema" },
   { id: "lixeira", icon: Trash2, label: "Lixeira", group: "Sistema" },
 ];
-const ADMIN_TAB_GROUPS = ["Operação", "Parceiros", "Conteúdo", "Sistema"] as const;
+const ADMIN_TAB_GROUPS = ["Operação", "Vendas", "Parceiros", "Conteúdo", "Sistema"] as const;
 
 const NOTIFICATION_ICONS: Record<Notification["type"], LucideIcon> = {
   booking_new: ClipboardList,
@@ -165,10 +181,6 @@ export default function AdminDashboard({
     return () => clearInterval(interval);
   }, []);
   const [activeTab, setActiveTab] = useState<AdminTab>("bookings");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showAddPousada, setShowAddPousada] = useState(false);
-  const [showNewBooking, setShowNewBooking] = useState(false);
-  const [showAddGuide, setShowAddGuide] = useState(false);
   const [googleCalendarStatus, setGoogleCalendarStatus] = useState<{ connected: boolean; email: string | null }>({ connected: false, email: null });
 
   // Detects rows matching the old hardcoded demo dataset's ids — a reliable
@@ -215,42 +227,6 @@ export default function AdminDashboard({
     }
   };
 
-  const [connectingGoogle, setConnectingGoogle] = useState(false);
-  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
-
-  // Both now go through adminFetch (an authenticated call) instead of a
-  // plain <a href> — the backend route requires an admin session, since an
-  // unauthenticated GET here used to let anyone hijack or drop the site's
-  // Google Calendar connection.
-  const handleConnectGoogleCalendar = async () => {
-    setConnectingGoogle(true);
-    try {
-      const response = await adminFetch("/api/auth/google");
-      const data = await response.json();
-      if (response.ok && data.authUrl) {
-        window.location.href = data.authUrl;
-      } else {
-        alert(data.error || "Erro ao iniciar conexão com o Google Calendar.");
-      }
-    } catch (err) {
-      console.error("Erro ao iniciar conexão com o Google Calendar:", err);
-    } finally {
-      setConnectingGoogle(false);
-    }
-  };
-
-  const handleDisconnectGoogleCalendar = async () => {
-    setDisconnectingGoogle(true);
-    try {
-      const response = await adminFetch("/api/auth/google/disconnect", { method: "POST" });
-      if (response.ok) await fetchGoogleCalendarStatus();
-    } catch (err) {
-      console.error("Erro ao desconectar Google Calendar:", err);
-    } finally {
-      setDisconnectingGoogle(false);
-    }
-  };
-
   // Runs once on mount rather than gated behind a tab — a stale/rogue
   // deployment writing fake data is worth surfacing proactively (see the
   // banner near the top of the dashboard below), not something an admin
@@ -283,22 +259,6 @@ export default function AdminDashboard({
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  // Forms States
-  const [pousadaForm, setPousadaForm] = useState({
-    name: "",
-    description: "",
-    longDescription: "",
-    location: "",
-    pricePerNight: 1500,
-    features: ["Wi-Fi", "Piscina", "Ar Condicionado"] as string[],
-    activities: ["Safári", "Trilha Noturna"] as string[],
-    experiences: [{ title: "Safári Onça-Pintada", price: 300 }, { title: "Observação de Aves", price: 150 }] as ExperienceDraft[],
-    capacity: 10,
-    images: "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80",
-    videoUrl: "",
-    rooms: [] as RoomDraft[]
-  });
-
   // Edit Pousada modal state
   const [editingPousadaId, setEditingPousadaId] = useState<string | null>(null);
   const [editPousadaForm, setEditPousadaForm] = useState({
@@ -315,28 +275,16 @@ export default function AdminDashboard({
     officialSiteImages: [] as string[],
     videoUrl: "",
     officialSiteUrl: "",
-    rooms: [] as RoomDraft[]
+    rooms: [] as RoomDraft[],
+    latitude: null as number | null,
+    longitude: null as number | null,
+    emailRemetente: "",
+    emailRemetenteNome: "",
+    emailContato: "",
+    customDomain: "",
+    sitePublicado: false
   });
-
-  const openEditPousada = (p: Pousada) => {
-    setEditingPousadaId(p.id);
-    setEditPousadaForm({
-      name: p.name,
-      description: p.description,
-      longDescription: p.longDescription || "",
-      location: p.location,
-      pricePerNight: p.pricePerNight,
-      capacity: p.capacity,
-      features: [...(p.features || [])],
-      activities: [...(p.activities || [])],
-      experiences: (p.experiences || []).map(e => ({ title: e.title, price: e.price })),
-      images: [...(p.images || [])],
-      officialSiteImages: [...(p.officialSiteImages || [])],
-      videoUrl: p.videoUrl || "",
-      officialSiteUrl: p.officialSiteUrl || "",
-      rooms: [...(p.rooms || [])]
-    });
-  };
+  const [remetenteReload, setRemetenteReload] = useState(0);
 
   const handleEditPousadaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,7 +306,15 @@ export default function AdminDashboard({
         officialSiteImages: editPousadaForm.officialSiteImages.map(i => i.trim()).filter(Boolean),
         videoUrl: editPousadaForm.videoUrl.trim() || undefined,
         officialSiteUrl: editPousadaForm.officialSiteUrl.trim() || undefined,
-        rooms: editPousadaForm.rooms.filter(r => r.type.trim())
+        rooms: editPousadaForm.rooms.filter(r => r.type.trim()),
+        latitude: editPousadaForm.latitude,
+        longitude: editPousadaForm.longitude,
+        // String vazia de propósito: limpar o campo volta ao remetente da plataforma.
+        emailRemetente: editPousadaForm.emailRemetente.trim().toLowerCase(),
+        emailRemetenteNome: editPousadaForm.emailRemetenteNome.trim(),
+        emailContato: editPousadaForm.emailContato.trim().toLowerCase(),
+        customDomain: editPousadaForm.customDomain.trim(),
+        sitePublicado: editPousadaForm.sitePublicado
       };
 
       const response = await adminFetch(`/api/pousadas/${editingPousadaId}`, {
@@ -375,101 +331,8 @@ export default function AdminDashboard({
       console.error(err);
     }
   };
-
-  const [guideForm, setGuideForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    languages: [{ language: "Português", level: "avancado" }, { language: "Inglês", level: "intermediario" }] as GuideLanguage[],
-    specialty: ["Fotografia", "Rastreamento"] as string[],
-    status: "disponivel" as "disponivel" | "indisponivel",
-    bio: "",
-    age: "",
-    birthplace: "",
-    interests: [] as string[],
-    photoUrl: "",
-    images: [] as string[]
-  });
-
-  // Edit Guide modal state
-  const [editingGuideId, setEditingGuideId] = useState<string | null>(null);
   const [managingGuideAccess, setManagingGuideAccess] = useState<Guide | null>(null);
   const [managingPousadaAccess, setManagingPousadaAccess] = useState<Pousada | null>(null);
-  const [editGuideForm, setEditGuideForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    languages: [] as GuideLanguage[],
-    specialty: [] as string[],
-    status: "disponivel" as "disponivel" | "indisponivel",
-    bio: "",
-    age: "",
-    birthplace: "",
-    interests: [] as string[],
-    photoUrl: "",
-    images: [] as string[],
-    unavailableDates: [] as string[]
-  });
-
-  const openEditGuide = (g: Guide) => {
-    setEditingGuideId(g.id);
-    setEditGuideForm({
-      name: g.name,
-      email: g.email,
-      phone: g.phone,
-      languages: [...(g.languages || [])],
-      specialty: [...(g.specialty || [])],
-      status: g.status,
-      bio: g.bio || "",
-      age: g.age ? String(g.age) : "",
-      birthplace: g.birthplace || "",
-      interests: [...(g.interests || [])],
-      photoUrl: g.photoUrl || "",
-      images: [...(g.images || [])],
-      unavailableDates: [...(g.unavailableDates || [])]
-    });
-  };
-
-  const handleEditGuideSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingGuideId) return;
-    const payload = {
-      name: editGuideForm.name,
-      email: editGuideForm.email,
-      phone: editGuideForm.phone,
-      languages: editGuideForm.languages,
-      specialty: editGuideForm.specialty,
-      photoUrl: editGuideForm.photoUrl,
-      status: editGuideForm.status,
-      bio: editGuideForm.bio,
-      age: editGuideForm.age ? Number(editGuideForm.age) : undefined,
-      birthplace: editGuideForm.birthplace,
-      interests: editGuideForm.interests,
-      images: editGuideForm.images,
-      unavailableDates: editGuideForm.unavailableDates
-    };
-    const response = await adminFetch(`/api/guides/${editingGuideId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    if (response.ok) {
-      setEditingGuideId(null);
-      fetchGuides();
-    }
-  };
-
-  const [showAddSpecies, setShowAddSpecies] = useState(false);
-  const [speciesForm, setSpeciesForm] = useState({
-    name: "",
-    scientificName: "",
-    category: "MAMÍFERO TERRESTRE",
-    description: "",
-    details: "",
-    sightings: "95%+ AVISTAMENTOS",
-    image: "",
-    bestPousadaId: ""
-  });
 
   // Calculate high-fidelity dashboard metrics
   const totalRevenue = bookings
@@ -480,64 +343,6 @@ export default function AdminDashboard({
 
   const activeReservationsCount = bookings.filter(b => b.status !== "cancelado").length;
 
-  // Actions for reservation statuses (simulating Guide & Pousada confirmations)
-  const handleConfirmPousada = async (bookingId: string) => {
-    try {
-      const response = await adminFetch(`/api/bookings/${bookingId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "confirmado_pousada" })
-      });
-      if (response.ok) { onRefreshData(); fetchBookings(); }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleConfirmGuide = async (bookingId: string, guideId: string) => {
-    try {
-      const response = await adminFetch(`/api/bookings/${bookingId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "confirmado_guia", guideId })
-      });
-      if (response.ok) { onRefreshData(); fetchBookings(); }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Marca uma reserva como paga sem passar pelo Stripe — pra fechamentos
-  // combinados fora do checkout (Pix, transferência, dinheiro na recepção,
-  // reserva por telefone/WhatsApp) e pra testar o resto do fluxo de
-  // confirmação (aprovar quarto → vincular guia → sincronizar agenda) sem
-  // precisar de um pagamento real configurado.
-  const handleMarkAsPaid = async (bookingId: string) => {
-    try {
-      const response = await adminFetch(`/api/bookings/${bookingId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "pago" })
-      });
-      if (response.ok) { onRefreshData(); fetchBookings(); }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleCancelBooking = async (bookingId: string) => {
-    try {
-      const response = await adminFetch(`/api/bookings/${bookingId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "cancelado" })
-      });
-      if (response.ok) { onRefreshData(); fetchBookings(); }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   // Mark notification as read
   const handleMarkNotificationRead = async (id: string) => {
     try {
@@ -547,214 +352,6 @@ export default function AdminDashboard({
       console.error(err);
     }
   };
-
-  // CRUD submissions
-  const handleAddPousadaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        name: pousadaForm.name,
-        description: pousadaForm.description,
-        longDescription: pousadaForm.longDescription,
-        location: pousadaForm.location,
-        pricePerNight: Number(pousadaForm.pricePerNight),
-        features: pousadaForm.features,
-        activities: pousadaForm.activities,
-        experiences: pousadaForm.experiences
-          .filter(exp => exp.title.trim())
-          .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
-        capacity: Number(pousadaForm.capacity),
-        images: [pousadaForm.images],
-        videoUrl: pousadaForm.videoUrl.trim() || undefined,
-        rooms: pousadaForm.rooms.filter(r => r.type.trim())
-      };
-
-      const response = await adminFetch("/api/pousadas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        setShowAddPousada(false);
-        onRefreshData();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddGuideSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        name: guideForm.name,
-        email: guideForm.email,
-        phone: guideForm.phone,
-        languages: guideForm.languages,
-        specialty: guideForm.specialty,
-        status: guideForm.status,
-        bio: guideForm.bio,
-        age: guideForm.age ? Number(guideForm.age) : undefined,
-        birthplace: guideForm.birthplace,
-        interests: guideForm.interests,
-        photoUrl: guideForm.photoUrl,
-        images: guideForm.images
-      };
-
-      const response = await adminFetch("/api/guides", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        setShowAddGuide(false);
-        fetchGuides();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeletePousada = async (id: string) => {
-    if (!window.confirm("Deseja realmente remover esta pousada parceira? Ela some do sistema, mas fica guardada na Lixeira (aba Sistema) por 30 dias caso precise restaurar.")) return;
-    try {
-      const response = await adminFetch(`/api/pousadas/${id}`, { method: "DELETE" });
-      if (response.ok) onRefreshData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleToggleVerified = async (id: string, currentValue: boolean) => {
-    try {
-      const response = await adminFetch(`/api/pousadas/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verified: !currentValue })
-      });
-      if (response.ok) onRefreshData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSetVideoUrl = async (id: string, currentValue: string) => {
-    const url = window.prompt("Link do vídeo desta pousada:", currentValue || "");
-    if (url === null) return;
-    try {
-      const response = await adminFetch(`/api/pousadas/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoUrl: url.trim() })
-      });
-      if (response.ok) onRefreshData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteGuide = async (id: string) => {
-    if (!window.confirm("Deseja realmente remover este guia turístico? Ele some do sistema, mas fica guardado na Lixeira (aba Sistema) por 30 dias caso precise restaurar.")) return;
-    try {
-      const response = await adminFetch(`/api/guides/${id}`, { method: "DELETE" });
-      if (response.ok) fetchGuides();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddSpeciesSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // Falls back to the first real registered pousada (never a fake demo
-      // name) when the admin leaves the "melhor pousada" dropdown unset.
-      const selectedPousada = pousadas.find(p => p.id === speciesForm.bestPousadaId) || pousadas[0];
-      const payload = {
-        name: speciesForm.name,
-        scientificName: speciesForm.scientificName,
-        category: speciesForm.category,
-        description: speciesForm.description,
-        details: speciesForm.details,
-        sightings: speciesForm.sightings,
-        image: speciesForm.image || "https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=800&q=80",
-        bestPousadaId: selectedPousada?.id || "",
-        bestPousadaName: selectedPousada?.name || ""
-      };
-
-      const response = await adminFetch("/api/species", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        setShowAddSpecies(false);
-        setSpeciesForm({
-          name: "",
-          scientificName: "",
-          category: "MAMÍFERO TERRESTRE",
-          description: "",
-          details: "",
-          sightings: "95%+ AVISTAMENTOS",
-          image: "",
-          bestPousadaId: ""
-        });
-        onRefreshData();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteSpecies = async (id: string) => {
-    if (!window.confirm("Deseja realmente remover esta espécie silvestre? Ela some do sistema, mas fica guardada na Lixeira (aba Sistema) por 30 dias caso precise restaurar.")) return;
-    try {
-      const response = await adminFetch(`/api/species/${id}`, { method: "DELETE" });
-      if (response.ok) onRefreshData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Filters bookings list
-  const filteredBookings = bookings.filter(b => {
-    const matchesSearch = b.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || b.pousadaName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
-  const bookingsPagination = usePagination(filteredBookings, 20);
-  const pousadasPagination = usePagination(pousadas, 10);
-
-  // Filtro da aba Guias — nome, idiomas falados e especialidade/foco.
-  const [guideSearch, setGuideSearch] = useState("");
-  const filteredGuides = guides.filter(g => {
-    if (!guideSearch.trim()) return true;
-    const q = guideSearch.toLowerCase();
-    return (
-      g.name.toLowerCase().includes(q) ||
-      (g.languages || []).some(l => l.language.toLowerCase().includes(q)) ||
-      (g.specialty || []).some(s => s.toLowerCase().includes(q))
-    );
-  });
-  const guidesPagination = usePagination(filteredGuides, 20);
-  const speciesPagination = usePagination(species, 20);
-
-  // Agenda Anual (aba "Agenda Integrada"): visão de todo o ano — quem vai
-  // pra onde, quando e com quem — em vez do recorte de poucos dias que a
-  // "Agenda do Ecossistema" mostra. Reaproveita o mesmo "bookings" já
-  // buscado pra tela de Reservas & Confirmações, só filtrado/ordenado de
-  // outro jeito, sem precisar de uma chamada nova ao servidor.
-  const [agendaSearch, setAgendaSearch] = useState("");
-  const agendaBookings = bookings
-    .filter(b => b.status !== "cancelado")
-    .filter(b => {
-      if (!agendaSearch) return true;
-      const q = agendaSearch.toLowerCase();
-      return b.customerName.toLowerCase().includes(q) || b.pousadaName.toLowerCase().includes(q) || (b.guideName || "").toLowerCase().includes(q);
-    })
-    .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-  const agendaPagination = usePagination(agendaBookings, 15);
 
   return (
     <div id="admin-panel" className="bg-editorial-bg min-h-screen py-8 text-editorial-text font-sans">
@@ -769,7 +366,7 @@ export default function AdminDashboard({
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                 <h3 className="font-bold text-lg text-zinc-900">Editar Pousada</h3>
-                <button
+                <button aria-label="Fechar"
                   type="button"
                   onClick={() => setEditingPousadaId(null)}
                   className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer"
@@ -800,6 +397,87 @@ export default function AdminDashboard({
                   />
                 </div>
               </div>
+
+              <CoordinatesInput
+                key={editingPousadaId || "nova"}
+                latitude={editPousadaForm.latitude}
+                longitude={editPousadaForm.longitude}
+                onChange={pos => setEditPousadaForm(prev => ({ ...prev, ...pos }))}
+              />
+
+              <fieldset className="border border-zinc-200 rounded-lg p-3 space-y-2 text-xs">
+                <legend className="px-1 font-semibold text-zinc-700">E-mails de reserva ao hóspede</legend>
+                <p className="text-[11px] text-zinc-500">
+                  Padrão: saem do domínio do EcoSafari como "{editPousadaForm.name || "Pousada"} via EcoSafari", e as respostas vão para o e-mail de contato abaixo.
+                </p>
+                <div>
+                  <label htmlFor="remetente-contato" className="block text-zinc-700 font-semibold mb-1">E-mail para respostas dos hóspedes</label>
+                  <input
+                    id="remetente-contato"
+                    type="email"
+                    placeholder="contato@pousada.com.br"
+                    value={editPousadaForm.emailContato}
+                    onChange={e => setEditPousadaForm(prev => ({ ...prev, emailContato: e.target.value }))}
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-500 pt-1">
+                  Domínio próprio (opcional): preencha só depois de verificar o domínio da pousada no Resend (resend.com → Domains). Se não estiver verificado, o envio volta sozinho ao padrão.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="remetente-email" className="block text-zinc-700 font-semibold mb-1">Endereço</label>
+                    <input
+                      id="remetente-email"
+                      type="email"
+                      placeholder="reservas@pousadavagalume.com"
+                      value={editPousadaForm.emailRemetente}
+                      onChange={e => setEditPousadaForm(prev => ({ ...prev, emailRemetente: e.target.value }))}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="remetente-nome" className="block text-zinc-700 font-semibold mb-1">Nome exibido</label>
+                    <input
+                      id="remetente-nome"
+                      type="text"
+                      maxLength={80}
+                      placeholder={editPousadaForm.name || "Nome da pousada"}
+                      value={editPousadaForm.emailRemetenteNome}
+                      onChange={e => setEditPousadaForm(prev => ({ ...prev, emailRemetenteNome: e.target.value }))}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+                {editingPousadaId && <RemetenteEmailStatus pousadaId={editingPousadaId} reloadKey={remetenteReload} />}
+              </fieldset>
+
+              <fieldset className="border border-zinc-200 rounded-lg p-3 space-y-2 text-xs">
+                <legend className="px-1 font-semibold text-zinc-700">Site oficial</legend>
+                <label className="flex items-center gap-2 font-semibold text-zinc-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editPousadaForm.sitePublicado}
+                    onChange={e => setEditPousadaForm(prev => ({ ...prev, sitePublicado: e.target.checked }))}
+                    className="h-4 w-4 accent-emerald-600"
+                  />
+                  Site criado pela equipe e publicado
+                </label>
+                <p className="text-[11px] text-zinc-500">Ligado: o site aparece no catálogo ("Ver site oficial") e o parceiro pode ajustar textos e fotos. Desligado: o portal mostra a oferta do serviço.</p>
+                <label htmlFor="custom-domain" className="block text-zinc-700 font-semibold pt-2">Domínio próprio (opcional)</label>
+                <input
+                  id="custom-domain"
+                  type="text"
+                  inputMode="url"
+                  placeholder="pousadavagalume.com"
+                  value={editPousadaForm.customDomain}
+                  onChange={e => setEditPousadaForm(prev => ({ ...prev, customDomain: e.target.value }))}
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-[11px] text-zinc-500">
+                  Só o endereço, sem http nem www. O domínio passa a abrir o site oficial desta pousada; reserva, cadastro e pagamento continuam no EcoSafari. Antes, adicione o domínio na Vercel (Settings → Domains) e aponte o DNS — passo a passo no RUNBOOK.md.
+                </p>
+              </fieldset>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
                 <div>
@@ -1202,868 +880,21 @@ export default function AdminDashboard({
         {activeTab === "admins" && <AdminUsersPanel />}
         {activeTab === "auditlog" && <AdminAuditLogPanel />}
         {activeTab === "lixeira" && <AdminLixeiraPanel />}
+        {activeTab === "pacotes" && <PacotesPanel pousadas={pousadas} guides={guides} />}
+        {activeTab === "cupons" && <CuponsPanel pousadas={pousadas} />}
+        {activeTab === "pedidos-site" && <PedidosSitePanel />}
 
         {/* TAB 1: RESERVAS & CONFIRMAÇÕES */}
-        {activeTab === "bookings" && (
-          <div className="space-y-6">
-            
-            {/* Search and filters */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 border border-zinc-200 rounded-2xl">
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar reserva..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full bg-zinc-50 border border-zinc-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-zinc-500 text-xs font-semibold whitespace-nowrap">{filteredBookings.length} reservas filtradas</span>
-                <button
-                  onClick={() => setShowNewBooking(v => !v)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                >
-                  <Plus className="h-4 w-4" /> Nova Reserva
-                </button>
-              </div>
-            </div>
-
-            {showNewBooking && (
-              <NewBookingForm
-                pousadas={pousadas}
-                onClose={() => setShowNewBooking(false)}
-                onCreated={() => { fetchBookings(); onRefreshData(); }}
-              />
-            )}
-
-            {/* List of active bookings */}
-            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-zinc-100 text-zinc-500 uppercase font-bold border-b border-zinc-200 text-[10px] tracking-wider">
-                      <th className="p-4">Cód / Cliente</th>
-                      <th className="p-4">Pousada / Experiência</th>
-                      <th className="p-4">Período</th>
-                      <th className="p-4">Valor</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Ações de Confirmação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200">
-                    {bookingsPagination.pageItems.map((b) => (
-                      <tr key={b.id} className="hover:bg-zinc-50/50">
-                        <td className="p-4">
-                          <span className="font-mono text-[10px] bg-zinc-100 text-zinc-600 px-1.5 py-0.5 rounded font-semibold">#{b.id.split("_")[1] || b.id}</span>
-                          <span className="block font-bold text-zinc-900 mt-1">{b.customerName}</span>
-                          <span className="text-[10px] text-zinc-500 block">{b.customerEmail} • {b.nationality}</span>
-                        </td>
-                        <td className="p-4">
-                          <span className="font-bold text-zinc-800">{b.pousadaName}</span>
-                          <span className="block text-[11px] text-emerald-700 font-semibold mt-0.5">{b.experienceType}</span>
-                        </td>
-                        <td className="p-4 font-medium text-zinc-700">
-                          {b.checkIn} <span className="text-zinc-400">até</span> {b.checkOut}
-                        </td>
-                        <td className="p-4 font-extrabold text-zinc-900">
-                          R$ {b.totalPrice.toLocaleString('pt-BR')}
-                        </td>
-                        <td className="p-4">
-                          {/* Rich Status Badges */}
-                          {b.status === "pendente_pagamento" && <span className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-2 py-1 rounded-full font-bold">Pendente Pagamento</span>}
-                          {b.status === "pago" && <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded-full font-bold animate-pulse">Pago (Aguardando ADM)</span>}
-                          {b.status === "confirmado_pousada" && <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-full font-bold">Confirmado Pousada</span>}
-                          {b.status === "confirmado_guia" && <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-1 rounded-full font-bold">Confirmado Guia</span>}
-                          {b.status === "confirmado_total" && <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-full font-bold flex items-center gap-1 w-max"><ShieldCheck className="h-3.5 w-3.5" /> Confirmado Total</span>}
-                          {b.status === "cancelado" && <span className="bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full font-bold">Cancelado</span>}
-                        </td>
-                        <td className="p-4 text-right space-y-1.5">
-                          {/* Admin interaction tools */}
-                          {b.status === "pendente_pagamento" && (
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                onClick={() => handleMarkAsPaid(b.id)}
-                                title="Pra fechamentos fora do Stripe (Pix, transferência, dinheiro) ou pra testar o fluxo de confirmação"
-                                className="bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 font-bold px-2.5 py-1.5 rounded transition text-[10px]"
-                              >
-                                Marcar como Paga
-                              </button>
-                            </div>
-                          )}
-                          {(b.status === "pago" || b.status === "confirmado_guia") && (
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                onClick={() => handleConfirmPousada(b.id)}
-                                title={b.status === "confirmado_guia" ? "O guia já foi vinculado sem esse passo — aprovar agora fecha a confirmação total e sincroniza o calendário." : undefined}
-                                className="bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold px-2.5 py-1.5 rounded transition text-[10px]"
-                              >
-                                Aprovar Quarto Pousada
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Allocation of available guides */}
-                          {(b.status === "pago" || b.status === "confirmado_pousada") && !b.guideId && (
-                            <div className="flex items-center justify-end gap-1.5 mt-1.5">
-                              <span className="text-[10px] text-zinc-500 font-semibold">Vincular Guia:</span>
-                              <select
-                                onChange={(e) => {
-                                  if (e.target.value) handleConfirmGuide(b.id, e.target.value);
-                                }}
-                                className="bg-zinc-50 border border-zinc-200 rounded p-1 text-[10px]"
-                                defaultValue=""
-                              >
-                                <option value="" disabled>Selecione...</option>
-                                {guides.filter(g => g.status === "disponivel").map(g => (
-                                  <option key={g.id} value={g.id}>{g.name}{g.specialty?.[0] ? ` (${g.specialty[0]})` : ""}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-
-                          {b.guideName && (
-                            <span className="block text-[10px] text-indigo-700 font-semibold text-right">🧭 Guia Alocado: {b.guideName}</span>
-                          )}
-
-                          {b.status !== "cancelado" && b.status !== "confirmado_total" && (
-                            <button
-                              onClick={() => handleCancelBooking(b.id)}
-                              className="text-red-400 hover:text-red-600 font-bold text-[10px] hover:underline"
-                            >
-                              Cancelar Reserva
-                            </button>
-                          )}
-                          
-                          {b.status === "confirmado_total" && b.googleCalendarEventId && (
-                            <span className="text-[9px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded font-mono block text-right w-max ml-auto">
-                              📅 Google Calendar Evento: {b.googleCalendarEventId}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredBookings.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="text-center p-8 text-zinc-400">Nenhuma reserva encontrada.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={bookingsPagination.page}
-                totalPages={bookingsPagination.totalPages}
-                totalItems={bookingsPagination.totalItems}
-                onPageChange={bookingsPagination.setPage}
-              />
-            </div>
-          </div>
-        )}
+        {activeTab === "bookings" && <AdminReservasTab pousadas={pousadas} onRefreshData={onRefreshData} fetchBookings={fetchBookings} guides={guides} bookings={bookings} />}
 
         {/* TAB 2: POUSADAS CRUD */}
-        {activeTab === "pousadas" && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 border border-zinc-200 rounded-2xl">
-              <span className="font-bold text-sm text-zinc-800">Total: {pousadas.length} pousadas cadastradas</span>
-              <button
-                onClick={() => setShowAddPousada(!showAddPousada)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm"
-              >
-                <Plus className="h-4 w-4" /> Adicionar Pousada Parceira
-              </button>
-            </div>
-
-            {/* Add Pousada form */}
-            {showAddPousada && (
-              <form onSubmit={handleAddPousadaSubmit} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-md space-y-4">
-                <h3 className="font-bold text-base text-zinc-900 border-b border-zinc-100 pb-2">Cadastrar Nova Pousada</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Nome da Pousada</label>
-                    <input
-                      type="text"
-                      value={pousadaForm.name}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                      placeholder="Ex: Pousada Ecológica Pantanal"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Localização (Bioma/Estado)</label>
-                    <input
-                      type="text"
-                      value={pousadaForm.location}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, location: e.target.value }))}
-                      required
-                      placeholder="Ex: Pantanal Norte, Mato Grosso"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Preço da Diária (Base R$)</label>
-                    <input
-                      type="number"
-                      value={pousadaForm.pricePerNight}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, pricePerNight: Number(e.target.value) }))}
-                      required
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Capacidade Máxima (Acomodações)</label>
-                    <input
-                      type="number"
-                      value={pousadaForm.capacity}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, capacity: Number(e.target.value) }))}
-                      required
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Link da Imagem Principal</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={pousadaForm.images}
-                        onChange={e => setPousadaForm(prev => ({ ...prev, images: e.target.value }))}
-                        className="flex-1 bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                      />
-                      <ImageUploadButton onUploaded={url => setPousadaForm(prev => ({ ...prev, images: url }))} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Link do Vídeo (opcional)</label>
-                    <input
-                      type="text"
-                      value={pousadaForm.videoUrl}
-                      onChange={e => setPousadaForm(prev => ({ ...prev, videoUrl: e.target.value }))}
-                      placeholder="https://... (vídeo desta pousada específica)"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Descrição Curta</label>
-                  <input
-                    type="text"
-                    value={pousadaForm.description}
-                    onChange={e => setPousadaForm(prev => ({ ...prev, description: e.target.value }))}
-                    required
-                    placeholder="Descrição para o card do catálogo..."
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Estrutura & Comodidades</label>
-                  <TagInput
-                    value={pousadaForm.features}
-                    onChange={features => setPousadaForm(prev => ({ ...prev, features }))}
-                    placeholder="Digite e pressione Enter (ex: Wi-Fi)"
-                  />
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Atividades Inclusas</label>
-                  <TagInput
-                    value={pousadaForm.activities}
-                    onChange={activities => setPousadaForm(prev => ({ ...prev, activities }))}
-                    placeholder="Digite e pressione Enter (ex: Safári)"
-                  />
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Experiências Pagas</label>
-                  <ExperienceListEditor
-                    value={pousadaForm.experiences}
-                    onChange={experiences => setPousadaForm(prev => ({ ...prev, experiences }))}
-                  />
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Quartos</label>
-                  <RoomsEditor
-                    value={pousadaForm.rooms}
-                    onChange={rooms => setPousadaForm(prev => ({ ...prev, rooms }))}
-                  />
-                </div>
-
-                <div className="flex gap-2 justify-end pt-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddPousada(false)}
-                    className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded font-semibold hover:bg-zinc-200 transition"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold transition shadow-sm"
-                  >
-                    Salvar Pousada
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Pousadas Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {pousadasPagination.pageItems.map(p => (
-                <div key={p.id} className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm flex gap-4">
-                  <img
-                    src={p.images[0]}
-                    alt={p.name}
-                    referrerPolicy="no-referrer"
-                    className="w-24 h-24 object-cover rounded-xl"
-                  />
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h4 className="font-extrabold text-zinc-950 text-base">{p.name}</h4>
-                        {p.verified && (
-                          <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full">
-                            <BadgeCheck className="h-3 w-3" /> Verificada
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">{p.location}</p>
-                      <p className="text-zinc-600 text-xs mt-1.5 line-clamp-2">{p.description}</p>
-                      <span className="flex items-center gap-1 text-[10px] text-zinc-400 mt-1.5">
-                        <Eye className="h-3 w-3" /> {p.viewCount || 0} visualizações
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-zinc-100 pt-2.5 mt-2 text-xs">
-                      <span className="font-extrabold text-zinc-900">Diária R$ {p.pricePerNight}</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => openEditPousada(p)}
-                          className="text-[10px] font-bold px-2 py-1.5 rounded text-zinc-600 hover:bg-zinc-100 transition flex items-center gap-1"
-                          title="Editar pousada"
-                        >
-                          <Edit3 className="h-3 w-3" /> Editar
-                        </button>
-                        <button
-                          onClick={() => handleSetVideoUrl(p.id, p.videoUrl || "")}
-                          className={`text-[10px] font-bold px-2 py-1.5 rounded transition ${
-                            p.videoUrl ? "text-emerald-700 hover:bg-emerald-50" : "text-zinc-500 hover:bg-zinc-100"
-                          }`}
-                          title={p.videoUrl ? "Editar link do vídeo" : "Definir vídeo desta pousada"}
-                        >
-                          {p.videoUrl ? "Editar vídeo" : "+ Vídeo"}
-                        </button>
-                        <button
-                          onClick={() => handleToggleVerified(p.id, !!p.verified)}
-                          className={`text-[10px] font-bold px-2 py-1.5 rounded transition ${
-                            p.verified ? "text-zinc-500 hover:bg-zinc-100" : "text-emerald-700 hover:bg-emerald-50"
-                          }`}
-                          title={p.verified ? "Remover selo de verificada" : "Marcar como verificada"}
-                        >
-                          {p.verified ? "Remover selo" : "Verificar"}
-                        </button>
-                        <button
-                          onClick={() => setManagingPousadaAccess(p)}
-                          className="text-zinc-500 hover:text-editorial-primary hover:bg-zinc-100 p-1.5 rounded transition cursor-pointer"
-                          title="Gerenciar acesso de parceiro"
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeletePousada(p.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition"
-                          title="Excluir Pousada"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Pagination
-              page={pousadasPagination.page}
-              totalPages={pousadasPagination.totalPages}
-              totalItems={pousadasPagination.totalItems}
-              onPageChange={pousadasPagination.setPage}
-            />
-          </div>
-        )}
+        {activeTab === "pousadas" && <AdminPousadasTab pousadas={pousadas} onRefreshData={onRefreshData} setManagingPousadaAccess={setManagingPousadaAccess} setEditingPousadaId={setEditingPousadaId} setEditPousadaForm={setEditPousadaForm} />}
 
         {/* TAB 3: GUIAS CRUD */}
-        {activeTab === "guides" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-white p-4 border border-zinc-200 rounded-2xl">
-              <span className="font-bold text-sm text-zinc-800 flex-shrink-0">Total: {guides.length} guias cadastrados{guideSearch && ` (${filteredGuides.length} encontrados)`}</span>
-              <div className="flex items-center gap-2 flex-1 sm:flex-none sm:justify-end">
-                <div className="relative flex-1 sm:flex-none">
-                  <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text" value={guideSearch} onChange={e => setGuideSearch(e.target.value)}
-                    placeholder="Buscar por nome, idioma ou especialidade..."
-                    className="pl-8 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:border-emerald-500 w-full sm:w-72"
-                  />
-                </div>
-                <button
-                  onClick={() => setShowAddGuide(!showAddGuide)}
-                  className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus className="h-4 w-4" /> Cadastrar Novo Guia
-                </button>
-              </div>
-            </div>
-
-            {/* Add Guide form */}
-            {showAddGuide && (
-              <form onSubmit={handleAddGuideSubmit} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-md space-y-4">
-                <h3 className="font-bold text-base text-zinc-900 border-b border-zinc-100 pb-2">Cadastrar Novo Guia Turístico</h3>
-
-                <div className="flex items-center gap-4 text-xs">
-                  <div className="w-16 h-16 flex-shrink-0 rounded-full overflow-hidden bg-zinc-100 border border-zinc-200 flex items-center justify-center">
-                    {guideForm.photoUrl ? (
-                      <img src={guideForm.photoUrl} alt="Prévia" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                    ) : (
-                      <Users className="h-6 w-6 text-zinc-400" />
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Foto de Perfil</label>
-                    <ImageUploadButton label="Enviar foto" onUploaded={url => setGuideForm(prev => ({ ...prev, photoUrl: url }))} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Nome Completo</label>
-                    <input
-                      type="text"
-                      value={guideForm.name}
-                      onChange={e => setGuideForm(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                      placeholder="Ex: Carlos Silva"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">E-mail</label>
-                    <input
-                      type="email"
-                      value={guideForm.email}
-                      onChange={e => setGuideForm(prev => ({ ...prev, email: e.target.value }))}
-                      required
-                      placeholder="carlos@hotmail.com"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Telefone WhatsApp</label>
-                    <input
-                      type="text"
-                      value={guideForm.phone}
-                      onChange={e => setGuideForm(prev => ({ ...prev, phone: e.target.value }))}
-                      required
-                      placeholder="+55 65 99912-3456"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados (com nível)</label>
-                  <LanguagesEditor
-                    value={guideForm.languages}
-                    onChange={languages => setGuideForm(prev => ({ ...prev, languages }))}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
-                    <TagInput
-                      value={guideForm.specialty}
-                      onChange={specialty => setGuideForm(prev => ({ ...prev, specialty }))}
-                      placeholder="Ex: Rastreamento"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Status do Guia</label>
-                    <ToggleSwitch
-                      checked={guideForm.status === "disponivel"}
-                      onChange={checked => setGuideForm(prev => ({ ...prev, status: checked ? "disponivel" : "indisponivel" }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Idade</label>
-                    <input
-                      type="number" min="18" value={guideForm.age}
-                      onChange={e => setGuideForm(prev => ({ ...prev, age: e.target.value }))}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Origem / Local de Nascimento</label>
-                    <input
-                      type="text" value={guideForm.birthplace}
-                      onChange={e => setGuideForm(prev => ({ ...prev, birthplace: e.target.value }))}
-                      placeholder="Ex: Poconé, MT"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Breve Histórico / Bio</label>
-                  <textarea
-                    rows={3} value={guideForm.bio}
-                    onChange={e => setGuideForm(prev => ({ ...prev, bio: e.target.value }))}
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 resize-none"
-                  />
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Temas de Interesse (piloteiro, passarinheiro, botânica...)</label>
-                  <TagInput
-                    value={guideForm.interests}
-                    onChange={interests => setGuideForm(prev => ({ ...prev, interests }))}
-                    placeholder="Digite e pressione Enter"
-                  />
-                </div>
-
-                <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={guideForm.images} onChange={images => setGuideForm(prev => ({ ...prev, images }))} />
-
-                <div className="flex gap-2 justify-end pt-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddGuide(false)}
-                    className="bg-zinc-100 text-zinc-700 px-4 py-2 rounded font-semibold hover:bg-zinc-200 transition"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold transition shadow-sm"
-                  >
-                    Salvar Guia
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Edit Guide modal */}
-            {editingGuideId && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <form
-                  onSubmit={handleEditGuideSubmit}
-                  className="bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-8 space-y-5"
-                >
-                  <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-                    <h3 className="font-bold text-lg text-zinc-900">Editar Guia</h3>
-                    <button type="button" onClick={() => setEditingGuideId(null)} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs">
-                    <div className="w-16 h-16 flex-shrink-0 rounded-full overflow-hidden bg-zinc-100 border border-zinc-200 flex items-center justify-center">
-                      {editGuideForm.photoUrl ? (
-                        <img src={editGuideForm.photoUrl} alt="Prévia" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                      ) : (
-                        <Users className="h-6 w-6 text-zinc-400" />
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Foto de Perfil</label>
-                      <ImageUploadButton label="Trocar foto" onUploaded={url => setEditGuideForm(prev => ({ ...prev, photoUrl: url }))} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Nome Completo</label>
-                      <input type="text" required value={editGuideForm.name} onChange={e => setEditGuideForm(prev => ({ ...prev, name: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
-                    </div>
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">E-mail</label>
-                      <input type="email" required value={editGuideForm.email} onChange={e => setEditGuideForm(prev => ({ ...prev, email: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
-                    </div>
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Telefone WhatsApp</label>
-                      <input type="text" required value={editGuideForm.phone} onChange={e => setEditGuideForm(prev => ({ ...prev, phone: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Idiomas Falados (com nível)</label>
-                    <LanguagesEditor value={editGuideForm.languages} onChange={languages => setEditGuideForm(prev => ({ ...prev, languages }))} />
-                  </div>
-
-                  <div className="text-xs">
-                    <label className="block text-zinc-700 font-semibold mb-1">Especialidades</label>
-                    <TagInput value={editGuideForm.specialty} onChange={specialty => setEditGuideForm(prev => ({ ...prev, specialty }))} placeholder="Ex: Rastreamento" />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Status</label>
-                      <ToggleSwitch
-                        checked={editGuideForm.status === "disponivel"}
-                        onChange={checked => setEditGuideForm(prev => ({ ...prev, status: checked ? "disponivel" : "indisponivel" }))}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Idade</label>
-                      <input type="number" min="18" value={editGuideForm.age} onChange={e => setEditGuideForm(prev => ({ ...prev, age: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
-                    </div>
-                    <div>
-                      <label className="block text-zinc-700 font-semibold mb-1">Origem</label>
-                      <input type="text" value={editGuideForm.birthplace} onChange={e => setEditGuideForm(prev => ({ ...prev, birthplace: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500" />
-                    </div>
-                  </div>
-
-                  <div className="text-xs">
-                    <label className="block text-zinc-700 font-semibold mb-1">Breve Histórico / Bio</label>
-                    <textarea rows={3} value={editGuideForm.bio} onChange={e => setEditGuideForm(prev => ({ ...prev, bio: e.target.value }))} className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 resize-none" />
-                  </div>
-
-                  <div className="text-xs">
-                    <label className="block text-zinc-700 font-semibold mb-1">Temas de Interesse</label>
-                    <TagInput value={editGuideForm.interests} onChange={interests => setEditGuideForm(prev => ({ ...prev, interests }))} placeholder="Digite e pressione Enter" />
-                  </div>
-
-                  <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={editGuideForm.images} onChange={images => setEditGuideForm(prev => ({ ...prev, images }))} />
-
-                  <div className="text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-3">
-                    <label className="block text-zinc-700 font-semibold mb-1.5">Agenda — datas indisponíveis</label>
-                    <GuideAvailabilityCalendar value={editGuideForm.unavailableDates} onChange={unavailableDates => setEditGuideForm(prev => ({ ...prev, unavailableDates }))} />
-                  </div>
-
-                  <div className="flex gap-2 justify-end pt-2 text-xs border-t border-zinc-100">
-                    <button type="button" onClick={() => setEditingGuideId(null)} className="bg-zinc-100 text-zinc-700 px-4 py-2.5 rounded-lg font-semibold hover:bg-zinc-200 transition cursor-pointer">
-                      Cancelar
-                    </button>
-                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold transition shadow-sm cursor-pointer">
-                      Salvar Alterações
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Guides List */}
-            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-zinc-100 text-zinc-500 uppercase font-bold border-b border-zinc-200 text-[10px] tracking-wider">
-                    <th className="p-4">Guia / Contato</th>
-                    <th className="p-4">Idiomas falados</th>
-                    <th className="p-4">Especialidade / Foco</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200">
-                  {guidesPagination.pageItems.map(g => (
-                    <tr key={g.id}>
-                      <td className="p-4">
-                        <span className="font-bold text-zinc-950 block">{g.name}</span>
-                        <span className="text-[10px] text-zinc-500 block mt-0.5">{g.email} • {g.phone}</span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1">
-                          {(g.languages || []).map((l, i) => (
-                            <span key={i} className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded text-[10px] border border-zinc-200">{l.language} ({LEVEL_LABELS[l.level]})</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4 font-medium text-zinc-700">
-                        {(g.specialty || []).join(", ")}
-                      </td>
-                      <td className="p-4">
-                        {g.status === "disponivel" ? (
-                          <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-1 rounded-full font-bold">Disponível</span>
-                        ) : (
-                          <span className="bg-zinc-100 text-zinc-600 border border-zinc-200 px-2 py-1 rounded-full font-bold">Indisponível</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => setManagingGuideAccess(g)}
-                          className="text-zinc-500 hover:text-editorial-primary p-2 rounded hover:bg-zinc-50 transition cursor-pointer"
-                          title="Gerenciar acesso de parceiro"
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => openEditGuide(g)}
-                          className="text-zinc-500 hover:text-editorial-primary p-2 rounded hover:bg-zinc-50 transition cursor-pointer"
-                          title="Editar Guia"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteGuide(g.id)}
-                          className="text-red-500 hover:text-red-700 p-2 rounded hover:bg-red-50 transition cursor-pointer"
-                          title="Excluir Guia"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredGuides.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center p-8 text-zinc-400">
-                        {guides.length === 0 ? "Nenhum guia cadastrado ainda." : "Nenhum guia encontrado com esse filtro."}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-              <Pagination
-                page={guidesPagination.page}
-                totalPages={guidesPagination.totalPages}
-                totalItems={guidesPagination.totalItems}
-                onPageChange={guidesPagination.setPage}
-              />
-            </div>
-
-          </div>
-        )}
+        {activeTab === "guides" && <AdminGuiasTab guides={guides} setManagingGuideAccess={setManagingGuideAccess} fetchGuides={fetchGuides} />}
 
         {/* TAB 4: AGENDA INTEGRADA */}
-        {activeTab === "agenda" && (
-          <div className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-sm space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 pb-4">
-              <div>
-                <h3 className="font-serif font-bold text-editorial-primary text-xl mb-1 flex items-center gap-1.5"><Calendar className="h-5 w-5 text-editorial-primary" /> Agenda Geral de Expedições</h3>
-                <p className="text-zinc-500 text-xs">Sincronização integrada em tempo real com o Google Calendar para todas as expedições confirmadas.</p>
-              </div>
-            </div>
-
-            {/* Google Calendar Connection Status Banner */}
-            <div className="bg-editorial-secondary border border-editorial-border p-5 rounded-none flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex-1">
-                <h4 className="font-serif font-bold text-editorial-primary text-sm flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${googleCalendarStatus.connected ? "bg-emerald-500" : "bg-amber-500"}`}></span>
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${googleCalendarStatus.connected ? "bg-emerald-600" : "bg-amber-600"}`}></span>
-                  </span>
-                  Integração Oficial Google Calendar
-                </h4>
-                <p className="text-editorial-muted text-[11px] mt-1 font-light">
-                  {googleCalendarStatus.connected
-                    ? `Sincronizado ativamente com a conta: ${googleCalendarStatus.email || "Conectada"}`
-                    : "Conecte sua agenda para enviar automaticamente as reservas confirmadas para o Google Calendar em tempo real."}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                {googleCalendarStatus.connected ? (
-                  <button
-                    onClick={handleDisconnectGoogleCalendar}
-                    disabled={disconnectingGoogle}
-                    className="bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 px-4 py-2 text-xs font-bold uppercase tracking-widest transition cursor-pointer disabled:opacity-60"
-                  >
-                    {disconnectingGoogle ? "Desconectando..." : "Desconectar Conta"}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleConnectGoogleCalendar}
-                    disabled={connectingGoogle}
-                    className="bg-editorial-primary text-white hover:bg-editorial-primary/95 px-4 py-2 text-xs font-bold uppercase tracking-widest transition cursor-pointer disabled:opacity-60"
-                  >
-                    {connectingGoogle ? "Conectando..." : "Conectar Google Calendar"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <AdminYearCalendarPanel bookings={bookings} pousadas={pousadas} />
-
-            <EcosystemAvailabilityPanel />
-
-            <AdminConfiabilidadePanel />
-
-            <PousadaCalendarsPanel pousadas={pousadas} connected={googleCalendarStatus.connected} onRefreshData={onRefreshData} />
-
-            <div className="border-t border-zinc-200 pt-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-1">
-                <h3 className="font-serif font-bold text-editorial-primary text-lg flex items-center gap-1.5">
-                  <CalendarClock className="h-5 w-5 text-editorial-primary" /> Agenda Anual — Todos os Itinerários
-                </h3>
-                <div className="relative w-full md:w-64">
-                  <Search className="h-3.5 w-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text" value={agendaSearch} onChange={e => setAgendaSearch(e.target.value)}
-                    placeholder="Buscar turista, pousada ou guia..."
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-editorial-primary"
-                  />
-                </div>
-              </div>
-              <p className="text-zinc-500 text-xs mb-4">
-                Todas as reservas ativas (não canceladas) de todas as pousadas, ordenadas por data de check-in — quem vai, pra onde, quando e com qual guia confirmado.
-              </p>
-
-              <div className="border border-zinc-200 rounded-xl overflow-hidden divide-y divide-zinc-200">
-                {agendaPagination.pageItems.map((b) => (
-                  <div key={b.id} className="p-4 hover:bg-zinc-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-emerald-50 text-emerald-800 p-3 rounded-lg font-bold text-center w-20 flex-shrink-0 border border-emerald-100">
-                        <span className="text-[10px] block uppercase text-emerald-600">Check-In</span>
-                        <span className="text-sm block leading-none mt-1">{b.checkIn.split("-")[2]} / {b.checkIn.split("-")[1]}</span>
-                      </div>
-                      <div>
-                        <h4 className="font-extrabold text-zinc-950 text-base">{b.pousadaName}</h4>
-                        <p className="text-xs text-zinc-600 mt-1">
-                          Cliente: <span className="font-bold text-zinc-800">{b.customerName}</span> ({b.adults} adultos, {b.children} crianças)
-                        </p>
-                        <p className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1">
-                          ⏱️ {b.checkIn} até {b.checkOut}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-start sm:items-end gap-1.5">
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {b.status === "pendente_pagamento" && <span className="text-[10px] uppercase tracking-wider bg-zinc-100 text-zinc-700 border border-zinc-200 px-2 py-0.5 rounded-full font-bold">Pendente Pagamento</span>}
-                        {b.status === "pago" && <span className="text-[10px] uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">Pago</span>}
-                        {b.status === "confirmado_pousada" && <span className="text-[10px] uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-bold">Confirmado Pousada</span>}
-                        {b.status === "confirmado_guia" && <span className="text-[10px] uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-bold">Confirmado Guia</span>}
-                        {b.status === "confirmado_total" && <span className="text-[10px] uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> Confirmado Total</span>}
-                      </div>
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
-                        🧭 {b.experienceType}
-                      </span>
-                      <span className="text-xs text-zinc-500">
-                        {b.guideName ? `Guia: ${b.guideName}` : "⚠️ Nenhum guia alocado"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {agendaBookings.length === 0 && (
-                  <p className="text-zinc-400 text-xs p-6 text-center">
-                    {agendaSearch ? "Nenhum itinerário encontrado com essa busca." : "Nenhuma reserva ativa no momento."}
-                  </p>
-                )}
-              </div>
-              <Pagination
-                page={agendaPagination.page}
-                totalPages={agendaPagination.totalPages}
-                totalItems={agendaPagination.totalItems}
-                onPageChange={agendaPagination.setPage}
-              />
-            </div>
-          </div>
-        )}
+        {activeTab === "agenda" && <AdminAgendaTab pousadas={pousadas} onRefreshData={onRefreshData} googleCalendarStatus={googleCalendarStatus} bookings={bookings} fetchGoogleCalendarStatus={fetchGoogleCalendarStatus} />}
 
         {/* TAB 5: HISTÓRICO DE CLIENTES */}
         {activeTab === "history" && (
@@ -2125,210 +956,7 @@ export default function AdminDashboard({
         )}
 
         {/* TAB 7: SPECIES CRUD */}
-        {activeTab === "species" && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 border border-zinc-200 rounded-2xl">
-              <span className="font-bold text-sm text-zinc-800">Total: {species.length} espécies cadastradas</span>
-              <button
-                onClick={() => setShowAddSpecies(!showAddSpecies)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm"
-              >
-                <Plus className="h-4 w-4" /> Cadastrar Nova Espécie
-              </button>
-            </div>
-
-            {/* Add Species form */}
-            {showAddSpecies && (
-              <form onSubmit={handleAddSpeciesSubmit} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-md space-y-4">
-                <h3 className="font-bold text-base text-zinc-900 border-b border-zinc-100 pb-2">Cadastrar Nova Espécie Silvestre</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Nome Popular (ex: Onça-Pintada)</label>
-                    <input
-                      type="text"
-                      value={speciesForm.name}
-                      onChange={e => setSpeciesForm(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                      placeholder="Ex: Onça-Pintada"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Nome Científico (ex: Panthera onca)</label>
-                    <input
-                      type="text"
-                      value={speciesForm.scientificName}
-                      onChange={e => setSpeciesForm(prev => ({ ...prev, scientificName: e.target.value }))}
-                      required
-                      placeholder="Ex: Panthera onca"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Categoria</label>
-                    <select
-                      value={speciesForm.category}
-                      onChange={e => setSpeciesForm(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="MAMÍFERO TERRESTRE">MAMÍFERO TERRESTRE</option>
-                      <option value="MAMÍFERO AQUÁTICO">MAMÍFERO AQUÁTICO</option>
-                      <option value="AVE EXÓTICA">AVE EXÓTICA</option>
-                      <option value="RÉPTIL PREDADOR">RÉPTIL PREDADOR</option>
-                      <option value="ANFÍBIO">ANFÍBIO</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Probabilidade de Avistamento (ex: 95%+ AVISTAMENTOS)</label>
-                    <input
-                      type="text"
-                      value={speciesForm.sightings}
-                      onChange={e => setSpeciesForm(prev => ({ ...prev, sightings: e.target.value }))}
-                      required
-                      placeholder="Ex: 90%+ AVISTAMENTOS"
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-zinc-700 font-semibold mb-1">Melhor Pousada de Observação</label>
-                    <select
-                      value={speciesForm.bestPousadaId}
-                      onChange={e => setSpeciesForm(prev => ({ ...prev, bestPousadaId: e.target.value }))}
-                      required
-                      className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value="">Selecione uma pousada...</option>
-                      {pousadas.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Link da Imagem Ilustrativa</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={speciesForm.image}
-                      onChange={e => setSpeciesForm(prev => ({ ...prev, image: e.target.value }))}
-                      placeholder="https://images.unsplash.com/..."
-                      className="flex-1 bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                    />
-                    <ImageUploadButton onUploaded={url => setSpeciesForm(prev => ({ ...prev, image: url }))} />
-                  </div>
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Descrição Curta (para o card principal)</label>
-                  <input
-                    type="text"
-                    value={speciesForm.description}
-                    onChange={e => setSpeciesForm(prev => ({ ...prev, description: e.target.value }))}
-                    required
-                    placeholder="Breve sumário ecológico..."
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="text-xs">
-                  <label className="block text-zinc-700 font-semibold mb-1">Detalhes Completos (para o modal explicativo)</label>
-                  <textarea
-                    value={speciesForm.details}
-                    onChange={e => setSpeciesForm(prev => ({ ...prev, details: e.target.value }))}
-                    required
-                    rows={3}
-                    placeholder="Informações comportamentais, conservação, etc..."
-                    className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddSpecies(false)}
-                    className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 px-4 py-2 rounded font-semibold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-bold"
-                  >
-                    Salvar Espécie
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Species List Grid */}
-            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-zinc-50 text-zinc-500 uppercase tracking-wider border-b border-zinc-200 font-bold">
-                      <th className="p-4">Espécie</th>
-                      <th className="p-4">Nome Científico</th>
-                      <th className="p-4">Categoria</th>
-                      <th className="p-4">Avistamentos</th>
-                      <th className="p-4">Melhor Pousada</th>
-                      <th className="p-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100">
-                    {species.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-zinc-400 italic">
-                          Nenhuma espécie cadastrada no banco de dados. O site está usando o catálogo padrão do Pantanal.
-                        </td>
-                      </tr>
-                    ) : (
-                      speciesPagination.pageItems.map(s => (
-                        <tr key={s.id} className="hover:bg-zinc-50/55 transition">
-                          <td className="p-4 flex items-center gap-3">
-                            <img
-                              src={s.image}
-                              alt={s.name}
-                              referrerPolicy="no-referrer"
-                              className="w-10 h-10 object-cover rounded border border-zinc-200"
-                            />
-                            <span className="font-bold text-zinc-900">{s.name}</span>
-                          </td>
-                          <td className="p-4 italic text-zinc-600">{s.scientificName}</td>
-                          <td className="p-4">
-                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-100 px-2 py-0.5 rounded text-[10px] font-bold">
-                              {s.category}
-                            </span>
-                          </td>
-                          <td className="p-4 font-mono font-semibold text-amber-800">{s.sightings}</td>
-                          <td className="p-4 text-zinc-600">{s.bestPousadaName}</td>
-                          <td className="p-4 text-right">
-                            <button
-                              onClick={() => handleDeleteSpecies(s.id)}
-                              className="text-red-600 hover:text-red-700 font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" /> Excluir
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={speciesPagination.page}
-                totalPages={speciesPagination.totalPages}
-                totalItems={speciesPagination.totalItems}
-                onPageChange={speciesPagination.setPage}
-              />
-            </div>
-          </div>
-        )}
+        {activeTab === "species" && <AdminEspeciesTab species={species} pousadas={pousadas} onRefreshData={onRefreshData} />}
 
         </div>
         {/* end TAB CONTENT */}

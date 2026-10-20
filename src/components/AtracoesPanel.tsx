@@ -5,6 +5,7 @@ import { adminFetch } from "../lib/adminFetch";
 import ImageListEditor from "./ImageListEditor";
 import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
 import PartnerAccessManager from "./PartnerAccessManager";
+import CoordinatesInput from "./CoordinatesInput";
 import Pagination from "./Pagination";
 import { usePagination } from "../lib/usePagination";
 
@@ -33,6 +34,8 @@ export default function AtracoesPanel() {
     images: [] as string[],
     menu: [] as ExperienceDraft[],
     availability: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -65,6 +68,8 @@ export default function AtracoesPanel() {
       images: [...(a.images || [])],
       menu: (a.menu || []).map(m => ({ title: m.item, price: m.price })),
       availability: a.availability || "",
+      latitude: a.latitude ?? null,
+      longitude: a.longitude ?? null,
     });
   };
 
@@ -84,6 +89,8 @@ export default function AtracoesPanel() {
       ? form.menu.filter(m => m.title.trim()).map(m => ({ item: m.title.trim(), price: m.price || 0 }))
       : undefined,
     availability: form.availability.trim() || undefined,
+    latitude: form.latitude,
+    longitude: form.longitude,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -156,7 +163,7 @@ export default function AtracoesPanel() {
         <form onSubmit={handleSubmit} className="bg-white border border-zinc-200 p-6 rounded-2xl shadow-md space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
             <h3 className="font-bold text-base text-zinc-900">{editing ? "Editar Atração" : "Cadastrar Nova Atração"}</h3>
-            <button type="button" onClick={closeForm} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
+            <button aria-label="Fechar" type="button" onClick={closeForm} className="text-zinc-400 hover:text-zinc-700 transition cursor-pointer">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -191,6 +198,13 @@ export default function AtracoesPanel() {
               className="w-full bg-zinc-50 border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500"
             />
           </div>
+
+          <CoordinatesInput
+            key={editing?.id || "nova"}
+            latitude={form.latitude}
+            longitude={form.longitude}
+            onChange={pos => setForm(prev => ({ ...prev, ...pos }))}
+          />
 
           <div className="text-xs">
             <label className="block text-zinc-700 font-semibold mb-1">Descrição</label>
@@ -263,7 +277,7 @@ export default function AtracoesPanel() {
                 {a.availability && <span className="text-[11px] text-zinc-400 block mt-0.5">{a.availability}</span>}
               </div>
               <div className="flex items-center justify-end gap-1 mt-2 flex-wrap">
-                <button onClick={() => setManagingAccessFor(a)} className="text-zinc-500 hover:text-editorial-primary p-1.5 rounded hover:bg-zinc-50 transition cursor-pointer" title="Gerenciar acesso de parceiro">
+                <button aria-label="Gerenciar acesso de parceiro" onClick={() => setManagingAccessFor(a)} className="text-zinc-500 hover:text-editorial-primary p-1.5 rounded hover:bg-zinc-50 transition cursor-pointer" title="Gerenciar acesso de parceiro">
                   <KeyRound className="h-4 w-4" />
                 </button>
                 <button onClick={() => handleToggleVerified(a)} className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-emerald-700 px-2 py-1 rounded hover:bg-emerald-50 transition cursor-pointer">
@@ -272,7 +286,7 @@ export default function AtracoesPanel() {
                 <button onClick={() => openEdit(a)} className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-editorial-primary px-2 py-1 rounded hover:bg-zinc-50 transition cursor-pointer">
                   Editar
                 </button>
-                <button onClick={() => handleDelete(a.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition cursor-pointer" title="Excluir">
+                <button aria-label="Excluir" onClick={() => handleDelete(a.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition cursor-pointer" title="Excluir">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>

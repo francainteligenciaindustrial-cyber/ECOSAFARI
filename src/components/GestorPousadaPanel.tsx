@@ -154,7 +154,7 @@ export default function GestorPousadaPanel({ supabase, userInfo, onUserInfoSaved
                   </span>
                   <span className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted">{isActive ? "Selecionada" : "Abrir e editar"}</span>
                 </button>
-                <button
+                <button aria-label="Remover pousada"
                   type="button"
                   onClick={() => removePousada(p)}
                   disabled={removingId === p.partnerId}

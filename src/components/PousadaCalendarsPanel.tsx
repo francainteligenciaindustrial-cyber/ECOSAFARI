@@ -57,7 +57,7 @@ export default function PousadaCalendarsPanel({ pousadas, connected, onRefreshDa
             <span className="text-sm font-semibold text-zinc-800 truncate">{p.name}</span>
             {p.googleCalendarId ? (
               <div className="flex items-center gap-2 flex-shrink-0">
-                <button
+                <button aria-label="Copiar ID do calendário"
                   onClick={() => handleCopyId(p.googleCalendarId!)}
                   title="Copiar ID do calendário"
                   className="text-zinc-400 hover:text-zinc-600 transition cursor-pointer"

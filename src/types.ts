@@ -83,6 +83,38 @@ export interface Pousada {
   // no catálogo aponta pra ownWebsiteUrl em vez do /site/:slug gerado.
   hasOwnWebsite?: boolean;
   ownWebsiteUrl?: string;
+  // Posição no mapa público (graus decimais). Sem isso, o mapa tenta uma
+  // posição aproximada pelo nome da cidade em "location".
+  latitude?: number;
+  longitude?: number;
+  // Remetente próprio dos e-mails de reserva ao hóspede (ex.:
+  // reservas@pousadavagalume.com). Definido só pelo admin, depois de
+  // verificar o domínio no Resend; vazio = remetente da plataforma.
+  emailRemetente?: string;
+  emailRemetenteNome?: string;
+  // Para onde vão as respostas dos hóspedes aos e-mails de reserva — a
+  // própria pousada edita no portal.
+  emailContato?: string;
+  // Domínio próprio que abre o site oficial da pousada (ex.:
+  // pousadavagalume.com). Só o admin define — ver /api/sites/by-host.
+  customDomain?: string;
+  // Site oficial criado pela equipe EcoSafari e no ar (só o admin muda).
+  // Antes disso o portal mostra a oferta do serviço em vez do editor.
+  sitePublicado?: boolean;
+}
+
+// Pedido de criação de site oficial feito pelo gestor no portal.
+export interface PedidoSite {
+  id: string;
+  pousadaId: string;
+  userId?: string;
+  contatoNome?: string;
+  contatoEmail?: string;
+  contatoTelefone?: string;
+  status: 'novo' | 'em_contato' | 'em_producao' | 'entregue' | 'cancelado';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Avaliação (antes chamada de "comentário") — unificada para os três tipos
@@ -138,6 +170,8 @@ export interface Atracao {
   images: string[];
   menu?: { item: string; price: number }[]; // cardápio — só para type === 'restaurante'
   availability?: string; // dias/horário de funcionamento, ex: "Terça a domingo, 11h às 22h"
+  latitude?: number;
+  longitude?: number;
   rating: number;
   verified?: boolean;
   dateCreated: string;
@@ -182,6 +216,10 @@ export interface Booking {
   // transfer, interesses, observações).
   guestDetails?: string;
   origem?: string;
+  // Pacote combinado (pousada + guia + atração) e cupom usados na reserva.
+  pacoteId?: string;
+  cupomCode?: string;
+  discountAmount?: number;
   // Deve bater com um Pousada.rooms[].type — quando informado, a
   // disponibilidade é checada por unidade daquele tipo de quarto (não só
   // contra a capacidade agregada da pousada). Opcional pra manter
@@ -198,6 +236,62 @@ export interface PublicBookingSummary {
   checkIn: string;
   checkOut: string;
   status: Booking['status'];
+}
+
+// Pacote combinado montado pelo admin: hospedagem + guia + atrações, vendido
+// por pessoa e pago num único checkout do Stripe (um item por componente).
+export interface PacoteItem {
+  label: string;
+  kind: 'hospedagem' | 'guia' | 'atracao' | 'outro';
+  pricePerPerson: number;
+}
+
+export interface Pacote {
+  id: string;
+  name: string;
+  description?: string;
+  pousadaId: string;
+  guideId?: string;
+  atracaoIds: string[];
+  nights: number;
+  items: PacoteItem[];
+  imageUrl?: string;
+  active: boolean;
+  createdAt: string;
+}
+
+// Versão pública (home): nomes resolvidos, sem ids internos de guia.
+export interface PacotePublico {
+  id: string;
+  name: string;
+  description?: string;
+  pousadaId: string;
+  pousadaName: string;
+  guideName?: string;
+  atracaoNames: string[];
+  nights: number;
+  items: PacoteItem[];
+  pricePerPerson: number;
+  imageUrl?: string;
+}
+
+// Cupom promocional aplicado no checkout. Percentual OU valor fixo;
+// validade, limite de usos e valor mínimo opcionais. Pode valer só para uma
+// pousada (pousadaId) ou para o site todo.
+export interface Cupom {
+  id: string;
+  code: string;
+  description?: string;
+  percentOff?: number;
+  amountOff?: number;
+  minTotal?: number;
+  maxUses?: number;
+  usedCount: number;
+  validFrom?: string;
+  validUntil?: string;
+  pousadaId?: string;
+  active: boolean;
+  createdAt: string;
 }
 
 export interface Sighting {

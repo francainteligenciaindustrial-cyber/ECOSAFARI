@@ -7,46 +7,110 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/sitemap.xml", "destination": "/api/index" },
-    { "source": "/pousadas/:id", "destination": "/api/index" },
-    { "source": "/site/:slug", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/pousadas/:id",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/site/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "crons": [
-    { "path": "/api/cron/lembretes-cancelamento", "schedule": "0 12 * * *" }
+    {
+      "path": "/api/cron/lembretes-cancelamento",
+      "schedule": "0 12 * * *"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=(self)" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(), microphone=(), camera=(self)"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com https://connect.facebook.net https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://www.google.com https://www.facebook.com https://*.sentry.io https://www.googletagmanager.com https://*.google-analytics.com; frame-src https://www.google.com https://www.youtube-nocookie.com https://www.youtube.com https://drive.google.com; media-src 'self' blob: https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com https://connect.facebook.net https://www.googletagmanager.com https://translate.google.com https://translate.googleapis.com https://translate-pa.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://www.gstatic.com https://translate.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://www.google.com https://www.facebook.com https://*.sentry.io https://www.googletagmanager.com https://*.google-analytics.com https://translate.googleapis.com https://translate-pa.googleapis.com; frame-src https://www.google.com https://www.youtube-nocookie.com https://www.youtube.com https://drive.google.com https://translate.google.com; media-src 'self' blob: https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     },
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(pousadas|species)/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=86400" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
       ]
     },
     {
       "source": "/favicon.svg",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
       ]
     }
   ]

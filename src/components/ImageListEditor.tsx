@@ -64,7 +64,7 @@ export default function ImageListEditor({ label, value, onChange, emptyHint = "N
               className="flex-1 bg-white border border-zinc-200 rounded p-2 focus:outline-none focus:border-emerald-500 font-mono"
             />
             <ImageUploadButton label="Enviar" onUploaded={url => update(idx, url)} />
-            <button
+            <button aria-label="Remover imagem"
               type="button"
               onClick={() => remove(idx)}
               className="text-zinc-400 hover:text-red-600 transition cursor-pointer flex-shrink-0"

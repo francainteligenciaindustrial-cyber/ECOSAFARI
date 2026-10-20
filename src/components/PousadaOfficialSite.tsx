@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Star, Check, Compass, MessageSquare, LoaderCircle, ArrowLeft, Instagram, ExternalLink, Users, PlayCircle, Quote, Sparkles } from "lucide-react";
+import { MapPin, Star, Check, Compass, MessageSquare, LoaderCircle, ArrowLeft, Instagram, ExternalLink, Users, PlayCircle, Quote, Sparkles, CalendarCheck } from "lucide-react";
 import { Pousada, Review } from "../types";
 import { slugify } from "../lib/slug";
 import { navigate } from "../lib/router";
@@ -16,9 +16,13 @@ interface PousadaOfficialSiteProps {
   // as edições ainda não salvas, atualizando a cada tecla digitada. A busca
   // real por slug (rota pública /site/:slug) continua intocada.
   previewPousada?: Pousada;
+  // Endereço do EcoSafari quando o site abre num domínio próprio da pousada
+  // (ex.: pousadavagalume.com): links para o catálogo e para a reserva vão
+  // para lá, onde ficam cadastro, login e pagamento.
+  mainUrl?: string;
 }
 
-export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOfficialSiteProps) {
+export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: PousadaOfficialSiteProps) {
   const [fetchedPousada, setFetchedPousada] = useState<Pousada | null | undefined>(undefined); // undefined = loading
   const [reviews, setReviews] = useState<Review[]>([]);
   const pousada = previewPousada ?? fetchedPousada;
@@ -33,6 +37,20 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
       })
       .catch(() => setFetchedPousada(null));
   }, [slug, previewPousada]);
+
+  useEffect(() => {
+    if (!pousada?.name || previewPousada) return;
+    const previous = document.title;
+    document.title = mainUrl ? pousada.name : `${pousada.name} — EcoSafari Brasil`;
+    return () => { document.title = previous; };
+  }, [pousada?.name, previewPousada, mainUrl]);
+
+  // Link para o catálogo/reserva: navegação interna no domínio do EcoSafari,
+  // link absoluto quando o site está no domínio próprio da pousada.
+  const platformLink = (target: string) => ({
+    href: `${mainUrl || ""}${target}`,
+    onClick: mainUrl ? undefined : (e: React.MouseEvent) => { e.preventDefault(); navigate(target); },
+  });
 
   useEffect(() => {
     if (!pousada?.id) return;
@@ -55,7 +73,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-editorial-bg text-center px-6">
         <h1 className="text-2xl font-serif font-bold text-editorial-primary">Site não encontrado</h1>
         <p className="text-editorial-muted text-sm">Não encontramos essa pousada.</p>
-        <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-editorial-primary hover:opacity-80 transition cursor-pointer">
+        <a {...platformLink("/")} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-editorial-primary hover:opacity-80 transition cursor-pointer">
           <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo EcoSafari
         </a>
       </div>
@@ -102,7 +120,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
               ainda não salvas, então some por lá. */}
           {!previewPousada && <LanguageSwitcher />}
           {pousada.officialSiteUrl && (
-            <a
+            <a aria-label={pousada.officialSiteUrl.includes("instagram.com") ? "Instagram" : "Redes sociais"}
               href={pousada.officialSiteUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -120,6 +138,14 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
           >
             <MessageSquare className="h-3.5 w-3.5" /> Fale Conosco
           </a>
+          {!previewPousada && (
+            <a
+              {...platformLink(`/reservar/${encodeURIComponent(pousada.id)}`)}
+              className="flex items-center gap-2 bg-editorial-primary hover:opacity-90 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition cursor-pointer"
+            >
+              <CalendarCheck className="h-3.5 w-3.5" /> Reservar
+            </a>
+          )}
         </div>
       </header>
 
@@ -323,14 +349,24 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
       <section className="bg-editorial-primary text-white py-16 text-center px-6">
         <h2 className="text-2xl md:text-3xl font-serif font-bold mb-3">Venha nos visitar</h2>
         <p className="text-white/80 text-sm mb-8 max-w-lg mx-auto">Diárias a partir de R$ {pousada.pricePerNight.toLocaleString('pt-BR')} · Capacidade para {pousada.capacity} hóspedes</p>
-        <a
-          href={whatsappLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-white text-editorial-primary hover:bg-white/90 font-bold px-8 py-3.5 text-xs uppercase tracking-widest transition"
-        >
-          <MessageSquare className="h-4 w-4" /> Fale Conosco no WhatsApp
-        </a>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {!previewPousada && (
+            <a
+              {...platformLink(`/reservar/${encodeURIComponent(pousada.id)}`)}
+              className="inline-flex items-center gap-2 bg-arara-yellow text-arara-black hover:bg-arara-orange font-bold px-8 py-3.5 text-xs uppercase tracking-widest transition cursor-pointer"
+            >
+              <CalendarCheck className="h-4 w-4" /> Reservar online
+            </a>
+          )}
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-white text-editorial-primary hover:bg-white/90 font-bold px-8 py-3.5 text-xs uppercase tracking-widest transition"
+          >
+            <MessageSquare className="h-4 w-4" /> Fale Conosco no WhatsApp
+          </a>
+        </div>
       </section>
 
       {/* Footer */}
@@ -338,7 +374,7 @@ export default function PousadaOfficialSite({ slug, previewPousada }: PousadaOff
         {previewPousada ? (
           <span>Listado no catálogo EcoSafari Brasil</span>
         ) : (
-          <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="hover:text-editorial-primary transition cursor-pointer">
+          <a {...platformLink("/")} className="hover:text-editorial-primary transition cursor-pointer">
             Listado no catálogo EcoSafari Brasil →
           </a>
         )}

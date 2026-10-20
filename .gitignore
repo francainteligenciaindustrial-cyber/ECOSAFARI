@@ -25,3 +25,7 @@ fotoss/
 # not site content, and this one specifically has a spoken-aloud email
 # password in it. Never belongs in git history.
 *Transcript*.pdf
+# Pasta de reuniões dos sócios e o caderno gerado a partir delas — mesmo
+# motivo acima: material interno, com dados sensíveis.
+REUNIOES DOS SOCIOS*/
+*Caderno de Campo*.pdf
