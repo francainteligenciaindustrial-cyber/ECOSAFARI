@@ -900,6 +900,8 @@ export default function PartnerPortalPage() {
                       <div className="text-xs">
                         <label className="block text-editorial-text font-semibold mb-1.5">Link do seu site</label>
                         <input type="text" placeholder="https://..." value={form.ownWebsiteUrl} onChange={e => setForm((p: any) => ({ ...p, ownWebsiteUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                        {/* Quem já tem site pode querer só a logo. */}
+                        <div className="mt-4"><PedidoSiteCard pousadaId={profile.partnerId} /></div>
                       </div>
                     ) : !profile.pousada?.sitePublicado ? (
                       <PedidoSiteCard pousadaId={profile.partnerId} />

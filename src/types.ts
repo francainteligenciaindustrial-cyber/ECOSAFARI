@@ -103,10 +103,29 @@ export interface Pousada {
   sitePublicado?: boolean;
 }
 
-// Pedido de criação de site oficial feito pelo gestor no portal.
+// Pedido de criação de site oficial (e/ou logo) feito pelo gestor no portal.
+// Com logo, o site só entra em produção depois da logo aprovada pelo cliente.
+export type ServicoSite = 'site' | 'logo' | 'logo_site';
+export type LogoStatus = 'novo' | 'em_criacao' | 'aguardando_aprovacao' | 'ajustes' | 'aprovada';
+
+export interface LogoVersao {
+  id: string;
+  pedidoId: string;
+  imageUrl: string;
+  descricao?: string;
+  status: 'pendente' | 'aprovada' | 'rejeitada';
+  clienteComentario?: string;
+  createdBy?: string;
+  createdAt: string;
+  decidedAt?: string;
+}
+
 export interface PedidoSite {
   id: string;
   pousadaId: string;
+  servico?: ServicoSite;
+  logoStatus?: LogoStatus | null;
+  versoes?: LogoVersao[];
   userId?: string;
   contatoNome?: string;
   contatoEmail?: string;

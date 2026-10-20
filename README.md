@@ -64,6 +64,7 @@ mais de uma vez. As mais recentes:
 4. `scripts/add-remetente-por-pousada.sql` — e-mail de contato e remetente próprio de cada pousada
 5. `scripts/add-dominio-proprio-pousada.sql` — domínio próprio abrindo o site oficial da pousada
 6. `scripts/add-pedidos-site.sql` — venda do site oficial (Gestão → Pedidos de site)
+7. `scripts/add-servico-logo.sql` — serviço de logo com aprovação de versões pelo cliente
 
 Sem a 2, duas reservas simultâneas ainda podem disputar o mesmo quarto. Sem a 3,
 a vitrine de pacotes fica vazia, cupons não validam e o mapa usa só posições
