@@ -11,6 +11,8 @@ interface SpeciesRow {
   image: string;
   season?: SeasonLevel[];
   bestPousadaId: string;
+  monthlyCounts?: number[];
+  seasonFromApp?: boolean;
 }
 
 const CELL: Record<SeasonLevel, string> = {
@@ -34,6 +36,7 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
   const now = new Date();
   const onca = rows.find(r => r.id === "onca" || /on[cç]a|jaguar/i.test(r.name));
   const oncaBest = onca ? nextBestMonth(onca.season) : null;
+  const appTotal = rows.filter(r => r.seasonFromApp).reduce((acc, r) => acc + (r.monthlyCounts || []).reduce((a, b) => a + b, 0), 0);
 
   return (
     <section className="bg-editorial-bg py-20 border-t border-editorial-border">
@@ -60,13 +63,17 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
                   <th scope="row" className="text-left font-normal px-4 py-2">
                     <button type="button" onClick={() => onOpenSpecies(s.id)} className="flex items-center gap-2 cursor-pointer hover:text-editorial-primary transition">
                       <PictureImg src={s.image} alt="" className="w-8 h-8 rounded-full object-cover border border-editorial-border" />
-                      <span className="font-serif font-bold text-sm text-editorial-text">{s.name}</span>
+                      <span>
+                        <span className="font-serif font-bold text-sm text-editorial-text block">{s.name}</span>
+                        {s.seasonFromApp && <span className="text-[9px] uppercase tracking-widest font-bold text-emerald-700">{t("species.appDataSpecies")}</span>}
+                      </span>
                     </button>
                   </th>
                   {s.season.map((level, i) => {
                     // Mês que já passou neste ano: a reserva vai para o ano que vem.
                     const year = i < now.getMonth() ? now.getFullYear() + 1 : now.getFullYear();
-                    const label = `${s.name} — ${monthLabels[i]}: ${levelName(level)}`;
+                    const count = s.monthlyCounts?.[i];
+                    const label = `${s.name} — ${monthLabels[i]}: ${levelName(level)}${count ? ` · ${t("species.monthSightings", { n: count })}` : ""}`;
                     const action = t("species.bookMonth", { month: monthLabels[i] });
                     return (
                       <td key={i} className="p-1">
@@ -100,6 +107,7 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
           </div>
           <p>{t("species.pickMonth")}</p>
         </div>
+        {appTotal > 0 && <p className="text-[11px] text-emerald-700 mt-2">{t("species.appData", { n: appTotal })}</p>}
 
         {/* Atalho: próximo mês de pico da onça, a espécie mais procurada. */}
         {onca && oncaBest && onca.bestPousadaId && (

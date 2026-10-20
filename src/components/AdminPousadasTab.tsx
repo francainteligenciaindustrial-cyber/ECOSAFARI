@@ -16,7 +16,7 @@ interface AdminPousadasTabProps {
   onRefreshData: () => void;
   setManagingPousadaAccess: React.Dispatch<React.SetStateAction<Pousada>>;
   setEditingPousadaId: React.Dispatch<React.SetStateAction<string>>;
-  setEditPousadaForm: React.Dispatch<React.SetStateAction<{ name: string; description: string; longDescription: string; location: string; pricePerNight: number; capacity: number; features: string[]; activities: string[]; experiences: ExperienceDraft[]; images: string[]; officialSiteImages: string[]; videoUrl: string; officialSiteUrl: string; rooms: RoomDraft[]; latitude: number; longitude: number; emailRemetente: string; emailRemetenteNome: string; emailContato: string; customDomain: string; sitePublicado: boolean; }>>;
+  setEditPousadaForm: React.Dispatch<React.SetStateAction<{ name: string; description: string; longDescription: string; location: string; pricePerNight: number; capacity: number; features: string[]; activities: string[]; experiences: ExperienceDraft[]; images: string[]; officialSiteImages: string[]; videoUrl: string; officialSiteUrl: string; rooms: RoomDraft[]; latitude: number; longitude: number; emailRemetente: string; emailRemetenteNome: string; emailContato: string; customDomain: string; sitePublicado: boolean; appLodgeId: string; }>>;
 }
 
 export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingPousadaAccess, setEditingPousadaId, setEditPousadaForm }: AdminPousadasTabProps) {
@@ -61,7 +61,8 @@ export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingP
       emailRemetenteNome: p.emailRemetenteNome || "",
       emailContato: p.emailContato || "",
       customDomain: p.customDomain || "",
-      sitePublicado: !!p.sitePublicado
+      sitePublicado: !!p.sitePublicado,
+      appLodgeId: p.appLodgeId || ""
     });
   };
 

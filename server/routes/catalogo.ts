@@ -220,6 +220,12 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
     if (host && !isValidCustomDomain(host)) return res.status(400).json({ error: "Domínio inválido. Use só o endereço, ex.: pousadavagalume.com" });
     updates.customDomain = host;
   }
+  // Vínculo com o app: UUID ou vazio (desvincula).
+  if (typeof updates.appLodgeId === "string") {
+    const id = updates.appLodgeId.trim().toLowerCase();
+    if (id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) return res.status(400).json({ error: "Vínculo com o app inválido." });
+    updates.appLodgeId = id || null as any;
+  }
   const { data, error, skipped } = await writeSkippingMissingColumns(updates, row => supabase.from("pousadas").update(row).eq("id", id).select().single());
   if (error && error.code !== "PGRST116") {
     log.error("[PUT /api/pousadas/:id]", error.message);

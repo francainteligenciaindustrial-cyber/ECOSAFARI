@@ -6,6 +6,7 @@ import { navigate } from "../lib/router";
 import { approximatePosition, spread } from "../data/places";
 import { findWildSpecies, WILD_SPECIES, SightingArea } from "../data/wildSpecies";
 import type { Atracao, Pousada } from "../types";
+import type { SightingPoint } from "../lib/sightingStats";
 
 interface SpeciesLike { id: string; name: string }
 
@@ -14,9 +15,11 @@ interface Props {
   atracoes: Atracao[];
   species: SpeciesLike[];
   onSelectPousada: (p: Pousada) => void;
+  // Avistamentos aprovados no app EcoSafari Go, agregados (~1 km).
+  sightingPoints?: SightingPoint[];
 }
 
-const COLORS = { pousada: "#101B4C", atracao: "#F28C00", species: "#3F8A2E" };
+const COLORS = { pousada: "#101B4C", atracao: "#F28C00", species: "#3F8A2E", app: "#1580B5" };
 
 // Pino tracejado = posição aproximada (só a cidade é conhecida).
 function pin(color: string, approximate: boolean): L.DivIcon {
@@ -59,7 +62,7 @@ function popupContent(title: string, subtitle: string, action?: { label: string;
 const contentKey = (items: { id: string; latitude?: number; longitude?: number; location?: string }[]) =>
   items.map(i => `${i.id}:${i.latitude ?? ""}:${i.longitude ?? ""}:${i.location ?? ""}`).join("|");
 
-export default function PantanalMap({ pousadas: pousadasProp, atracoes: atracoesProp, species, onSelectPousada }: Props) {
+export default function PantanalMap({ pousadas: pousadasProp, atracoes: atracoesProp, species, onSelectPousada, sightingPoints = [] }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const pousadas = useMemo(() => pousadasProp, [contentKey(pousadasProp)]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,9 +167,26 @@ export default function PantanalMap({ pousadas: pousadasProp, atracoes: atracoes
         .addTo(layer);
     }
 
+    // Avistamentos reais do app: círculo maior onde houve mais registros.
+    if (filter !== "parceiros") {
+      const filtroNome = filter === "all" ? null : speciesAreas.find(s => s.id === filter)?.name || species.find(s => s.id === filter)?.name || null;
+      const filtroWild = filtroNome ? findWildSpecies(filter) || findWildSpecies(filtroNome) : undefined;
+      for (const p of sightingPoints) {
+        if (filtroNome) {
+          const pWild = findWildSpecies(p.speciesName);
+          const mesma = (filtroWild && pWild && filtroWild.id === pWild.id) || p.speciesName.toLowerCase() === filtroNome.toLowerCase();
+          if (!mesma) continue;
+        }
+        bounds.push([p.lat, p.lng]);
+        L.circleMarker([p.lat, p.lng], { radius: Math.min(16, 4 + Math.sqrt(p.count) * 2), color: "#fff", weight: 1.5, fillColor: COLORS.app, fillOpacity: 0.75 })
+          .bindPopup(popupContent(p.speciesName, t("species.monthSightings", { n: p.count })))
+          .addTo(layer);
+      }
+    }
+
     setMissing(showPartners ? semPosicao : 0);
     if (bounds.length > 0) map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 9 });
-  }, [pousadas, atracoes, speciesAreas, filter, t]);
+  }, [pousadas, atracoes, speciesAreas, filter, t, sightingPoints, species]);
 
   return (
     <div>
@@ -175,6 +195,7 @@ export default function PantanalMap({ pousadas: pousadasProp, atracoes: atracoes
           <span className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ background: COLORS.pousada }} /> {t("map.legend.pousada")}</span>
           <span className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ background: COLORS.atracao }} /> {t("map.legend.atracao")}</span>
           <span className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full opacity-60" style={{ background: COLORS.species }} /> {t("map.legend.species")}</span>
+          {sightingPoints.length > 0 && <span className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ background: COLORS.app }} /> {t("map.legend.appSightings")}</span>}
         </div>
         <label className="flex items-center gap-2">
           <span className="uppercase tracking-widest font-bold text-editorial-muted text-[10px]">{t("map.speciesFilter")}</span>

@@ -968,7 +968,7 @@ export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", 
 // /api/pousadas/:id/google-calendar (cria um calendário novo), mas também
 // editável aqui à mão se o admin preferir apontar pra um que já existe.
 // emailRemetente/emailRemetenteNome: só admin (ver remetenteDaPousada).
-export const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified", "googleCalendarId", "emailRemetente", "emailRemetenteNome", "customDomain", "sitePublicado"] as const;
+export const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified", "googleCalendarId", "emailRemetente", "emailRemetenteNome", "customDomain", "sitePublicado", "appLodgeId"] as const;
 export const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images", "unavailableDates"] as const;
 export const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 export const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "language", "age", "preferences"] as const;

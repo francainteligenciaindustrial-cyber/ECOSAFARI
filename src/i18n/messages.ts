@@ -129,6 +129,11 @@ const raw = {
   "species.calendarKicker": ["Planeje sua viagem", "Plan your trip", "Planifica tu viaje"],
   "species.calendarTitle": ["Calendário de melhor época por espécie", "Best-season calendar by species", "Calendario de mejor época por especie"],
   "species.calendarSubtitle": ["No Pantanal, a seca (julho a outubro) concentra os animais na beira dos rios. Veja o melhor mês para cada espécie e a ocupação das pousadas.", "In the Pantanal, the dry season (July to October) concentrates wildlife along the rivers. See the best month for each species and how full the lodges are.", "En el Pantanal, la sequía (julio a octubre) concentra a los animales junto a los ríos. Mira el mejor mes para cada especie y la ocupación de las posadas."],
+  "species.appData": ["Baseado em {n} avistamentos reais aprovados no app EcoSafari Go.", "Based on {n} real sightings approved in the EcoSafari Go app.", "Basado en {n} avistamientos reales aprobados en la app EcoSafari Go."],
+  "species.appDataSpecies": ["Dados reais do app", "Real app data", "Datos reales de la app"],
+  "species.referenceData": ["Época de referência da espécie (ainda poucos registros no app).", "Reference season for the species (few app records so far).", "Época de referencia de la especie (aún pocos registros en la app)."],
+  "species.monthSightings": ["{n} avistamentos", "{n} sightings", "{n} avistamientos"],
+  "map.legend.appSightings": ["Avistamentos no app", "Sightings in the app", "Avistamientos en la app"],
   "species.occupancyLegend": ["Barra = ocupação da pousada indicada", "Bar = occupancy of the suggested lodge", "Barra = ocupación de la posada sugerida"],
 
   // ---- mapa

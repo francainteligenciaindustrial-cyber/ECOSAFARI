@@ -16,6 +16,8 @@ import { WILD_SPECIES, findWildSpecies, SeasonLevel } from "../data/wildSpecies"
 import SpeciesSeasonCalendar from "./SpeciesSeasonCalendar";
 import SeasonCalendarSection from "./SeasonCalendarSection";
 import PacotesSection from "./PacotesSection";
+import { useSightingStats, matchSpeciesStats } from "../lib/useSightingStats";
+import { seasonFromMonthly } from "../lib/sightingStats";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -39,6 +41,10 @@ interface DisplaySpecies {
   bestPousadaId: string;
   bestPousadaName: string;
   season?: SeasonLevel[];
+  // Avistamentos aprovados no app EcoSafari Go (Jan..Dez), quando há.
+  monthlyCounts?: number[];
+  sightingsTotal?: number;
+  seasonFromApp?: boolean;
 }
 
 interface PousadaCatalogProps {
@@ -74,7 +80,7 @@ export default function PousadaCatalog({
   // and that the "Conhecer Pousada Ideal" button actually opens — instead of
   // a fixed fake name from demo data. Espécies do banco ganham o calendário
   // de melhor época quando o nome casa com uma de src/data/wildSpecies.ts.
-  const displaySpecies: DisplaySpecies[] = useMemo(() => species.length > 0
+  const baseSpecies: DisplaySpecies[] = useMemo(() => species.length > 0
     ? species.map(s => ({ ...s, season: findWildSpecies(s.name)?.season }))
     : WILD_SPECIES.map((s, idx) => {
         const realPousada = pousadas.length > 0 ? pousadas[idx % pousadas.length] : null;
@@ -93,6 +99,25 @@ export default function PousadaCatalog({
           bestPousadaName: realPousada?.name || t("species.partnerFallback"),
         };
       }), [species, pousadas, lang, t]);
+
+  // Dados reais do app EcoSafari Go: com amostra suficiente, o calendário
+  // passa a refletir os avistamentos aprovados, e a pousada indicada vira a
+  // que mais registrou a espécie (vínculo feito pelo ID da pousada no app).
+  const sightingStats = useSightingStats();
+  const displaySpecies: DisplaySpecies[] = useMemo(() => baseSpecies.map(s => {
+    const real = matchSpeciesStats(sightingStats, s);
+    if (!real) return s;
+    const realSeason = seasonFromMonthly(real.monthly, real.total);
+    const top = real.topPousadaId ? pousadas.find(p => p.id === real.topPousadaId) : undefined;
+    return {
+      ...s,
+      season: realSeason || s.season,
+      seasonFromApp: !!realSeason,
+      monthlyCounts: real.monthly,
+      sightingsTotal: real.total,
+      ...(top ? { bestPousadaId: top.id, bestPousadaName: top.name } : {}),
+    };
+  }), [baseSpecies, sightingStats, pousadas]);
   const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
   const { showToast } = useToast();
   const [filterLocation, setFilterLocation] = useState("all");
@@ -763,7 +788,7 @@ export default function PousadaCatalog({
               <p className="text-editorial-muted text-xs mt-2">{t("map.subtitle")}</p>
             </div>
             <Suspense fallback={<div className="h-[520px] flex items-center justify-center border border-editorial-border text-editorial-muted text-xs">{t("map.loading")}</div>}>
-              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} />
+              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} sightingPoints={sightingStats?.points} />
             </Suspense>
           </div>
         </section>
@@ -953,7 +978,7 @@ export default function PousadaCatalog({
 
                 {selectedSpecies.season && (
                   <div className="mb-6">
-                    <SpeciesSeasonCalendar season={selectedSpecies.season} pousadaId={selectedSpecies.bestPousadaId} variant="dark" />
+                    <SpeciesSeasonCalendar season={selectedSpecies.season} pousadaId={selectedSpecies.bestPousadaId} variant="dark" monthlyCounts={selectedSpecies.monthlyCounts} fromApp={selectedSpecies.seasonFromApp} />
                   </div>
                 )}
 

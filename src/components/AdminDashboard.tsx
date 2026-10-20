@@ -64,6 +64,7 @@ import CoordinatesInput from "./CoordinatesInput";
 import RemetenteEmailStatus from "./RemetenteEmailStatus";
 import CuponsPanel from "./CuponsPanel";
 import PedidosSitePanel from "./PedidosSitePanel";
+import AppLodgeSelect from "./AppLodgeSelect";
 import { usePagination } from "../lib/usePagination";
 import AdminReservasTab from "./AdminReservasTab";
 import AdminPousadasTab from "./AdminPousadasTab";
@@ -282,7 +283,8 @@ export default function AdminDashboard({
     emailRemetenteNome: "",
     emailContato: "",
     customDomain: "",
-    sitePublicado: false
+    sitePublicado: false,
+    appLodgeId: ""
   });
   const [remetenteReload, setRemetenteReload] = useState(0);
 
@@ -314,7 +316,8 @@ export default function AdminDashboard({
         emailRemetenteNome: editPousadaForm.emailRemetenteNome.trim(),
         emailContato: editPousadaForm.emailContato.trim().toLowerCase(),
         customDomain: editPousadaForm.customDomain.trim(),
-        sitePublicado: editPousadaForm.sitePublicado
+        sitePublicado: editPousadaForm.sitePublicado,
+        appLodgeId: editPousadaForm.appLodgeId
       };
 
       const response = await adminFetch(`/api/pousadas/${editingPousadaId}`, {
@@ -324,6 +327,8 @@ export default function AdminDashboard({
       });
 
       if (response.ok) {
+        // Vínculo com o app pode ter mudado: recalcula as estatísticas.
+        adminFetch("/api/admin/app-stats/refresh", { method: "POST" }).catch(() => {});
         setEditingPousadaId(null);
         onRefreshData();
       }
@@ -453,7 +458,8 @@ export default function AdminDashboard({
               </fieldset>
 
               <fieldset className="border border-zinc-200 rounded-lg p-3 space-y-2 text-xs">
-                <legend className="px-1 font-semibold text-zinc-700">Site oficial</legend>
+                <legend className="px-1 font-semibold text-zinc-700">Site oficial e app</legend>
+                <AppLodgeSelect value={editPousadaForm.appLodgeId} onChange={id => setEditPousadaForm(prev => ({ ...prev, appLodgeId: id }))} />
                 <label className="flex items-center gap-2 font-semibold text-zinc-700 cursor-pointer">
                   <input
                     type="checkbox"

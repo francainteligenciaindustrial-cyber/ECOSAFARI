@@ -101,6 +101,9 @@ export interface Pousada {
   // Site oficial criado pela equipe EcoSafari e no ar (só o admin muda).
   // Antes disso o portal mostra a oferta do serviço em vez do editor.
   sitePublicado?: boolean;
+  // UUID da mesma pousada no app EcoSafari Go (banco separado) — vínculo
+  // feito pelo admin, liga os avistamentos do app ao calendário e ao mapa.
+  appLodgeId?: string;
 }
 
 // Pedido de criação de site oficial (e/ou logo) feito pelo gestor no portal.

@@ -51,12 +51,15 @@ interface Props {
   season: SeasonLevel[];
   pousadaId?: string;
   variant?: "dark" | "light";
+  // Avistamentos aprovados no app por mês (Jan..Dez) e se a época veio deles.
+  monthlyCounts?: number[];
+  fromApp?: boolean;
 }
 
 // Próximos 12 meses (a partir do atual), cada um colorido pela chance de
 // avistar a espécie e com uma barrinha de ocupação da pousada indicada.
 // Clicar num mês abre a reserva com as datas já preenchidas.
-export default function SpeciesSeasonCalendar({ season, pousadaId, variant = "light" }: Props) {
+export default function SpeciesSeasonCalendar({ season, pousadaId, variant = "light", monthlyCounts, fromApp }: Props) {
   const { t, locale } = useI18n();
   const [ocupacao, setOcupacao] = useState<Ocupacao>([]);
 
@@ -93,7 +96,8 @@ export default function SpeciesSeasonCalendar({ season, pousadaId, variant = "li
       <ol className="grid grid-cols-6 gap-1.5">
         {months.map(m => {
           const busy = m.occupancy !== null && m.occupancy >= 0.85;
-          const label = `${m.longLabel}: ${levelName(m.level as SeasonLevel)}${busy ? ` · ${t("species.busy")}` : ""}`;
+          const count = monthlyCounts?.[m.month - 1];
+          const label = `${m.longLabel}: ${levelName(m.level as SeasonLevel)}${count ? ` · ${t("species.monthSightings", { n: count })}` : ""}${busy ? ` · ${t("species.busy")}` : ""}`;
           const content = (
             <>
               <span className="block text-[10px] font-bold uppercase leading-none">{m.label}</span>
@@ -132,6 +136,11 @@ export default function SpeciesSeasonCalendar({ season, pousadaId, variant = "li
         ))}
         {pousadaId && ocupacao.length > 0 && <span>· {t("species.occupancyLegend")}</span>}
       </div>
+      {monthlyCounts && (
+        <p className={`text-[10px] mt-1 ${dark ? "text-emerald-400" : "text-emerald-700"}`}>
+          {fromApp ? t("species.appData", { n: monthlyCounts.reduce((a, b) => a + b, 0) }) : t("species.referenceData")}
+        </p>
+      )}
       {pousadaId && <p className={`text-[10px] mt-1 ${dark ? "text-zinc-500" : "text-editorial-muted"}`}>{t("species.pickMonth")}</p>}
     </div>
   );

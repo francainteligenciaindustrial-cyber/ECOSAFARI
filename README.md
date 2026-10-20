@@ -65,6 +65,11 @@ mais de uma vez. As mais recentes:
 5. `scripts/add-dominio-proprio-pousada.sql` — domínio próprio abrindo o site oficial da pousada
 6. `scripts/add-pedidos-site.sql` — venda do site oficial (Gestão → Pedidos de site)
 7. `scripts/add-servico-logo.sql` — serviço de logo com aprovação de versões pelo cliente
+8. `scripts/add-vinculo-app.sql` — vínculo pousada do site ↔ pousada do app EcoSafari Go
+
+**No Supabase do app** (projeto separado): `scripts/app-ecosafari-go/estatisticas-publicas.sql`
+— funções somente leitura com números agregados de avistamentos aprovados, que
+alimentam o calendário de melhor época e o mapa do site.
 
 Sem a 2, duas reservas simultâneas ainda podem disputar o mesmo quarto. Sem a 3,
 a vitrine de pacotes fica vazia, cupons não validam e o mapa usa só posições
