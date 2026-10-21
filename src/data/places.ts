@@ -19,6 +19,10 @@ const PLACES: { match: RegExp; lat: number; lng: number }[] = [
   { match: /aquidauana/i, lat: -20.467, lng: -55.787 },
   { match: /bonito/i, lat: -21.126, lng: -56.484 },
   { match: /campo grande/i, lat: -20.47, lng: -54.62 },
+  { match: /alta floresta/i, lat: -9.875, lng: -56.086 },
+  { match: /len[cç][oó]is/i, lat: -12.562, lng: -41.39 },
+  { match: /novo air[aã]o/i, lat: -2.62, lng: -60.944 },
+  { match: /mateiros/i, lat: -10.546, lng: -46.418 },
   { match: /pantanal norte|pantanal mato-grossense/i, lat: -16.8, lng: -56.7 },
   { match: /pantanal sul|pantanal sul-mato-grossense/i, lat: -19.6, lng: -56.9 },
 ];

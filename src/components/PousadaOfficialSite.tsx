@@ -201,7 +201,7 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
         <div className="max-w-3xl mx-auto text-center">
           <Quote className="h-7 w-7 text-white/40 mx-auto mb-6" />
           <p className="text-white text-2xl md:text-3xl font-serif italic leading-snug">
-            Mais que um pesqueiro: um lugar pra pescar em paz, rir em família e voltar sempre que bater a saudade.
+            Mais que uma pousada: um lugar pra {/pesca|pescaria/i.test([...(pousada.activities || []), ...(pousada.features || []), ...(pousada.experiences || []).map(e => e.title)].join(" ")) ? "pescar" : "viver a natureza"} em paz, rir em família e voltar sempre que bater a saudade.
           </p>
         </div>
       </section>
@@ -348,11 +348,9 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
         </section>
       )}
 
-      {typeof pousada.latitude === "number" && typeof pousada.longitude === "number" && (
-        <section className="max-w-5xl mx-auto px-6 md:px-10 pb-16">
-          <PousadaLocation pousada={pousada} />
-        </section>
-      )}
+      <section className="max-w-5xl mx-auto px-6 md:px-10 pb-16">
+        <PousadaLocation pousada={pousada} />
+      </section>
 
       {/* Contact CTA */}
       <section className="bg-editorial-primary text-white py-16 text-center px-6">

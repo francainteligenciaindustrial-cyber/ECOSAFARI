@@ -41,13 +41,31 @@ export const placeUrl = (lat: number, lng: number) =>
 
 // Referências de chegada para quem vem de fora (aeroporto onde o turista
 // pousa). Distância em linha reta — a de estrada é maior, e o texto diz isso.
+// Aeroportos com voo comercial perto dos destinos do catálogo — a seção
+// mostra o mais próximo da pousada.
 export const REFERENCE_POINTS = [
   { id: "cgb", name: "Aeroporto de Cuiabá (CGB)", lat: -15.6529, lng: -56.1167 },
+  { id: "cgr", name: "Aeroporto de Campo Grande (CGR)", lat: -20.4687, lng: -54.6725 },
+  { id: "afl", name: "Aeroporto de Alta Floresta (AFL)", lat: -9.8664, lng: -56.105 },
+  { id: "mao", name: "Aeroporto de Manaus (MAO)", lat: -3.0386, lng: -60.0497 },
+  { id: "pmw", name: "Aeroporto de Palmas (PMW)", lat: -10.2915, lng: -48.357 },
+  { id: "lec", name: "Aeroporto de Lençóis (LEC)", lat: -12.4823, lng: -41.277 },
+  { id: "bsb", name: "Aeroporto de Brasília (BSB)", lat: -15.8711, lng: -47.9186 },
 ];
 
 export function referenceDistances(lat: number, lng: number) {
   return REFERENCE_POINTS.map(r => ({ ...r, km: Math.round(distanceKm(lat, lng, r.lat, r.lng)) }));
 }
+
+export function nearestReference(lat: number, lng: number) {
+  return referenceDistances(lat, lng).sort((a, b) => a.km - b.km)[0];
+}
+
+// Sem coordenada exata: Google Maps / Waze procuram a pousada pelo nome e
+// cidade — o Google acha o estabelecimento certo, melhor que um ponto chutado.
+export const searchUrl = (query: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+export const directionsQueryUrl = (query: string) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}`;
+export const wazeQueryUrl = (query: string) => `https://waze.com/ul?q=${encodeURIComponent(query)}&navigate=yes`;
 
 export const hasCoordinates = (p: { latitude?: number; longitude?: number }): p is { latitude: number; longitude: number } =>
   typeof p.latitude === "number" && typeof p.longitude === "number" && Number.isFinite(p.latitude) && Number.isFinite(p.longitude);
