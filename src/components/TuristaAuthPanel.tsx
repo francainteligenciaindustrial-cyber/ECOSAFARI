@@ -7,6 +7,7 @@ import { isTouristUser } from "../lib/authRoles";
 import { Turista } from "../types";
 import { navigate } from "../lib/router";
 import { consumeReturnTo } from "../lib/returnTo";
+import CountrySelect from "./CountrySelect";
 import MinhasReservas from "./MinhasReservas";
 
 // Miolo do login/cadastro de turista, sem cabeçalho/rodapé próprio — usado
@@ -258,10 +259,7 @@ export default function TuristaAuthPanel() {
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
           <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text" required placeholder="País" value={country} onChange={e => setCountry(e.target.value)}
-              className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-            />
+            <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
             <input
               type="number" required min={1} placeholder="Idade" value={age} onChange={e => setAge(e.target.value)}
               className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
@@ -386,10 +384,7 @@ export default function TuristaAuthPanel() {
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
           <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text" required placeholder="País" value={country} onChange={e => setCountry(e.target.value)}
-              className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-            />
+            <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
             <input
               type="number" required min={1} placeholder="Idade" value={age} onChange={e => setAge(e.target.value)}
               className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"

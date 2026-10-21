@@ -7,6 +7,7 @@ import { useTouristSession } from "../lib/useTouristSession";
 import { adminFetch } from "../lib/adminFetch";
 import { navigate } from "../lib/router";
 import { Pousada, Resgate, Turista, TuristaPost } from "../types";
+import CountrySelect from "./CountrySelect";
 import ImageUploadButton from "./ImageUploadButton";
 
 interface VisitedPousada {
@@ -364,10 +365,7 @@ export default function TuristaProfileView() {
                   type="tel" required placeholder="WhatsApp" value={form.whatsapp} onChange={e => setForm(p => ({ ...p, whatsapp: e.target.value }))}
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                 />
-                <input
-                  type="text" required placeholder="País" value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))}
-                  className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-                />
+                <CountrySelect required placeholder="País" value={form.country} onChange={v => setForm(p => ({ ...p, country: v }))} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                 <input
                   type="text" required placeholder="Idioma preferido" value={form.language} onChange={e => setForm(p => ({ ...p, language: e.target.value }))}
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"

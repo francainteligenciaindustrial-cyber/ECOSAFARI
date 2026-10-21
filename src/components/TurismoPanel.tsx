@@ -3,6 +3,7 @@ import { Users, MapIcon, CalendarCheck, CreditCard, Compass, Plus, Trash2, Loade
 import { Turista, Roteiro, Reserva, Pagamento, GuiaTuristico } from "../types";
 import { adminFetch } from "../lib/adminFetch";
 import Pagination from "./Pagination";
+import CountrySelect from "./CountrySelect";
 import { usePagination } from "../lib/usePagination";
 
 type Section = "turistas" | "roteiros" | "reservas" | "pagamentos" | "guias";
@@ -223,7 +224,7 @@ function TuristasSection({ items, showAddForm, onAdded, onDelete }: {
           <FormInput required placeholder="Nome" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           <FormInput required type="email" placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           <FormInput required placeholder="WhatsApp" value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })} />
-          <FormInput required placeholder="País" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
+          <CountrySelect required placeholder="País" value={form.country} onChange={v => setForm({ ...form, country: v })} className="w-full border border-zinc-200 rounded px-3 py-2 text-sm bg-white" />
           <FormInput required type="number" placeholder="Idade" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} />
           <FormInput placeholder="Preferências" value={form.preferences} onChange={e => setForm({ ...form, preferences: e.target.value })} />
           <button type="submit" className="col-span-2 md:col-span-3 bg-editorial-primary text-white text-xs uppercase tracking-widest font-bold py-2 rounded-md cursor-pointer">Salvar Turista</button>

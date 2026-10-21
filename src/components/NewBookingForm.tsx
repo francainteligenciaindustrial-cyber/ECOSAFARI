@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { adminFetch } from "../lib/adminFetch";
 import { useToast } from "../lib/ToastProvider";
+import CountrySelect from "./CountrySelect";
 import { Pousada } from "../types";
 
 interface NewBookingFormProps {
@@ -32,7 +33,7 @@ export default function NewBookingForm({ pousadas, onClose, onCreated }: NewBook
     customerName: "",
     customerEmail: "",
     customerPhone: "",
-    nationality: "Brasileira",
+    nationality: "Brasil",
     experienceType: "",
     dietaryRestrictions: "",
     specialNeeds: "",
@@ -158,7 +159,7 @@ export default function NewBookingForm({ pousadas, onClose, onCreated }: NewBook
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
         <div>
           <label className="block text-zinc-700 font-semibold mb-1">Nacionalidade</label>
-          <input type="text" value={form.nationality} onChange={e => setForm(prev => ({ ...prev, nationality: e.target.value }))} className={inputClass} />
+          <CountrySelect placeholder="Nacionalidade" value={form.nationality} onChange={v => setForm(prev => ({ ...prev, nationality: v }))} className={inputClass} />
         </div>
         <div>
           <label className="block text-zinc-700 font-semibold mb-1">Experiência (opcional)</label>
