@@ -803,7 +803,7 @@ export default function PartnerPortalPage() {
                     <p className="text-editorial-muted text-[11px] -mt-1">Fotos e vídeo que aparecem no catálogo e no site oficial — adicione, troque ou remova quando quiser.</p>
                     <ImageListEditor label="Fotos" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
                     <div className="text-xs border-t border-editorial-border pt-4">
-                      <label className="block text-editorial-text font-semibold mb-1.5">Vídeo (link do YouTube ou Instagram)</label>
+                      <label className="block text-editorial-text font-semibold mb-1.5">Vídeo (link do YouTube ou do Google Drive)</label>
                       <p className="text-editorial-muted text-[11px] mb-2">Cole o link do YouTube ou do Google Drive (no Drive, deixe o compartilhamento como "Qualquer pessoa com o link"). Esse vídeo aparece na tela de contato e no site oficial.</p>
                       <input type="text" placeholder="https://youtube.com/watch?v=... ou https://drive.google.com/file/d/..." value={form.videoUrl} onChange={e => setForm((p: any) => ({ ...p, videoUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                       {form.videoUrl.trim() && !parseVideoUrl(form.videoUrl) && (
