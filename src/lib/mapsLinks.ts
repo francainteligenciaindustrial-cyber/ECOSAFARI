@@ -2,7 +2,17 @@
 // Não embutimos o mapa do Google (cookies de rastreamento → exigiria
 // consentimento pela LGPD): o mini-mapa é OpenStreetMap e os botões abrem o
 // Google Maps / Waze no app do celular ou numa nova aba.
-import { distanceKm } from "./nearbySightings";
+// Sem imports: este arquivo também roda no servidor (server/routes/catalogo.ts),
+// onde o Node exige caminho com extensão — um import relativo derrubaria a
+// função inteira na Vercel.
+
+export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(bLat - aLat);
+  const dLng = rad(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 // Ficha da pousada no Google (fotos, avaliações de lá). Só aceita endereços
 // do próprio Google Maps — nada de link arbitrário num botão do site.

@@ -7,6 +7,7 @@
 // Para não contar o mesmo avistamento duas vezes (ele pode estar vinculado à
 // pousada E ter coordenada perto dela), fica o maior dos dois números.
 import type { SightingPoint } from "./sightingStats";
+import { distanceKm } from "./mapsLinks";
 
 export const NEARBY_RADIUS_KM = 40;
 
@@ -29,13 +30,7 @@ export interface NearbySpecies {
 
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const rad = (d: number) => (d * Math.PI) / 180;
-  const dLat = rad(bLat - aLat);
-  const dLng = rad(bLng - aLng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+export { distanceKm };
 
 export function speciesNearPousadas(
   pousadas: PlacedPousada[],
