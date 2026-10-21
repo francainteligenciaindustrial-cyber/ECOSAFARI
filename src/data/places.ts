@@ -12,6 +12,7 @@ const PLACES: { match: RegExp; lat: number; lng: number }[] = [
   { match: /cuiab[aá]/i, lat: -15.601, lng: -56.097 },
   { match: /c[aá]ceres/i, lat: -16.071, lng: -57.679 },
   { match: /nobres/i, lat: -14.721, lng: -56.328 },
+  { match: /barra do bugres/i, lat: -15.073, lng: -57.181 },
   { match: /rondon[oó]polis/i, lat: -16.467, lng: -54.637 },
   { match: /corumb[aá]/i, lat: -19.008, lng: -57.651 },
   { match: /miranda/i, lat: -20.241, lng: -56.378 },
