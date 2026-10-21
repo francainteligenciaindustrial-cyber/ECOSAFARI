@@ -16,7 +16,7 @@ import { WILD_SPECIES, findWildSpecies, SeasonLevel } from "../data/wildSpecies"
 import SpeciesSeasonCalendar from "./SpeciesSeasonCalendar";
 import SeasonCalendarSection from "./SeasonCalendarSection";
 import PacotesSection from "./PacotesSection";
-import { useSightingStats, matchSpeciesStats, unmatchedSpeciesStats, publishablePoints } from "../lib/useSightingStats";
+import { useSightingStats, matchSpeciesStats, unmatchedSpeciesStats, publishablePoints, publishableSpecies } from "../lib/useSightingStats";
 import { seasonFromMonthly } from "../lib/sightingStats";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
@@ -135,6 +135,12 @@ export default function PousadaCatalog({
     };
   }), [sightingStats, baseSpecies, pousadas]);
   const mapPoints = useMemo(() => publishablePoints(sightingStats, baseSpecies), [sightingStats, baseSpecies]);
+  // Avistamentos vinculados a cada pousada pelo ID — mesmo filtro dos pontos
+  // (só espécies do catálogo do app ou que o site conhece).
+  const mapLinkedSpecies = useMemo(
+    () => publishableSpecies(sightingStats, baseSpecies).map(s => ({ name: s.name, pousadaCounts: s.pousadaCounts || {} })),
+    [sightingStats, baseSpecies]
+  );
   const { checking: checkingTourist, isTourist, profile: touristProfile } = useTouristSession();
   const { showToast } = useToast();
   const [filterLocation, setFilterLocation] = useState("all");
@@ -806,7 +812,7 @@ export default function PousadaCatalog({
               <p className="text-editorial-muted text-xs mt-2">{t("map.subtitle")}</p>
             </div>
             <Suspense fallback={<div className="h-[520px] flex items-center justify-center border border-editorial-border text-editorial-muted text-xs">{t("map.loading")}</div>}>
-              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} sightingPoints={mapPoints} />
+              <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} sightingPoints={mapPoints} linkedSpecies={mapLinkedSpecies} />
             </Suspense>
           </div>
         </section>

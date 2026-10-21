@@ -66,8 +66,13 @@ export function unmatchedSpeciesStats(stats: SightingStats | null, shown: Specie
 
 // Pontos do mapa: só espécies do catálogo do app ou que casam com uma
 // espécie exibida no site.
+export function publishableSpecies(stats: SightingStats | null, shown: SpeciesRef[]) {
+  if (!stats) return [];
+  return stats.species.filter(s => isPublishableAppSpecies(s) || shown.some(sp => isSameSpecies(s, sp)));
+}
+
 export function publishablePoints(stats: SightingStats | null, shown: SpeciesRef[]) {
   if (!stats) return [];
-  const ok = new Set(stats.species.filter(s => isPublishableAppSpecies(s) || shown.some(sp => isSameSpecies(s, sp))).map(s => s.key));
+  const ok = new Set(publishableSpecies(stats, shown).map(s => s.key));
   return stats.points.filter(p => ok.has(p.speciesKey));
 }

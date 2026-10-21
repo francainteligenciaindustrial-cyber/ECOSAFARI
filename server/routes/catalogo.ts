@@ -2,7 +2,7 @@
 import type { Express } from "express";
 import { randomUUID } from "crypto";
 import { Pousada, Guide, Atracao, Sighting, Review, Species } from "../../src/types.js";
-import { slugify } from "../../src/lib/slug.js";
+import { slugify, resolveSlug } from "../../src/lib/slug.js";
 import { normalizeHost, isValidCustomDomain } from "../../src/lib/customDomain.js";
 import { normalizePrecosPorMes } from "../../src/lib/pricing.js";
 import path from "path";
@@ -649,7 +649,7 @@ app.get('/pousadas/:id', async (req, res, next) => {
 app.get('/site/:slug', async (req, res, next) => {
   try {
     const { data: allPousadas } = await supabase.from("pousadas").select("*");
-    const pousadaRow = (allPousadas || []).find(p => slugify(p.name) === req.params.slug);
+    const pousadaRow = (allPousadas || []).find(p => slugify(p.name) === resolveSlug(req.params.slug));
     if (!pousadaRow) return next();
     const pousada = mapPousadaRow(pousadaRow);
     const indexPath = isProd ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'index.html');

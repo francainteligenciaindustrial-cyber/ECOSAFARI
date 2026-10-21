@@ -22,16 +22,19 @@ export default function ImageListEditor({ label, value, onChange, emptyHint = "N
 
   return (
     <div className="text-xs">
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-zinc-700 font-semibold flex items-center gap-1.5">
-          <ImageIcon className="h-3.5 w-3.5" /> {label}
+      {/* Rótulo em cima e botões embaixo quando falta espaço (coluna
+          estreita do "Editar site", ao lado da prévia) — antes o texto
+          longo espremia os botões um sobre o outro. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-2">
+        <label className="text-zinc-700 font-semibold flex items-start gap-1.5 min-w-[12rem] flex-1">
+          <ImageIcon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" /> <span>{label}</span>
         </label>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
           <ImageUploadButton label="Enviar nova imagem" onUploaded={url => onChange([...value, url])} />
           <button
             type="button"
             onClick={add}
-            className="flex items-center gap-1 text-emerald-700 font-semibold hover:text-emerald-800 transition cursor-pointer"
+            className="flex items-center gap-1 text-emerald-700 font-semibold hover:text-emerald-800 transition cursor-pointer whitespace-nowrap"
           >
             <Plus className="h-3.5 w-3.5" /> Adicionar link
           </button>

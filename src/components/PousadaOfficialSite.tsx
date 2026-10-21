@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Star, Check, Compass, MessageSquare, LoaderCircle, ArrowLeft, Instagram, ExternalLink, Users, PlayCircle, Quote, Sparkles, CalendarCheck } from "lucide-react";
 import { Pousada, Review } from "../types";
-import { slugify } from "../lib/slug";
+import { slugify, resolveSlug } from "../lib/slug";
 import { navigate } from "../lib/router";
 import LanguageSwitcher from "./LanguageSwitcher";
 import PictureImg from "./PictureImg";
@@ -32,7 +32,7 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
     fetch("/api/pousadas")
       .then(res => res.json())
       .then((all: Pousada[]) => {
-        const found = all.find(p => slugify(p.name) === slug);
+        const found = all.find(p => slugify(p.name) === resolveSlug(slug));
         setFetchedPousada(found || null);
       })
       .catch(() => setFetchedPousada(null));
