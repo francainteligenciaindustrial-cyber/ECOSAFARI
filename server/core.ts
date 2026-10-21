@@ -1002,7 +1002,8 @@ export function mapPousadaRow(p: any): Pousada {
     ? rawExperiences.map((exp: any) => ({
         title: resolveTranslation(exp.title),
         description: resolveTranslation(exp.description),
-        price: typeof exp.price === "number" ? exp.price : parseFloat(exp.price || "0")
+        price: typeof exp.price === "number" ? exp.price : parseFloat(exp.price || "0"),
+        ...(exp.requiresProvider ? { requiresProvider: true, providerType: typeof exp.providerType === "string" ? exp.providerType.slice(0, 60) : undefined } : {}),
       }))
     : [];
 
@@ -1326,10 +1327,14 @@ export async function checkPousadaAvailability(pousada: Pousada, checkIn: string
 // Preço sempre calculado no servidor a partir do cadastro da pousada —
 // nunca a partir de um valor enviado pelo navegador.
 // Diárias somadas noite a noite (preço por temporada, ver src/lib/pricing.ts)
-// + experiência por adulto.
-export function computeBookingTotal(pousada: Pousada, checkIn: string, checkOut: string, adults: number, experienceType?: string): number {
-  const exp = experienceType ? (pousada.experiences || []).find(e => e.title === experienceType) : undefined;
-  return lodgingTotal(pousada, checkIn, checkOut) + (exp ? exp.price * adults : 0);
+// + experiências escolhidas, cada uma por adulto (o turista pode marcar
+// várias em "O que você quer fazer?").
+export function computeBookingTotal(pousada: Pousada, checkIn: string, checkOut: string, adults: number, experience?: string | string[]): number {
+  const titles = new Set((Array.isArray(experience) ? experience : experience ? [experience] : []).filter(Boolean));
+  const extras = (pousada.experiences || [])
+    .filter(e => titles.has(e.title))
+    .reduce((acc, e) => acc + (Number(e.price) || 0) * adults, 0);
+  return lodgingTotal(pousada, checkIn, checkOut) + extras;
 }
 
 // Percentuais padrão da plataforma (Vercel). Sem eles, 0 — o painel

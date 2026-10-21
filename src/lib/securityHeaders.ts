@@ -35,7 +35,7 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   // camera=(self): o leitor de QR dos produtos (Caixa/Consumo) usa a câmera
   // do próprio site — "camera=()" bloqueava o scanner em produção.
-  "Permissions-Policy": "geolocation=(), microphone=(), camera=(self)",
+  "Permissions-Policy": "geolocation=(self), microphone=(), camera=(self)",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "Content-Security-Policy": CONTENT_SECURITY_POLICY,
 };

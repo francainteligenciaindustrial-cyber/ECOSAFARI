@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UserRound, Hotel, Plus, Trash2, LoaderCircle, Check, ChevronRight } from "lucide-react";
+import { UserRound, Hotel, Plus, Trash2, LoaderCircle, Check, ChevronRight, ImageOff } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminFetch } from "../lib/adminFetch";
 import { useToast } from "../lib/ToastProvider";
@@ -7,6 +7,7 @@ import { useToast } from "../lib/ToastProvider";
 interface PousadaRef {
   partnerId: string;
   name: string;
+  imageUrl?: string | null;
 }
 
 interface Props {
@@ -147,12 +148,21 @@ export default function GestorPousadaPanel({ supabase, userInfo, onUserInfoSaved
           {pousadas.map(p => {
             const isActive = p.partnerId === activeId;
             return (
-              <div key={p.partnerId} className={`border rounded-lg p-4 flex items-center justify-between gap-3 transition ${isActive ? "border-editorial-primary bg-editorial-secondary/30" : "border-editorial-border"}`}>
-                <button type="button" onClick={() => onOpen(p.partnerId)} className="flex-1 min-w-0 text-left cursor-pointer group">
+              <div key={p.partnerId} className={`border rounded-lg p-3 flex items-center justify-between gap-3 transition ${isActive ? "border-editorial-primary bg-editorial-secondary/30" : "border-editorial-border"}`}>
+                <button type="button" onClick={() => onOpen(p.partnerId)} className="flex-1 min-w-0 text-left cursor-pointer group flex items-center gap-3">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt="" loading="lazy" className="h-16 w-20 sm:h-20 sm:w-28 rounded-md object-cover flex-shrink-0 bg-editorial-secondary" />
+                  ) : (
+                    <span className="h-16 w-20 sm:h-20 sm:w-28 rounded-md flex-shrink-0 bg-editorial-secondary flex items-center justify-center text-editorial-muted" title="Sem foto — adicione na Galeria de Fotos">
+                      <ImageOff className="h-5 w-5" />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 block">
                   <span className="font-semibold text-sm text-editorial-text group-hover:text-editorial-primary flex items-center gap-1 truncate">
                     {p.name} <ChevronRight className="h-4 w-4 flex-shrink-0" />
                   </span>
                   <span className="text-[10px] uppercase tracking-widest font-bold text-editorial-muted">{isActive ? "Selecionada" : "Abrir e editar"}</span>
+                  </span>
                 </button>
                 <button aria-label="Remover pousada"
                   type="button"

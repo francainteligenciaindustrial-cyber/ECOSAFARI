@@ -10,12 +10,18 @@ import TuristaAuthPanel from "./TuristaAuthPanel";
 import { RETURN_TO_KEY } from "../lib/returnTo";
 import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
+import { lodgingTotal } from "../lib/pricing";
 
 // Os valores enviados à pousada ficam em português (é quem lê); só o rótulo
-// exibido muda com o idioma do turista — ver occasion.N / interest.N.
-const OCCASIONS = ["Lazer / férias", "Pescaria", "Observação de fauna", "Lua de mel", "Aniversário", "Viagem em família", "Corporativo", "Outra"];
-const INTERESTS = ["Pesca esportiva", "Observação de aves", "Onça-pintada", "Trilhas", "Passeio de barco", "Fotografia", "Gastronomia regional", "Descanso"];
+// exibido muda com o idioma do turista — ver arrival.N / diet.N / need.N.
+// "O que você quer fazer?" não tem lista fixa: são os passeios que a
+// própria pousada cadastrou, cada um com preço (reunião de 20/10/2026).
 const ARRIVAL_TIMES = ["Manhã (até 12h)", "Tarde (12h–18h)", "Noite (após 18h)", "Ainda não sei"];
+const DIETS = ["Vegetariano", "Vegano", "Sem glúten", "Sem lactose", "Alergia a frutos do mar", "Diabético"];
+const NEEDS = ["Cadeirante", "Mobilidade reduzida", "Idoso(a)", "Bebê / criança pequena", "Deficiência visual", "Deficiência auditiva"];
+const chipClass = (active: boolean) =>
+  `text-xs px-3 py-1.5 rounded-full border transition cursor-pointer ${active ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white border-editorial-border hover:bg-editorial-secondary"}`;
+const toggle = (list: string[], v: string) => (list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
 
 const inputClass = "w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary";
 const labelClass = "block text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-1.5";
@@ -59,13 +65,13 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState("");
-  const [experienceType, setExperienceType] = useState("");
-  const [dietaryRestrictions, setDietaryRestrictions] = useState("");
-  const [specialNeeds, setSpecialNeeds] = useState("");
+  const [experienceTypes, setExperienceTypes] = useState<string[]>([]);
+  const [diets, setDiets] = useState<string[]>([]);
+  const [dietOther, setDietOther] = useState("");
+  const [needs, setNeeds] = useState<string[]>([]);
+  const [needOther, setNeedOther] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
-  const [occasion, setOccasion] = useState("");
   const [needsTransfer, setNeedsTransfer] = useState(false);
-  const [interests, setInterests] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
@@ -128,12 +134,17 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
   const selectedRoom = pousada?.rooms?.find(r => r.type === roomType);
   const nights = nightsBetween(checkIn, checkOut);
   const guests = adults + children;
+  const chosenExperiences = useMemo(
+    () => (pousada?.experiences || []).filter(e => experienceTypes.includes(e.title)),
+    [pousada, experienceTypes]
+  );
+  // Mesma conta do servidor (computeBookingTotal): diárias noite a noite +
+  // cada passeio escolhido por adulto.
   const subtotal = useMemo(() => {
     if (!pousada || nights < 1) return null;
     if (pacote) return pacote.pricePerPerson * guests;
-    const exp = pousada.experiences?.find(e => e.title === experienceType);
-    return pousada.pricePerNight * nights + (exp ? exp.price * adults : 0);
-  }, [pousada, pacote, nights, guests, experienceType, adults]);
+    return lodgingTotal(pousada, checkIn, checkOut) + chosenExperiences.reduce((acc, e) => acc + (Number(e.price) || 0) * adults, 0);
+  }, [pousada, pacote, nights, guests, chosenExperiences, adults, checkIn, checkOut]);
   const discount = cupom && subtotal !== null ? Math.min(cupom.discount, subtotal) : 0;
   const estimate = subtotal !== null ? subtotal - discount : null;
 
@@ -168,7 +179,7 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subtotal]);
 
-  const toggleInterest = (i: string) => setInterests(prev => (prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]));
+  const joinChoices = (list: string[], other: string) => [...list, other.trim()].filter(Boolean).join(", ");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,11 +201,12 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
         body: JSON.stringify({
           pousadaId, checkIn, checkOut, adults, children, childAges,
           roomType: roomType || undefined,
-          experienceType: pacote ? undefined : experienceType || undefined,
+          experienceTypes: pacote ? [] : experienceTypes,
           pacoteId: pacote?.id,
           cupomCode: cupom?.code,
-          dietaryRestrictions, specialNeeds,
-          details: { arrivalTime, occasion, needsTransfer, interests: interests.join(", "), notes, language: lang },
+          dietaryRestrictions: joinChoices(diets, dietOther),
+          specialNeeds: joinChoices(needs, needOther),
+          details: { arrivalTime, needsTransfer, notes, language: lang },
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -339,6 +351,23 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
                 )}
               </section>
 
+              {!pacote && (pousada.experiences || []).length > 0 && (
+                <section className="bg-white border border-editorial-border rounded-lg p-5 space-y-3">
+                  <h2 id="interests-label" className="text-[10px] uppercase tracking-[0.15em] font-bold text-editorial-primary flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /> {t("booking.interests")}</h2>
+                  <p className="text-[11px] text-editorial-muted">{t("booking.interestsHint")}</p>
+                  <div role="group" aria-labelledby="interests-label" className="flex flex-wrap gap-2">
+                    {pousada.experiences.map(exp => {
+                      const active = experienceTypes.includes(exp.title);
+                      return (
+                        <button key={exp.title} type="button" aria-pressed={active} onClick={() => setExperienceTypes(prev => toggle(prev, exp.title))} className={chipClass(active)}>
+                          {active ? "✓ " : ""}{exp.title} · {formatMoney(exp.price)}{t("booking.perPersonShort")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               {(pousada.rooms || []).length > 0 && (
                 <section className="bg-white border border-editorial-border rounded-lg p-5 space-y-3">
                   <h2 className="text-[10px] uppercase tracking-[0.15em] font-bold text-editorial-primary flex items-center gap-2"><BedDouble className="h-3.5 w-3.5" /> {t("booking.room")}</h2>
@@ -369,23 +398,7 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
 
               <section className="bg-white border border-editorial-border rounded-lg p-5 space-y-4">
                 <h2 className="text-[10px] uppercase tracking-[0.15em] font-bold text-editorial-primary flex items-center gap-2"><Sparkles className="h-3.5 w-3.5" /> {t("booking.prepare")}</h2>
-                {!pacote && (pousada.experiences || []).length > 0 && (
-                  <div>
-                    <label htmlFor="experience" className={labelClass}>{t("booking.experience")}</label>
-                    <select id="experience" value={experienceType} onChange={e => setExperienceType(e.target.value)} className={inputClass}>
-                      <option value="">{t("booking.onlyStay")}</option>
-                      {pousada.experiences.map(exp => <option key={exp.title} value={exp.title}>{exp.title} — {formatMoney(exp.price)}{t("booking.perPersonShort")}</option>)}
-                    </select>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="occasion" className={labelClass}>{t("booking.occasion")}</label>
-                    <select id="occasion" value={occasion} onChange={e => setOccasion(e.target.value)} className={inputClass}>
-                      <option value="">{t("common.select")}</option>
-                      {OCCASIONS.map((o, i) => <option key={o} value={o}>{t(`occasion.${i}` as MessageKey)}</option>)}
-                    </select>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                   <div>
                     <label htmlFor="arrival" className={labelClass}>{t("booking.arrival")}</label>
                     <select id="arrival" value={arrivalTime} onChange={e => setArrivalTime(e.target.value)} className={inputClass}>
@@ -393,33 +406,38 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
                       {ARRIVAL_TIMES.map((o, i) => <option key={o} value={o}>{t(`arrival.${i}` as MessageKey)}</option>)}
                     </select>
                   </div>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer sm:pb-2">
+                    <input type="checkbox" checked={needsTransfer} onChange={e => setNeedsTransfer(e.target.checked)} className="accent-editorial-primary h-4 w-4" />
+                    {t("booking.transfer")}
+                  </label>
                 </div>
-                <div role="group" aria-labelledby="interests-label">
-                  <span id="interests-label" className={labelClass}>{t("booking.interests")}</span>
-                  <div className="flex flex-wrap gap-2">
-                    {INTERESTS.map((i, idx) => {
-                      const active = interests.includes(i);
+                <div role="group" aria-labelledby="dietary-label">
+                  <span id="dietary-label" className={labelClass}>{t("booking.dietary")}</span>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {DIETS.map((d, i) => {
+                      const active = diets.includes(d);
                       return (
-                        <button key={i} type="button" aria-pressed={active} onClick={() => toggleInterest(i)} className={`text-xs px-3 py-1.5 rounded-full border transition cursor-pointer ${active ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white border-editorial-border hover:bg-editorial-secondary"}`}>
-                          {active ? "✓ " : ""}{t(`interest.${idx}` as MessageKey)}
+                        <button key={d} type="button" aria-pressed={active} onClick={() => setDiets(prev => toggle(prev, d))} className={chipClass(active)}>
+                          {active ? "✓ " : ""}{t(`diet.${i}` as MessageKey)}
                         </button>
                       );
                     })}
                   </div>
+                  <input type="text" maxLength={200} aria-label={`${t("booking.dietary")}: ${t("booking.otherPh")}`} placeholder={t("booking.otherPh")} value={dietOther} onChange={e => setDietOther(e.target.value)} className={inputClass} />
                 </div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={needsTransfer} onChange={e => setNeedsTransfer(e.target.checked)} className="accent-editorial-primary h-4 w-4" />
-                  {t("booking.transfer")}
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="dietary" className={labelClass}>{t("booking.dietary")}</label>
-                    <input id="dietary" type="text" maxLength={500} placeholder={t("booking.dietaryPh")} value={dietaryRestrictions} onChange={e => setDietaryRestrictions(e.target.value)} className={inputClass} />
+                <div role="group" aria-labelledby="needs-label">
+                  <span id="needs-label" className={labelClass}>{t("booking.needs")}</span>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {NEEDS.map((n, i) => {
+                      const active = needs.includes(n);
+                      return (
+                        <button key={n} type="button" aria-pressed={active} onClick={() => setNeeds(prev => toggle(prev, n))} className={chipClass(active)}>
+                          {active ? "✓ " : ""}{t(`need.${i}` as MessageKey)}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <label htmlFor="needs" className={labelClass}>{t("booking.needs")}</label>
-                    <input id="needs" type="text" maxLength={500} placeholder={t("booking.needsPh")} value={specialNeeds} onChange={e => setSpecialNeeds(e.target.value)} className={inputClass} />
-                  </div>
+                  <input type="text" maxLength={200} aria-label={`${t("booking.needs")}: ${t("booking.otherPh")}`} placeholder={t("booking.otherPh")} value={needOther} onChange={e => setNeedOther(e.target.value)} className={inputClass} />
                 </div>
                 <div>
                   <label htmlFor="notes" className={labelClass}>{t("booking.notes")}</label>
@@ -439,7 +457,9 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
                 <li className="flex justify-between"><span>{t("booking.nights")}</span><span>{nights > 0 ? nights : "—"}</span></li>
                 <li className="flex justify-between"><span className="flex items-center gap-1"><Users className="h-3 w-3" /> {t("booking.guests")}</span><span>{guests}</span></li>
                 {roomType && <li className="flex justify-between gap-2"><span>{t("booking.roomShort")}</span><span className="text-right">{roomType}</span></li>}
-                {!pacote && experienceType && <li className="flex justify-between gap-2"><span>{t("booking.experienceShort")}</span><span className="text-right">{experienceType}</span></li>}
+                {!pacote && chosenExperiences.map(exp => (
+                  <li key={exp.title} className="flex justify-between gap-2"><span>{exp.title}</span><span className="text-right whitespace-nowrap">{formatMoney(exp.price)} × {adults}</span></li>
+                ))}
                 {cupom && discount > 0 && (
                   <li className="flex justify-between gap-2 text-emerald-700 font-semibold"><span>{t("booking.discount")} ({cupom.code})</span><span>− {formatMoney(discount)}</span></li>
                 )}

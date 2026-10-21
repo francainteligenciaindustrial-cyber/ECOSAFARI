@@ -39,6 +39,37 @@ import {
   writeSkippingMissingColumns,
 } from "../core.js";
 
+// Novo link de confirmação para um turista que ainda não confirmou. Usa
+// magiclink (não "signup"): não precisa da senha e, ao clicar, o Supabase
+// confirma o email e já abre a sessão.
+async function sendTouristConfirmationEmail(email: string, name?: string): Promise<boolean> {
+  if (!supabaseAdminAuth) return false;
+  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: { redirectTo: `${SITE_URL}/turista` },
+  });
+  const link = linkData?.properties?.action_link;
+  if (linkErr || !link) {
+    log.warn("Falha ao gerar novo link de confirmação:", linkErr?.message);
+    return false;
+  }
+  const sent = await sendEmail({
+    to: email,
+    subject: "Confirme seu email — EcoSafari Brasil",
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #101B4C;">Confirme seu email 🌿</h2>
+        <p>${name ? `Olá, ${escapeHtml(name)}! ` : ""}Clique no botão abaixo para ativar seu perfil de turista na EcoSafari.</p>
+        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+        <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${link}</p>
+        <p style="color: #888; font-size: 12px;">Se você não pediu isso, pode ignorar este email.</p>
+      </div>
+    `,
+  });
+  return sent.ok;
+}
+
 export function registerTuristasRoutes(app: Express) {
 
 // TURISTA SELF-SERVICE (Supabase Auth) — unlike admin/partner (invite-only,
@@ -74,10 +105,11 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   if (password !== confirmPassword) {
     return res.status(400).json({ error: "As senhas não coincidem." });
   }
-  // All profile fields are mandatory at signup — a "perfil de turista"
-  // that's just an empty shell defeats the point of requiring one to review.
-  if (!name || !whatsapp || !country || !language || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma e idade." });
+  // Nome, WhatsApp e país são obrigatórios. Idioma e idade saíram do
+  // cadastro (reunião de 20/10/2026): o idioma vem do idioma do site e
+  // ambos continuam editáveis no perfil.
+  if (!name || !whatsapp || !country) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp e país." });
   }
 
   // Só exige a confirmação de email de verdade quando dá pra mandar o link
@@ -93,11 +125,31 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
     app_metadata: { role: "tourist" },
   });
   if (createErr || !created.user) {
-    return res.status(400).json({ error: describeAuthError(createErr, "Erro ao criar sua conta (o email já pode estar em uso).") });
+    // Email já cadastrado: se for um turista que nunca confirmou (o caso de
+    // quem tenta de novo porque o primeiro email não chegou), reenvia o
+    // link em vez de só dar erro. A senha NÃO é trocada pela nova — senão
+    // qualquer um poderia definir a senha de um cadastro pendente alheio.
+    const { data: list } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
+    const existing = (list?.users || []).find((u: any) => u.email?.toLowerCase() === email);
+    if (existing && !existing.email_confirmed_at && existing.app_metadata?.role === "tourist") {
+      const resent = await sendTouristConfirmationEmail(email, name);
+      return res.status(resent ? 200 : 400).json(resent
+        ? { success: true, emailConfirmationSent: true, alreadyRegistered: true }
+        : { error: "Esse email já tem um cadastro aguardando confirmação, mas não conseguimos reenviar o link agora. Tente de novo em alguns minutos." });
+    }
+    if (existing) {
+      return res.status(400).json({ error: "Já existe uma conta com esse email. Use \"Entrar\" (ou \"Esqueci minha senha\")." });
+    }
+    return res.status(400).json({ error: describeAuthError(createErr, "Erro ao criar sua conta.") });
   }
 
   const interests = sanitizeTouristInterests(req.body.interests);
-  const newTurista: Turista = { id: created.user.id, name, email, whatsapp, country, language, age, preferences, interests };
+  const newTurista: Turista = {
+    id: created.user.id, name, email, whatsapp, country,
+    language: language || undefined,
+    age: Number.isFinite(age) && age > 0 ? age : undefined,
+    preferences, interests,
+  };
   const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
   if (insertErr) {
     // Don't leave a bare auth account behind with no profile row — it would
@@ -154,7 +206,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
 app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
   const generic = { success: true };
   const email = String(req.body.email || "").trim().toLowerCase();
-  if (!supabaseAdminAuth || !resend || !/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) return res.json(generic);
+  if (!supabaseAdminAuth || !resend || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.json(generic);
   const { data } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
   const user = (data?.users || []).find((u: any) => u.email?.toLowerCase() === email);
   const role = user?.app_metadata?.role;
@@ -184,6 +236,37 @@ app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
   res.json(generic);
 });
 
+// Nome do lugar a partir das coordenadas (post do turista com local da
+// foto). OpenStreetMap/Nominatim, pelo servidor: identifica o site no
+// User-Agent (exigência da política de uso) e guarda em cache — a mesma
+// região quase sempre se repete.
+const reverseGeoCache = new Map<string, string>();
+app.get("/api/geo/reverse", publicFormLimiter, async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return res.status(400).json({ error: "Coordenadas inválidas." });
+  }
+  const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+  const cached = reverseGeoCache.get(key);
+  if (cached !== undefined) return res.json({ name: cached });
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&accept-language=pt-BR&lat=${lat}&lon=${lng}`;
+    const r = await fetch(url, { headers: { "User-Agent": `EcoSafariBrasil/1.0 (${SITE_URL})` }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const body: any = await r.json();
+    const a = body?.address || {};
+    const place = a.city || a.town || a.village || a.municipality || a.hamlet || a.county || a.state_district || "";
+    const name = [place, a.state].filter(Boolean).join(", ") || String(body?.display_name || "").split(",").slice(0, 2).join(",").trim();
+    if (reverseGeoCache.size > 2000) reverseGeoCache.clear();
+    reverseGeoCache.set(key, name);
+    res.json({ name });
+  } catch (err: any) {
+    log.warn("Falha no reverse geocoding:", err?.message);
+    res.json({ name: "" });
+  }
+});
+
 // Reenvia o link de confirmação. Resposta sempre igual (exista ou não a
 // conta) pra não servir de verificador de quais emails estão cadastrados.
 app.post("/api/turista/resend-confirmation", publicFormLimiter, async (req, res) => {
@@ -195,28 +278,7 @@ app.post("/api/turista/resend-confirmation", publicFormLimiter, async (req, res)
   const user = (data?.users || []).find((u: any) => u.email?.toLowerCase() === email);
   if (!user || user.email_confirmed_at || user.app_metadata?.role !== "tourist") return res.json(generic);
 
-  const { data: linkData, error: linkErr } = await supabaseAdminAuth.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo: `${SITE_URL}/turista` },
-  });
-  const link = linkData?.properties?.action_link;
-  if (linkErr || !link) {
-    log.warn("Falha ao gerar novo link de confirmação:", linkErr?.message);
-    return res.json(generic);
-  }
-  await sendEmail({
-    to: email,
-    subject: "Confirme seu email — EcoSafari Brasil",
-    html: `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #101B4C;">Confirme seu email 🌿</h2>
-        <p>Clique no botão abaixo para ativar seu perfil de turista na EcoSafari.</p>
-        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
-        <p style="color: #888; font-size: 12px;">Se você não pediu isso, pode ignorar este email.</p>
-      </div>
-    `,
-  });
+  await sendTouristConfirmationEmail(email);
   res.json(generic);
 });
 
@@ -231,7 +293,12 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
   const adults = Math.trunc(Number(req.body.adults));
   const children = Math.trunc(Number(req.body.children) || 0);
   const roomType = clip(req.body.roomType, 120) || undefined;
-  const experienceType = clip(req.body.experienceType, 200) || undefined;
+  // Vários passeios (experienceTypes) ou um só (experienceType, legado).
+  const experienceTitles = Array.from(new Set(
+    (Array.isArray(req.body.experienceTypes) ? req.body.experienceTypes : [req.body.experienceType])
+      .map((t: unknown) => clip(t, 200))
+      .filter(Boolean) as string[]
+  )).slice(0, 15);
   const pacoteId = clip(req.body.pacoteId, 100) || undefined;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -250,9 +317,11 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
   if (!pousadaRow) return res.status(404).json({ error: "Pousada não encontrada." });
   const pousada = mapPousadaRow(pousadaRow);
   if ((pousada.rooms || []).length > 0 && !roomType) return res.status(400).json({ error: "Escolha o tipo de quarto." });
-  if (experienceType && !(pousada.experiences || []).some(e => e.title === experienceType)) {
-    return res.status(400).json({ error: "Experiência não encontrada nesta pousada." });
+  const missingExperience = experienceTitles.find(title => !(pousada.experiences || []).some(e => e.title === title));
+  if (missingExperience) {
+    return res.status(400).json({ error: `Experiência não encontrada nesta pousada: ${missingExperience}.` });
   }
+  const experienceType = experienceTitles.length ? experienceTitles.join(" + ").slice(0, 300) : undefined;
 
   // Pacote: preço por pessoa definido pelo admin e noites fixas.
   let pacote: Pacote | null = null;
@@ -264,7 +333,7 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
   }
   const subtotal = pacote
     ? Math.round(pacotePricePerPerson(pacote) * (adults + children) * 100) / 100
-    : computeBookingTotal(pousada, checkIn, checkOut, adults, experienceType);
+    : computeBookingTotal(pousada, checkIn, checkOut, adults, experienceTitles);
 
   let cupom: Cupom | null = null;
   let discountAmount = 0;
@@ -291,7 +360,7 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
   const detailsSummary = [
     pacote && `Pacote: ${pacote.name}`,
     cupom && `Cupom: ${cupom.code}`,
-    details.arrivalTime && `Chegada prevista: ${details.arrivalTime}`,
+    details.arrivalTime && `Horário de chegada: ${details.arrivalTime}`,
     details.occasion && `Ocasião: ${details.occasion}`,
     details.needsTransfer && "Precisa de transfer",
     details.interests && `Interesses: ${details.interests}`,
@@ -459,8 +528,9 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
   const age = req.body.age !== undefined && Number.isFinite(Number(req.body.age)) && Number(req.body.age) > 0
     ? Number(req.body.age)
     : current.age;
-  if (!name || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha ao menos nome e idade." });
+  // Idade virou opcional (saiu do cadastro em 20/10/2026).
+  if (!name) {
+    return res.status(400).json({ error: "Preencha ao menos o nome." });
   }
   const interests = req.body.interests !== undefined ? sanitizeTouristInterests(req.body.interests) : current.interests;
   // Opcionais — só são enviados quando a pessoa troca a foto de perfil ou de
@@ -468,17 +538,20 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
   // UPDATE simplesmente não mexe neles.
   const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl.trim() : undefined;
   const coverPhotoUrl = typeof req.body.coverPhotoUrl === "string" ? req.body.coverPhotoUrl.trim() : undefined;
+  // Enquadramento da capa escolhido pelo turista ("x% y%", object-position).
+  const coverPosition = typeof req.body.coverPosition === "string" && /^\d{1,3}(\.\d+)?% \d{1,3}(\.\d+)?%$/.test(req.body.coverPosition.trim())
+    ? req.body.coverPosition.trim()
+    : undefined;
 
-  const { data, error } = await supabase
-    .from("turistas")
-    .update({
+  const { data, error } = await writeSkippingMissingColumns(
+    {
       name, whatsapp, country, language, age, preferences, interests,
       ...(photoUrl !== undefined ? { photoUrl } : {}),
       ...(coverPhotoUrl !== undefined ? { coverPhotoUrl } : {}),
-    })
-    .eq("id", userId)
-    .select()
-    .maybeSingle();
+      ...(coverPosition !== undefined ? { coverPosition } : {}),
+    },
+    row => supabase.from("turistas").update(row).eq("id", userId).select().maybeSingle()
+  );
   if (error || !data) return res.status(500).json({ error: "Erro ao salvar seu perfil." });
   res.json(data as Turista);
 });
@@ -557,8 +630,8 @@ app.post("/api/turista/upgrade", requireAnyAuth, async (req, res) => {
   const language = String(req.body.language || "").trim();
   const age = Number(req.body.age);
   const preferences = String(req.body.preferences || "").trim();
-  if (!name || !whatsapp || !country || !language || !Number.isFinite(age) || age <= 0) {
-    return res.status(400).json({ error: "Preencha nome, WhatsApp, país, idioma e idade." });
+  if (!name || !whatsapp || !country) {
+    return res.status(400).json({ error: "Preencha nome, WhatsApp e país." });
   }
 
   const mergedMetadata = { ...(user.app_metadata || {}), isTourist: true };
@@ -566,7 +639,12 @@ app.post("/api/turista/upgrade", requireAnyAuth, async (req, res) => {
   if (updateErr) return res.status(500).json({ error: describeAuthError(updateErr, "Erro ao ativar o perfil de turista.") });
 
   const interests = sanitizeTouristInterests(req.body.interests);
-  const newTurista: Turista = { id: user.id, name, email, whatsapp, country, language, age, preferences, interests };
+  const newTurista: Turista = {
+    id: user.id, name, email, whatsapp, country,
+    language: language || undefined,
+    age: Number.isFinite(age) && age > 0 ? age : undefined,
+    preferences, interests,
+  };
   const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
   if (insertErr) {
     // Desfaz o isTourist se não conseguiu criar o perfil — não deixa a conta
@@ -647,8 +725,18 @@ app.post("/api/turista/posts", requireTourist, async (req, res) => {
   const text = String(req.body.text || "").trim();
   const photoUrl = typeof req.body.photoUrl === "string" ? req.body.photoUrl.trim() : "";
   if (!text && !photoUrl) return res.status(400).json({ error: "Escreva algo ou adicione uma foto." });
-  const newPost = { id: `tp_${randomUUID()}`, turistaId: userId, text, photoUrl: photoUrl || null, createdAt: new Date().toISOString() };
-  const { error } = await supabase.from("turista_posts").insert(newPost);
+  // Local da foto: vem do GPS gravado na própria foto (EXIF) ou da
+  // localização do aparelho, e o turista pode editar o nome antes de publicar.
+  const lat = Number(req.body.latitude);
+  const lng = Number(req.body.longitude);
+  const hasCoords = req.body.latitude != null && req.body.longitude != null && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  const newPost = {
+    id: `tp_${randomUUID()}`, turistaId: userId, text, photoUrl: photoUrl || null, createdAt: new Date().toISOString(),
+    location: clip(req.body.location, 120) || null,
+    latitude: hasCoords ? lat : null,
+    longitude: hasCoords ? lng : null,
+  };
+  const { error } = await writeSkippingMissingColumns(newPost, row => supabase.from("turista_posts").insert(row));
   if (error) return res.status(500).json({ error: "Erro ao publicar." });
   res.status(201).json(newPost);
 });

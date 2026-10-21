@@ -16,14 +16,18 @@ interface Props {
   // Botão circular só com ícone, sem texto — usado sobre um avatar/capa
   // (estética "editar foto" de rede social), em vez do botão-pílula com label.
   compact?: boolean;
+  // Recebe o arquivo original antes do upload — ex: ler o GPS do EXIF, que
+  // pode se perder quando a imagem é recomprimida.
+  onFileSelected?: (file: File) => void;
 }
 
-export default function ImageUploadButton({ onUploaded, label = "Enviar imagem", icon, compact = false }: Props) {
+export default function ImageUploadButton({ onUploaded, label = "Enviar imagem", icon, compact = false, onFileSelected }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
 
   const handleFile = async (file: File) => {
+    onFileSelected?.(file);
     setUploading(true);
     setError("");
     try {

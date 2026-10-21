@@ -66,6 +66,8 @@ mais de uma vez. As mais recentes:
 6. `scripts/add-pedidos-site.sql` — venda do site oficial (Gestão → Pedidos de site)
 7. `scripts/add-servico-logo.sql` — serviço de logo com aprovação de versões pelo cliente
 8. `scripts/add-vinculo-app.sql` — vínculo pousada do site ↔ pousada do app EcoSafari Go
+9. `scripts/add-receita-confianca-crescimento.sql` — comissão, planos, preço por temporada, afiliados, avaliação verificada, conservação e destaque
+10. `scripts/add-local-foto-e-capa.sql` — local da foto nos posts do turista e enquadramento da capa
 
 **No Supabase do app** (projeto separado): `scripts/app-ecosafari-go/estatisticas-publicas.sql`
 — funções somente leitura com números agregados de avistamentos aprovados, que

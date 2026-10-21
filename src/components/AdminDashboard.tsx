@@ -303,7 +303,7 @@ export default function AdminDashboard({
         activities: editPousadaForm.activities,
         experiences: editPousadaForm.experiences
           .filter(exp => exp.title.trim())
-          .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
+          .map(exp => ({ ...exp, title: exp.title.trim(), description: exp.description || `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
         images: editPousadaForm.images.map(i => i.trim()).filter(Boolean),
         officialSiteImages: editPousadaForm.officialSiteImages.map(i => i.trim()).filter(Boolean),
         videoUrl: editPousadaForm.videoUrl.trim() || undefined,
@@ -568,6 +568,7 @@ export default function AdminDashboard({
                 <ExperienceListEditor
                   value={editPousadaForm.experiences}
                   onChange={experiences => setEditPousadaForm(prev => ({ ...prev, experiences }))}
+                  withProvider
                 />
               </div>
 

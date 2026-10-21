@@ -89,7 +89,7 @@ export default function PousadaProdutosManager({ pousadaId }: Props) {
     setQrDataUrl(null);
     setLoadingQr(true);
     try {
-      const res = await adminFetch(`/api/produtos/${p.id}/qrcode`);
+      const res = await adminFetch(`/api/pousadas/${p.pousadaId}/produtos/${p.id}/qrcode`);
       const data = await res.json();
       if (res.ok) setQrDataUrl(data.qrcode);
     } finally {

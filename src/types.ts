@@ -13,6 +13,10 @@ export interface Pousada {
     title: string;
     description: string;
     price: number;
+    // Depende de contratar um prestador (guia, piloteiro...) — ver
+    // PROVIDER_TYPES em ExperienceListEditor.
+    requiresProvider?: boolean;
+    providerType?: string;
   }[];
   capacity: number;
   videoUrl?: string;
@@ -399,7 +403,7 @@ export interface Turista {
   email: string;
   whatsapp: string;
   country: string;
-  age: number;
+  age?: number;
   preferences: string;
   language?: string;
   coins?: number;
@@ -411,6 +415,7 @@ export interface Turista {
   // Foto de capa do perfil (estética "Facebook") — puramente estética, não
   // alimenta nenhuma lógica de negócio como interests.
   coverPhotoUrl?: string;
+  coverPosition?: string; // enquadramento da capa ("50% 30%"), escolhido arrastando a foto
 }
 
 // Pousada que um turista logado marcou como "gostei" — alimenta o widget de
@@ -455,6 +460,10 @@ export interface TuristaPost {
   text: string;
   photoUrl?: string;
   createdAt: string;
+  // Onde a foto foi tirada (EXIF/GPS do aparelho, nome editável).
+  location?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 // Item vendável pela pousada (frigobar, vestuário, brinde...) — cadastrado

@@ -8,6 +8,11 @@ import { Turista } from "../types";
 import { navigate } from "../lib/router";
 import { consumeReturnTo } from "../lib/returnTo";
 import CountrySelect from "./CountrySelect";
+import { useI18n } from "../i18n/I18nProvider";
+
+// Idioma do perfil = idioma em que a pessoa usa o site (não é mais
+// perguntado no cadastro). Fica editável depois, no perfil.
+const LANGUAGE_NAMES = { pt: "Português", en: "English", es: "Español" } as const;
 import MinhasReservas from "./MinhasReservas";
 
 // Miolo do login/cadastro de turista, sem cabeçalho/rodapé próprio — usado
@@ -15,6 +20,7 @@ import MinhasReservas from "./MinhasReservas";
 // pela casca fina em TuristaAuthPage.tsx (que precisa continuar existindo em
 // /turista: é o redirectTo do link de confirmação de email do cadastro).
 export default function TuristaAuthPanel() {
+  const { lang } = useI18n();
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [isTourist, setIsTourist] = useState(false);
@@ -33,6 +39,10 @@ export default function TuristaAuthPanel() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  // Conta criada mas email ainda não confirmado — o login mostra o motivo
+  // real (antes aparecia "Email ou senha inválidos") e um botão de reenvio.
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [loginResend, setLoginResend] = useState<"idle" | "sending" | "sent">("idle");
   const [loggingIn, setLoggingIn] = useState(false);
 
   // Signup — every field is required, matching the "campos obrigatórios no
@@ -44,8 +54,6 @@ export default function TuristaAuthPanel() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [country, setCountry] = useState("");
-  const [language, setLanguage] = useState("");
-  const [age, setAge] = useState("");
   const [signupError, setSignupError] = useState("");
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
   const [signingUp, setSigningUp] = useState(false);
@@ -105,7 +113,15 @@ export default function TuristaAuthPanel() {
     if (!supabase || loggingIn) return;
     setLoggingIn(true);
     setLoginError("");
+    setUnconfirmedEmail(null);
+    setLoginResend("idle");
     const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    if (error && ((error as any).code === "email_not_confirmed" || /not confirmed/i.test(error.message || ""))) {
+      setUnconfirmedEmail(loginEmail.trim().toLowerCase());
+      setLoginError("Seu email ainda não foi confirmado. Clique no link que enviamos no cadastro — ou peça um novo abaixo.");
+      setLoggingIn(false);
+      return;
+    }
     if (error || !data.user) {
       setLoginError("Email ou senha inválidos.");
       setLoggingIn(false);
@@ -132,7 +148,7 @@ export default function TuristaAuthPanel() {
       const res = await adminFetch("/api/turista/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, whatsapp, country, language, age: Number(age) }),
+        body: JSON.stringify({ name, whatsapp, country, language: LANGUAGE_NAMES[lang] }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -169,7 +185,7 @@ export default function TuristaAuthPanel() {
       const res = await fetch("/api/turista/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language, age: Number(age) }),
+        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language: LANGUAGE_NAMES[lang] }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -258,17 +274,7 @@ export default function TuristaAuthPanel() {
             type="tel" required placeholder="WhatsApp (com DDD/país)" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
-          <div className="grid grid-cols-2 gap-3">
-            <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-            <input
-              type="number" required min={1} placeholder="Idade" value={age} onChange={e => setAge(e.target.value)}
-              className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-            />
-          </div>
-          <input
-            type="text" required placeholder="Idioma preferido (ex: Português, English, Español)" value={language} onChange={e => setLanguage(e.target.value)}
-            className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-          />
+          <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
           {upgradeError && <p className="text-red-600 text-xs font-medium">{upgradeError}</p>}
           <button
             type="submit" disabled={upgrading}
@@ -302,7 +308,7 @@ export default function TuristaAuthPanel() {
             <p><span className="text-editorial-muted text-xs block">WhatsApp</span> {profile.whatsapp}</p>
             <p><span className="text-editorial-muted text-xs block">País</span> {profile.country}</p>
             {profile.language && <p><span className="text-editorial-muted text-xs block">Idioma</span> {profile.language}</p>}
-            <p><span className="text-editorial-muted text-xs block">Idade</span> {profile.age}</p>
+            {typeof profile.age === "number" && profile.age > 0 && <p><span className="text-editorial-muted text-xs block">Idade</span> {profile.age}</p>}
             {typeof profile.coins === "number" && <p><span className="text-editorial-muted text-xs block">Jaguars</span> {profile.coins}</p>}
             {profile.preferences && <p><span className="text-editorial-muted text-xs block">Preferências</span> {profile.preferences}</p>}
             <p className="text-emerald-700 text-xs font-semibold pt-2">✓ Você já pode reservar e avaliar pousadas, guias e atrações.</p>
@@ -354,6 +360,24 @@ export default function TuristaAuthPanel() {
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
           {loginError && <p className="text-red-600 text-xs font-medium">{loginError}</p>}
+          {unconfirmedEmail && (
+            <button
+              type="button"
+              disabled={loginResend !== "idle"}
+              onClick={async () => {
+                setLoginResend("sending");
+                await fetch("/api/turista/resend-confirmation", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email: unconfirmedEmail }),
+                }).catch(() => {});
+                setLoginResend("sent");
+              }}
+              className="text-left text-[11px] uppercase tracking-widest font-bold text-editorial-primary hover:underline disabled:opacity-60 cursor-pointer"
+            >
+              {loginResend === "sending" ? "Reenviando..." : loginResend === "sent" ? "Link reenviado — confira seu email (e o spam)" : "Reenviar email de confirmação"}
+            </button>
+          )}
           <button
             type="submit" disabled={loggingIn}
             className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
@@ -383,17 +407,7 @@ export default function TuristaAuthPanel() {
             type="tel" required placeholder="WhatsApp (com DDD/país)" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
-          <div className="grid grid-cols-2 gap-3">
-            <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-            <input
-              type="number" required min={1} placeholder="Idade" value={age} onChange={e => setAge(e.target.value)}
-              className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-            />
-          </div>
-          <input
-            type="text" required placeholder="Idioma preferido (ex: Português, English, Español)" value={language} onChange={e => setLanguage(e.target.value)}
-            className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
-          />
+          <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
           {signupError && <p className="text-red-600 text-xs font-medium">{signupError}</p>}
           <button
             type="submit" disabled={signingUp}

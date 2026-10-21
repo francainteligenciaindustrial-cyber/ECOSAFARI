@@ -306,16 +306,12 @@ export default function PousadaCatalog({
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-editorial-primary/45"></div>
         
         <div className="relative max-w-5xl mx-auto px-6 text-center z-10 flex flex-col items-center">
-          <span className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#F6EEDC]/80 mb-4">
-            {t("catalog.hero.kicker")}
-          </span>
-          <span aria-hidden="true" className="block w-14 h-[3px] bg-arara-yellow -mt-2 mb-6" />
-          <h1 className="text-3xl sm:text-4xl md:text-6xl font-serif tracking-tight mb-5 sm:mb-6 max-w-4xl text-balance leading-tight">
-            {t("catalog.hero.title1")} <span className="italic font-normal opacity-90">{t("catalog.hero.titleEm")}</span> {t("catalog.hero.title2")}
+          {/* Só a frase-chave, no estilo "Conecte sua loja a milhões de
+              clientes" (pedido de 20/10/2026). */}
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-serif tracking-tight mb-6 max-w-4xl text-balance leading-tight">
+            {t("catalog.hero.headline1")} <span className="italic font-normal opacity-90">{t("catalog.hero.headlineEm")}</span>
           </h1>
-          <p className="text-sm md:text-base text-[#F6EEDC] mb-8 max-w-2xl text-balance font-light leading-relaxed tracking-wide">
-            {t("catalog.hero.subtitle")}
-          </p>
+          <span aria-hidden="true" className="block w-14 h-[3px] bg-arara-yellow mb-8" />
           <div className="flex flex-wrap gap-3 sm:gap-4 justify-center text-[10px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.2em] font-semibold">
             <a href="#catalogo" className="bg-arara-yellow text-arara-black hover:bg-arara-orange px-4 sm:px-6 py-2.5 sm:py-3 rounded-none transition duration-200 shadow-sm flex items-center gap-2">
               <Compass className="h-4 w-4" /> {t("catalog.hero.cta")}

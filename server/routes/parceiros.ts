@@ -188,10 +188,14 @@ app.delete("/api/pousadas/:id/produtos/:produtoId", requirePartnerAccess("pousad
 
 // QR code de um produto — encodifica só o id (curto, sem informação
 // sensível) direto num PNG em data URL. Não precisa de coluna nem tabela
-// própria: o mesmo id do produto sempre gera o mesmo QR.
-app.get("/api/produtos/:id/qrcode", requirePartnerAccess("pousada"), async (req, res) => {
+// próprio: o mesmo id do produto sempre gera o mesmo QR. A rota fica sob
+// /api/pousadas/:id para requirePartnerAccess checar a pousada (antes o :id
+// era o do produto e todo parceiro levava 403 — só admin conseguia gerar).
+app.get("/api/pousadas/:id/produtos/:produtoId/qrcode", requirePartnerAccess("pousada"), async (req, res) => {
+  const { data: produto } = await supabase.from("produtos").select("id").eq("id", req.params.produtoId).eq("pousadaId", req.params.id).maybeSingle();
+  if (!produto) return res.status(404).json({ error: "Produto não encontrado." });
   try {
-    const dataUrl = await QRCode.toDataURL(req.params.id, { width: 240, margin: 1 });
+    const dataUrl = await QRCode.toDataURL(produto.id, { width: 240, margin: 1 });
     res.json({ qrcode: dataUrl });
   } catch (err) {
     log.error("Erro ao gerar QR code do produto:", err);
@@ -459,13 +463,24 @@ app.get("/api/my-partner-properties", authLimiter, async (req, res) => {
   for (const l of links.values()) idsByType[l.partnerType].push(l.partnerId);
 
   const [pousadaRows, atracaoRows, guideRows] = await Promise.all([
-    idsByType.pousada.length ? supabase.from("pousadas").select("id,name").in("id", idsByType.pousada) : Promise.resolve({ data: [] as any[] }),
-    idsByType.atracao.length ? supabase.from("atracoes").select("id,name").in("id", idsByType.atracao) : Promise.resolve({ data: [] as any[] }),
+    idsByType.pousada.length ? supabase.from("pousadas").select("id,name,images").in("id", idsByType.pousada) : Promise.resolve({ data: [] as any[] }),
+    idsByType.atracao.length ? supabase.from("atracoes").select("id,name,images").in("id", idsByType.atracao) : Promise.resolve({ data: [] as any[] }),
     idsByType.guia.length ? supabase.from("guides").select("id,name").in("id", idsByType.guia) : Promise.resolve({ data: [] as any[] }),
   ]);
   const nameById = new Map<string, string>();
-  for (const r of (pousadaRows.data || []) as any[]) nameById.set(`pousada:${r.id}`, resolveTranslation(r.name));
-  for (const r of (atracaoRows.data || []) as any[]) nameById.set(`atracao:${r.id}`, resolveTranslation(r.name));
+  // Capa (1ª foto da galeria) — o card da pousada no painel do gestor mostra.
+  const imageById = new Map<string, string>();
+  const firstImage = (images: unknown) => (Array.isArray(images) ? images.find(i => typeof i === "string" && i.trim()) : undefined);
+  for (const r of (pousadaRows.data || []) as any[]) {
+    nameById.set(`pousada:${r.id}`, resolveTranslation(r.name));
+    const img = firstImage(r.images);
+    if (img) imageById.set(`pousada:${r.id}`, img);
+  }
+  for (const r of (atracaoRows.data || []) as any[]) {
+    nameById.set(`atracao:${r.id}`, resolveTranslation(r.name));
+    const img = firstImage(r.images);
+    if (img) imageById.set(`atracao:${r.id}`, img);
+  }
   for (const r of (guideRows.data || []) as any[]) nameById.set(`guia:${r.id}`, r.name);
 
   // Sem o filtro, uma pousada removida (ainda apontada pelo app_metadata
@@ -476,6 +491,7 @@ app.get("/api/my-partner-properties", authLimiter, async (req, res) => {
       partnerType: l.partnerType,
       partnerId: l.partnerId,
       name: nameById.get(`${l.partnerType}:${l.partnerId}`)!,
+      imageUrl: imageById.get(`${l.partnerType}:${l.partnerId}`) || null,
     }));
 
   res.json({ properties });

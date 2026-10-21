@@ -49,7 +49,7 @@ export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingP
       capacity: p.capacity,
       features: [...(p.features || [])],
       activities: [...(p.activities || [])],
-      experiences: (p.experiences || []).map(e => ({ title: e.title, price: e.price })),
+      experiences: (p.experiences || []).map(e => ({ title: e.title, price: e.price, description: e.description, requiresProvider: e.requiresProvider, providerType: e.providerType })),
       images: [...(p.images || [])],
       officialSiteImages: [...(p.officialSiteImages || [])],
       videoUrl: p.videoUrl || "",
@@ -80,7 +80,7 @@ export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingP
         activities: pousadaForm.activities,
         experiences: pousadaForm.experiences
           .filter(exp => exp.title.trim())
-          .map(exp => ({ title: exp.title.trim(), description: `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
+          .map(exp => ({ ...exp, title: exp.title.trim(), description: exp.description || `Expedição de ${exp.title.trim()}`, price: exp.price || 0 })),
         capacity: Number(pousadaForm.capacity),
         images: [pousadaForm.images],
         videoUrl: pousadaForm.videoUrl.trim() || undefined,
@@ -263,6 +263,7 @@ export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingP
                   <ExperienceListEditor
                     value={pousadaForm.experiences}
                     onChange={experiences => setPousadaForm(prev => ({ ...prev, experiences }))}
+                    withProvider
                   />
                 </div>
 

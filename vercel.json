@@ -52,7 +52,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "geolocation=(), microphone=(), camera=(self)"
+          "value": "geolocation=(self), microphone=(), camera=(self)"
         },
         {
           "key": "Strict-Transport-Security",

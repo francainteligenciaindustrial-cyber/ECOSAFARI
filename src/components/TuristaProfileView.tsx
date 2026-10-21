@@ -9,6 +9,13 @@ import { navigate } from "../lib/router";
 import { Pousada, Resgate, Turista, TuristaPost } from "../types";
 import CountrySelect from "./CountrySelect";
 import ImageUploadButton from "./ImageUploadButton";
+import { readGpsFromFile, type GpsCoords } from "../lib/exifGps";
+
+const parseCoverPosition = (pos?: string) => {
+  const m = /^(\d+(?:\.\d+)?)% (\d+(?:\.\d+)?)%$/.exec(pos || "");
+  return m ? { x: Number(m[1]), y: Number(m[2]) } : { x: 50, y: 50 };
+};
+const clampPct = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
 
 interface VisitedPousada {
   pousadaId: string;
@@ -55,6 +62,16 @@ export default function TuristaProfileView() {
   const [posts, setPosts] = useState<TuristaPost[] | null>(null);
   const [postText, setPostText] = useState("");
   const [postPhotoUrl, setPostPhotoUrl] = useState("");
+  // Local da foto do post: preenchido sozinho pelo GPS da foto (EXIF); sem
+  // GPS na foto, o turista pode usar a localização do aparelho ou digitar.
+  const [postCoords, setPostCoords] = useState<GpsCoords | null>(null);
+  const [postLocation, setPostLocation] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [locationHint, setLocationHint] = useState("");
+  // Ajuste do enquadramento da capa (arrastar a foto).
+  const [adjustingCover, setAdjustingCover] = useState(false);
+  const [coverPos, setCoverPos] = useState({ x: 50, y: 50 });
+  const coverDrag = React.useRef<{ startX: number; startY: number; x: number; y: number; w: number; h: number } | null>(null);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState("");
 
@@ -90,7 +107,7 @@ export default function TuristaProfileView() {
     });
   }, []);
 
-  const saveProfile = async (overrides?: Partial<{ photoUrl: string; coverPhotoUrl: string }>): Promise<Turista | null> => {
+  const saveProfile = async (overrides?: Partial<{ photoUrl: string; coverPhotoUrl: string; coverPosition: string }>): Promise<Turista | null> => {
     const body = {
       name: form.name,
       whatsapp: form.whatsapp,
@@ -100,6 +117,7 @@ export default function TuristaProfileView() {
       preferences: form.preferences,
       ...(overrides?.photoUrl !== undefined ? { photoUrl: overrides.photoUrl } : {}),
       ...(overrides?.coverPhotoUrl !== undefined ? { coverPhotoUrl: overrides.coverPhotoUrl } : {}),
+      ...(overrides?.coverPosition !== undefined ? { coverPosition: overrides.coverPosition } : {}),
     };
     const res = await adminFetch("/api/turista/me", {
       method: "PUT",
@@ -132,8 +150,88 @@ export default function TuristaProfileView() {
 
   const handleCoverUploaded = async (url: string) => {
     setCoverError("");
-    const updated = await saveProfile({ coverPhotoUrl: url });
-    if (!updated) setCoverError("Erro ao salvar a foto de capa. Tente novamente.");
+    // Foto nova começa centralizada e já abre o ajuste de enquadramento.
+    const updated = await saveProfile({ coverPhotoUrl: url, coverPosition: "50% 50%" });
+    if (!updated) {
+      setCoverError("Erro ao salvar a foto de capa. Tente novamente.");
+      return;
+    }
+    setCoverPos({ x: 50, y: 50 });
+    setAdjustingCover(true);
+  };
+
+  const startCoverAdjust = () => {
+    setCoverPos(parseCoverPosition(localProfile?.coverPosition));
+    setAdjustingCover(true);
+  };
+  const saveCoverPosition = async () => {
+    const updated = await saveProfile({ coverPosition: `${coverPos.x}% ${coverPos.y}%` });
+    if (!updated) {
+      setCoverError("Erro ao salvar o enquadramento. Tente novamente.");
+      return;
+    }
+    setAdjustingCover(false);
+  };
+  // Arrastar a foto para baixo mostra mais da parte de cima (y diminui).
+  const onCoverPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!adjustingCover) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    coverDrag.current = { startX: e.clientX, startY: e.clientY, x: coverPos.x, y: coverPos.y, w: rect.width, h: rect.height };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onCoverPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = coverDrag.current;
+    if (!adjustingCover || !d) return;
+    setCoverPos({
+      x: clampPct(d.x - ((e.clientX - d.startX) / d.w) * 100),
+      y: clampPct(d.y - ((e.clientY - d.startY) / d.h) * 150),
+    });
+  };
+  const onCoverPointerUp = () => { coverDrag.current = null; };
+
+  const lookupPlaceName = async (coords: GpsCoords) => {
+    try {
+      const res = await fetch(`/api/geo/reverse?lat=${coords.latitude}&lng=${coords.longitude}`);
+      const body = await res.json().catch(() => ({}));
+      if (body.name) setPostLocation(prev => prev || body.name);
+    } catch { /* fica só com as coordenadas */ }
+  };
+  const handlePostFile = async (file: File) => {
+    setLocationHint("");
+    const coords = await readGpsFromFile(file);
+    if (coords) {
+      setPostCoords(coords);
+      setPostLocation("");
+      lookupPlaceName(coords);
+    } else {
+      setLocationHint("Esta foto não tem localização gravada. Use sua localização atual ou digite o lugar.");
+    }
+  };
+  const useDeviceLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationHint("Seu navegador não permite pegar a localização. Digite o lugar.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = { latitude: Math.round(pos.coords.latitude * 1e6) / 1e6, longitude: Math.round(pos.coords.longitude * 1e6) / 1e6 };
+        setPostCoords(coords);
+        setLocationHint("");
+        setLocating(false);
+        lookupPlaceName(coords);
+      },
+      () => {
+        setLocating(false);
+        setLocationHint("Não foi possível pegar sua localização. Digite o lugar.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+  const clearPostLocation = () => {
+    setPostCoords(null);
+    setPostLocation("");
+    setLocationHint("");
   };
 
   const handleSaveForm = async (e: React.FormEvent) => {
@@ -175,7 +273,13 @@ export default function TuristaProfileView() {
       const res = await adminFetch("/api/turista/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: postText.trim(), photoUrl: postPhotoUrl || undefined }),
+        body: JSON.stringify({
+          text: postText.trim(),
+          photoUrl: postPhotoUrl || undefined,
+          location: postLocation.trim() || undefined,
+          latitude: postCoords?.latitude,
+          longitude: postCoords?.longitude,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -186,6 +290,7 @@ export default function TuristaProfileView() {
       setPosts(prev => [newPost, ...(prev || [])]);
       setPostText("");
       setPostPhotoUrl("");
+      clearPostLocation();
     } catch {
       setPostError("Erro ao publicar. Tente novamente.");
     } finally {
@@ -255,13 +360,42 @@ export default function TuristaProfileView() {
       {/* Capa + avatar sobreposto — mesma ideia visual de um perfil do
           Facebook, com a paleta editorial do site em vez de azul/cinza. */}
       <div className="relative">
-        <div className="h-48 md:h-64 bg-gradient-to-br from-editorial-primary via-emerald-800 to-editorial-primary/70 overflow-hidden">
+        <div
+          className={`h-48 md:h-64 bg-gradient-to-br from-editorial-primary via-emerald-800 to-editorial-primary/70 overflow-hidden relative ${adjustingCover ? "cursor-grab active:cursor-grabbing touch-none select-none" : ""}`}
+          onPointerDown={onCoverPointerDown}
+          onPointerMove={onCoverPointerMove}
+          onPointerUp={onCoverPointerUp}
+          onPointerCancel={onCoverPointerUp}
+        >
           {localProfile.coverPhotoUrl && (
-            <img src={localProfile.coverPhotoUrl} alt="Capa do perfil" className="w-full h-full object-cover" />
+            <img
+              src={localProfile.coverPhotoUrl}
+              alt="Capa do perfil"
+              draggable={false}
+              className="w-full h-full object-cover pointer-events-none"
+              style={{ objectPosition: adjustingCover ? `${coverPos.x}% ${coverPos.y}%` : localProfile.coverPosition || "50% 50%" }}
+            />
+          )}
+          {adjustingCover && (
+            <span className="absolute inset-x-0 bottom-3 mx-auto w-fit bg-black/60 text-white text-[11px] font-semibold px-3 py-1 rounded-full pointer-events-none">
+              Arraste a foto para enquadrar
+            </span>
           )}
         </div>
-        <div className="absolute top-3 right-3">
-          <ImageUploadButton label="Editar capa" onUploaded={handleCoverUploaded} />
+        <div className="absolute top-3 right-3 flex flex-wrap justify-end gap-2">
+          {adjustingCover ? (
+            <>
+              <button type="button" onClick={() => setAdjustingCover(false)} className="bg-white/90 text-editorial-text text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-white">Cancelar</button>
+              <button type="button" onClick={saveCoverPosition} className="bg-editorial-primary text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer hover:opacity-90">Salvar posição</button>
+            </>
+          ) : (
+            <>
+              {localProfile.coverPhotoUrl && (
+                <button type="button" onClick={startCoverAdjust} className="bg-white/90 text-emerald-700 border border-emerald-600/40 text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-white">Ajustar posição</button>
+              )}
+              <ImageUploadButton label="Editar capa" onUploaded={handleCoverUploaded} />
+            </>
+          )}
         </div>
 
         <div className="px-6">
@@ -367,11 +501,11 @@ export default function TuristaProfileView() {
                 />
                 <CountrySelect required placeholder="País" value={form.country} onChange={v => setForm(p => ({ ...p, country: v }))} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                 <input
-                  type="text" required placeholder="Idioma preferido" value={form.language} onChange={e => setForm(p => ({ ...p, language: e.target.value }))}
+                  type="text" placeholder="Idioma preferido (opcional)" value={form.language} onChange={e => setForm(p => ({ ...p, language: e.target.value }))}
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                 />
                 <input
-                  type="number" required min={1} placeholder="Idade" value={form.age} onChange={e => setForm(p => ({ ...p, age: e.target.value }))}
+                  type="number" min={1} placeholder="Idade (opcional)" value={form.age} onChange={e => setForm(p => ({ ...p, age: e.target.value }))}
                   className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
                 />
                 <textarea
@@ -546,9 +680,32 @@ export default function TuristaProfileView() {
                   </button>
                 </div>
               )}
+              {(postPhotoUrl || postCoords || postLocation) && (
+                <div className="ml-[52px] flex flex-wrap items-center gap-2 text-xs">
+                  <MapPin className="h-3.5 w-3.5 text-editorial-primary flex-shrink-0" />
+                  <input
+                    type="text"
+                    maxLength={120}
+                    value={postLocation}
+                    onChange={e => setPostLocation(e.target.value)}
+                    placeholder={postCoords ? "Buscando o nome do lugar..." : "Onde a foto foi tirada? (opcional)"}
+                    aria-label="Local da foto"
+                    className="flex-1 min-w-[160px] border border-editorial-border bg-white px-2.5 py-1.5 text-xs rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
+                  />
+                  {!postCoords && (
+                    <button type="button" onClick={useDeviceLocation} disabled={locating} className="text-[11px] font-semibold text-emerald-700 hover:underline cursor-pointer disabled:opacity-60">
+                      {locating ? "Localizando..." : "Usar minha localização"}
+                    </button>
+                  )}
+                  {(postCoords || postLocation) && (
+                    <button type="button" onClick={clearPostLocation} aria-label="Remover local" className="text-editorial-muted hover:text-red-600 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+                  )}
+                  {locationHint && <p className="w-full text-[11px] text-editorial-muted">{locationHint}</p>}
+                </div>
+              )}
               {postError && <p className="text-red-600 text-xs font-medium ml-[52px]">{postError}</p>}
               <div className="flex items-center justify-between ml-[52px]">
-                <ImageUploadButton label="Foto" icon={<ImagePlus className="h-3.5 w-3.5" />} onUploaded={setPostPhotoUrl} />
+                <ImageUploadButton label="Foto" icon={<ImagePlus className="h-3.5 w-3.5" />} onUploaded={setPostPhotoUrl} onFileSelected={handlePostFile} />
                 <button
                   type="submit"
                   disabled={posting || (!postText.trim() && !postPhotoUrl)}
@@ -583,7 +740,21 @@ export default function TuristaProfileView() {
                       )}
                       <div>
                         <p className="text-sm font-bold text-editorial-text">{localProfile.name}</p>
-                        <p className="text-editorial-muted text-[11px]">{formatPostDate(post.createdAt)}</p>
+                        <p className="text-editorial-muted text-[11px]">
+                          {formatPostDate(post.createdAt)}
+                          {post.location && (
+                            <>
+                              {" · "}
+                              {typeof post.latitude === "number" && typeof post.longitude === "number" ? (
+                                <a href={`https://www.openstreetmap.org/?mlat=${post.latitude}&mlon=${post.longitude}#map=13/${post.latitude}/${post.longitude}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 hover:text-editorial-primary hover:underline">
+                                  <MapPin className="h-3 w-3" />{post.location}
+                                </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" />{post.location}</span>
+                              )}
+                            </>
+                          )}
+                        </p>
                       </div>
                     </div>
                     <button aria-label="Excluir post" onClick={() => handleDeletePost(post.id)} className="text-editorial-muted hover:text-red-600 transition cursor-pointer flex-shrink-0" title="Excluir post">

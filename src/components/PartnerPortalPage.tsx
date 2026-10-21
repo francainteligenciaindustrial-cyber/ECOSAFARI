@@ -110,7 +110,7 @@ export default function PartnerPortalPage() {
   // GET /api/my-partner-properties/provisionPartnerLogin em server.ts.
   // selectedProperty null = usa a propriedade "principal" salva em
   // app_metadata (comportamento de sempre, pra quem só tem uma).
-  const [properties, setProperties] = useState<{ partnerType: PartnerType; partnerId: string; name: string }[] | null>(null);
+  const [properties, setProperties] = useState<{ partnerType: PartnerType; partnerId: string; name: string; imageUrl?: string | null }[] | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<{ partnerType: PartnerType; partnerId: string } | null>(null);
 
   // Whether the current session came from clicking an invite/recovery link
@@ -217,7 +217,7 @@ export default function PartnerPortalPage() {
             activities: [...(data.pousada.activities || [])],
             pricePerNight: data.pousada.pricePerNight,
             capacity: data.pousada.capacity,
-            experiences: (data.pousada.experiences || []).map(e => ({ title: e.title, price: e.price })) as ExperienceDraft[],
+            experiences: (data.pousada.experiences || []).map(e => ({ title: e.title, price: e.price, description: e.description, requiresProvider: e.requiresProvider, providerType: e.providerType })) as ExperienceDraft[],
             videoUrl: data.pousada.videoUrl || "",
             officialSiteUrl: data.pousada.officialSiteUrl || "",
             officialSiteImages: [...(data.pousada.officialSiteImages || [])],
@@ -360,7 +360,9 @@ export default function PartnerPortalPage() {
           activities: form.activities,
           pricePerNight: Number(form.pricePerNight),
           capacity: Number(form.capacity),
-          experiences: form.experiences.filter((e: ExperienceDraft) => e.title.trim()),
+          experiences: form.experiences
+            .filter((e: ExperienceDraft) => e.title.trim())
+            .map((e: ExperienceDraft) => ({ ...e, title: e.title.trim(), description: e.description || "" })),
           videoUrl: form.videoUrl.trim() || undefined,
           officialSiteUrl: form.officialSiteUrl.trim() || undefined,
           officialSiteImages: form.officialSiteImages.map((i: string) => i.trim()).filter(Boolean),
@@ -474,9 +476,8 @@ export default function PartnerPortalPage() {
           experiences: form.experiences
             .filter((e: ExperienceDraft) => e.title.trim())
             .map((e: ExperienceDraft) => ({
-              title: e.title,
-              price: e.price,
-              description: profile.pousada!.experiences.find(orig => orig.title === e.title)?.description || "",
+              ...e,
+              description: e.description || profile.pousada!.experiences.find(orig => orig.title === e.title)?.description || "",
             })),
           videoUrl: form.videoUrl.trim() || undefined,
           officialSiteUrl: form.officialSiteUrl.trim() || undefined,
@@ -723,7 +724,8 @@ export default function PartnerPortalPage() {
                     </div>
                     <div className="text-xs">
                       <label className="block text-editorial-text font-semibold mb-1.5">Experiências Pagas (passeios)</label>
-                      <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} />
+                      <p className="text-editorial-muted text-[11px] mb-2">Cada passeio tem um valor (por pessoa) que entra no total da reserva quando o hóspede escolhe. Marque se ele depende de contratar um prestador (guia, piloteiro...).</p>
+                      <ExperienceListEditor value={form.experiences} onChange={experiences => setForm((p: any) => ({ ...p, experiences }))} withProvider namePlaceholder="Nome do passeio/atividade" />
                     </div>
                     <div className="flex flex-wrap gap-6">
                       <div className="text-xs bg-editorial-secondary/40 border border-editorial-border rounded-md p-3 flex items-center gap-3">
