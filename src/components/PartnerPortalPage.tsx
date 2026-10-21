@@ -249,6 +249,7 @@ export default function PartnerPortalPage() {
             themeColorAccent: data.pousada.themeColorAccent || "",
             latitude: data.pousada.latitude ?? null,
             longitude: data.pousada.longitude ?? null,
+            googleMapsUrl: data.pousada.googleMapsUrl || "",
             emailContato: data.pousada.emailContato || "",
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
@@ -400,6 +401,7 @@ export default function PartnerPortalPage() {
           themeColorAccent: form.themeColorAccent.trim(),
           latitude: form.latitude,
           longitude: form.longitude,
+          googleMapsUrl: form.googleMapsUrl.trim(),
           // String vazia de propósito: limpar volta ao e-mail de login do gestor.
           emailContato: form.emailContato.trim().toLowerCase(),
         };
@@ -703,6 +705,11 @@ export default function PartnerPortalPage() {
                     </div>
                     <p className="text-editorial-muted text-[11px]">Esse texto compõe a página da pousada no catálogo e o site oficial.</p>
                     <CoordinatesInput latitude={form.latitude} longitude={form.longitude} onChange={pos => setForm((p: any) => ({ ...p, ...pos }))} />
+                    <div className="text-xs">
+                      <label htmlFor="google-maps-url" className="block text-editorial-text font-semibold mb-1.5">Link da pousada no Google Maps (opcional)</label>
+                      <input id="google-maps-url" type="url" placeholder="https://maps.app.goo.gl/..." value={form.googleMapsUrl} onChange={e => setForm((p: any) => ({ ...p, googleMapsUrl: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <p className="text-editorial-muted text-[11px] mt-1">No Google Maps, abra a pousada → Compartilhar → Copiar link. O botão "Google Maps" da seção "Localização e como chegar" passa a abrir essa ficha.</p>
+                    </div>
                     <div className="text-xs">
                       <label htmlFor="email-contato" className="block text-editorial-text font-semibold mb-1.5">E-mail para respostas dos hóspedes</label>
                       <input id="email-contato" type="email" placeholder="contato@suapousada.com.br" value={form.emailContato} onChange={e => setForm((p: any) => ({ ...p, emailContato: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />

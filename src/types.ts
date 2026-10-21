@@ -31,6 +31,9 @@ export interface Pousada {
   // Oficial usa "images" como fallback, então pousadas antigas continuam
   // mostrando uma galeria mesmo sem configurar este campo.
   officialSiteImages?: string[];
+  // Ficha da pousada no Google Maps (botão "Google Maps" da seção de
+  // localização). Sem ela, o botão abre a coordenada exata.
+  googleMapsUrl?: string;
   // Identidade visual própria do Site Oficial (/site/:slug) — cada pousada
   // pode ter sua própria logo + paleta de cores em vez de sempre herdar o
   // verde/creme editorial padrão do EcoSafari. Quando ausentes, o Site

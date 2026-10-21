@@ -10,6 +10,7 @@ import FavoriteButton from "./FavoriteButton";
 import PousadaRecompensas from "./PousadaRecompensas";
 import { useStructuredData } from "../lib/structuredData";
 import { useI18n } from "../i18n/I18nProvider";
+import PousadaLocation from "./PousadaLocation";
 
 const MENU_CATEGORIES = ["prato", "sobremesa", "bebida", "drink", "outro"] as const;
 
@@ -478,6 +479,8 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 ))}
               </div>
             </div>
+
+            <PousadaLocation pousada={pousada} />
 
           </div>
 

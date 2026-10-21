@@ -7,6 +7,7 @@ import LanguageSwitcher from "./LanguageSwitcher";
 import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 import ScrollReveal from "./ScrollReveal";
+import PousadaLocation from "./PousadaLocation";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -344,6 +345,12 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {typeof pousada.latitude === "number" && typeof pousada.longitude === "number" && (
+        <section className="max-w-5xl mx-auto px-6 md:px-10 pb-16">
+          <PousadaLocation pousada={pousada} />
         </section>
       )}
 

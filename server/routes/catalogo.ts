@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { Pousada, Guide, Atracao, Sighting, Review, Species } from "../../src/types.js";
 import { slugify, resolveSlug } from "../../src/lib/slug.js";
 import { normalizeHost, isValidCustomDomain } from "../../src/lib/customDomain.js";
+import { isGoogleMapsUrl, cleanGoogleMapsUrl } from "../../src/lib/mapsLinks.js";
 import { normalizePrecosPorMes } from "../../src/lib/pricing.js";
 import path from "path";
 import fs from "fs";
@@ -243,6 +244,13 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
     updates.customDomain = host;
   }
   if ("precosPorMes" in updates) updates.precosPorMes = normalizePrecosPorMes(updates.precosPorMes);
+  // Ficha do Google Maps: só endereço do próprio Google, sem parâmetros de
+  // rastreio; vazio limpa.
+  if (typeof updates.googleMapsUrl === "string") {
+    const raw = updates.googleMapsUrl.trim();
+    if (raw && !isGoogleMapsUrl(raw)) return res.status(400).json({ error: "Link do Google Maps inválido. No Google Maps, abra a pousada → Compartilhar → Copiar link." });
+    updates.googleMapsUrl = raw ? cleanGoogleMapsUrl(raw) : null as any;
+  }
   for (const f of ["commissionPct", "conservationPct"] as const) {
     if (f in updates) {
       const v = (updates as any)[f];
