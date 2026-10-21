@@ -182,6 +182,15 @@ const raw = {
   "map.offline": ["O mapa precisa de internet para carregar.", "The map needs an internet connection.", "El mapa necesita conexión a internet."],
 
   // ---- app promo
+  "promo.kicker": ["Ambiente unificado", "One connected platform", "Entorno unificado"],
+  "promo.headline": ["Tenha acesso à maior rede de avistamentos da fauna e flora brasileira", "Access Brazil's largest network of wildlife and plant sightings", "Accede a la mayor red de avistamientos de fauna y flora de Brasil"],
+  "promo.headlineText": ["Turistas, guias, biólogos e pousadas no mesmo lugar: cada registro feito no app aparece no mapa e no calendário do site e chega às pousadas da região.", "Travelers, guides, biologists and lodges in one place: every record made in the app shows up on the site's map and calendar and reaches the lodges in the area.", "Turistas, guías, biólogos y posadas en un mismo lugar: cada registro hecho en la app aparece en el mapa y el calendario del sitio y llega a las posadas de la región."],
+  "promo.step1.title": ["Você registra", "You log it", "Tú registras"],
+  "promo.step1.text": ["Foto e local do animal ou planta, direto do celular — funciona até sem sinal.", "Photo and location of the animal or plant, straight from your phone — even offline.", "Foto y ubicación del animal o planta, desde el celular — incluso sin señal."],
+  "promo.step2.title": ["Guias validam", "Guides verify it", "Guías validan"],
+  "promo.step2.text": ["Guias e biólogos credenciados conferem cada avistamento antes de publicar.", "Certified guides and biologists check every sighting before it goes live.", "Guías y biólogos acreditados revisan cada avistamiento antes de publicarlo."],
+  "promo.step3.title": ["Todos enxergam", "Everyone sees it", "Todos lo ven"],
+  "promo.step3.text": ["O registro alimenta o mapa, o calendário de melhor época e as pousadas por perto.", "The record feeds the map, the best-season calendar and nearby lodges.", "El registro alimenta el mapa, el calendario de mejor época y las posadas cercanas."],
   "promo.title": ["Baixe o App Oficial", "Get the official app", "Descarga la app oficial"],
   "promo.text": ["Maximize sua expedição no Pantanal com nosso aplicativo exclusivo para hóspedes. Monitore avistamentos de animais ao vivo, faça check-in autônomo por GPS e receba alertas ecológicos de extrema relevância emitidos pelos nossos guias e biólogos credenciados.", "Make the most of your Pantanal expedition with our guest-only app. Follow live wildlife sightings, check in by GPS and get important ecological alerts from our certified guides and biologists.", "Aprovecha al máximo tu expedición en el Pantanal con nuestra app exclusiva para huéspedes. Sigue avistamientos en vivo, haz check-in por GPS y recibe alertas ecológicas de nuestros guías y biólogos acreditados."],
   "promo.feed.title": ["Feed de Fauna", "Wildlife feed", "Feed de fauna"],

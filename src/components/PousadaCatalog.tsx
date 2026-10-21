@@ -18,6 +18,8 @@ import SeasonCalendarSection from "./SeasonCalendarSection";
 import PacotesSection from "./PacotesSection";
 import { useSightingStats, matchSpeciesStats, unmatchedSpeciesStats, publishablePoints, publishableSpecies } from "../lib/useSightingStats";
 import { seasonFromMonthly } from "../lib/sightingStats";
+import ScrollReveal from "./ScrollReveal";
+import type { MessageKey } from "../i18n/messages";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
 // here since this page embeds it directly too).
@@ -302,6 +304,7 @@ export default function PousadaCatalog({
 
   return (
     <div id="landing-page" className="bg-editorial-bg min-h-screen text-editorial-text font-sans">
+      <ScrollReveal rootId="landing-page" />
       
       {/* Hero Section */}
       <section className="relative h-[550px] flex items-center justify-center bg-editorial-primary text-white overflow-hidden">
@@ -828,6 +831,21 @@ export default function PousadaCatalog({
           
           {/* Left Column: Advertising Copy */}
           <div className="lg:col-span-7 flex flex-col justify-center text-left">
+            {/* Ambiente unificado — o app como a rede que conecta todo mundo. */}
+            <span className="self-start inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] font-bold text-emerald-300 bg-emerald-400/10 border border-emerald-400/30 px-3 py-1 mb-4">
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> {t("promo.kicker")}
+            </span>
+            <p className="font-serif text-xl md:text-2xl text-white/95 leading-snug mb-3 max-w-xl text-balance">{t("promo.headline")}</p>
+            <p className="text-zinc-400 text-xs md:text-sm leading-relaxed mb-6 max-w-xl">{t("promo.headlineText")}</p>
+            <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10 max-w-2xl">
+              {([1, 2, 3] as const).map(n => (
+                <li key={n} className="relative bg-white/[0.04] border border-white/10 p-4">
+                  <span className="absolute -top-3 left-4 w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-amber-400 text-[#0e120f] text-[11px] font-bold flex items-center justify-center">{n}</span>
+                  <h3 className="font-serif font-semibold text-white text-sm mt-1 mb-1">{t(`promo.step${n}.title` as MessageKey)}</h3>
+                  <p className="text-zinc-400 text-[11px] leading-relaxed">{t(`promo.step${n}.text` as MessageKey)}</p>
+                </li>
+              ))}
+            </ol>
             <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight mb-6 text-balance text-white">
               {t("promo.title")} <br className="hidden md:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400">

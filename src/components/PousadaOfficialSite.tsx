@@ -6,6 +6,7 @@ import { navigate } from "../lib/router";
 import LanguageSwitcher from "./LanguageSwitcher";
 import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
+import ScrollReveal from "./ScrollReveal";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -104,7 +105,8 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
     : undefined;
 
   return (
-    <div className="bg-editorial-bg font-sans text-editorial-text" style={themeStyle}>
+    <div id="official-site" className="bg-editorial-bg font-sans text-editorial-text" style={themeStyle}>
+      <ScrollReveal rootId="official-site" />
 
       {/* Minimal site header — no EcoSafari nav, feels like its own domain */}
       <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white/70 backdrop-blur-sm sticky top-0 z-20">
