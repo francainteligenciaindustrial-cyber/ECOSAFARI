@@ -6,15 +6,15 @@ import { randomUUID } from "crypto";
 import type { LogoVersao, PedidoSite, ServicoSite } from "../../src/types.js";
 import { SERVICOS, SERVICO_LABEL, aprovarVersao, incluiLogo, pedirAjustes, podeMudarStatus } from "../../src/lib/pedidoSite.js";
 import {
-  AGENCY_WHATSAPP,
-  SITE_URL,
   addNotification,
+  AGENCY_WHATSAPP,
   escapeHtml,
   log,
   logAdminAction,
   requireAdmin,
   requirePartnerAccess,
   sendEmail,
+  SITE_URL,
   supabase,
 } from "../core.js";
 
@@ -208,6 +208,8 @@ app.put("/api/admin/pedidos-site/:id", requireAdmin, async (req, res) => {
   if (status) updates.status = status;
   if (logoStatus) updates.logoStatus = logoStatus;
   if (typeof req.body.notes === "string") updates.notes = req.body.notes.slice(0, 2000);
+  // Valor combinado do serviço (entra no painel Financeiro quando entregue).
+  if (req.body.valor !== undefined) updates.valor = req.body.valor === "" || req.body.valor === null || !Number.isFinite(Number(req.body.valor)) ? null : Math.max(0, Number(req.body.valor));
   const { data, error } = await supabase.from("pedidos_site").update(updates).eq("id", req.params.id).select().maybeSingle();
   if (error || !data) return res.status(500).json({ error: "Erro ao atualizar o pedido." });
   if (status === "entregue" && (data.servico || "site") !== "logo") {

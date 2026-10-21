@@ -19,7 +19,10 @@ import QRCode from "qrcode";
 import { slugify } from "../src/lib/slug.js";
 import { SECURITY_HEADERS } from "../src/lib/securityHeaders.js";
 import { safeEqual } from "../src/lib/safeEqual.js";
-import { buildPousadaSender, pickReplyTo, EMAIL_ADDRESS } from "../src/lib/emailSender.js";
+import { buildPousadaSender, pickReplyTo, EMAIL_ADDRESS, parseFromHeader } from "../src/lib/emailSender.js";
+import { lodgingTotal, normalizePrecosPorMes } from "../src/lib/pricing.js";
+import { splitBooking } from "../src/lib/finance.js";
+import { sendWhatsAppTemplate } from "./whatsapp.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 
@@ -727,6 +730,13 @@ if (resend && !process.env.EMAIL_FROM) {
 // pousada (ver remetenteDaPousada). Se o Resend recusar esse remetente
 // (domínio ainda não verificado), reenvia pelo EMAIL_FROM da plataforma —
 // o hóspede recebe de qualquer jeito.
+// Último erro de envio (sem o destinatário) — exposto em /api/resend/status
+// para diagnosticar recusas do Resend sem precisar abrir os logs da Vercel.
+export let lastEmailFailure: { at: string; from: string; message: string } | null = null;
+const recordEmailFailure = (from: string, message: string) => {
+  lastEmailFailure = { at: new Date().toISOString(), from: parseFromHeader(from).address, message: String(message).slice(0, 300) };
+};
+
 export async function sendEmail(msg: { to: string; subject: string; html: string; attachments?: { filename: string; content: string }[]; from?: string; replyTo?: string }): Promise<{ ok: boolean; error?: string }> {
   if (!resend) return { ok: false, error: "Resend não configurado" };
   const { from, replyTo, ...rest } = msg;
@@ -742,11 +752,13 @@ export async function sendEmail(msg: { to: string; subject: string; html: string
     }
     if (error) {
       log.warn(`Resend recusou o envio para ${msg.to}: ${error.message}`);
+      recordEmailFailure(EMAIL_FROM, error.message);
       return { ok: false, error: error.message };
     }
     return { ok: true };
   } catch (err: any) {
     log.warn(`Falha ao enviar email para ${msg.to}: ${err.message}`);
+    recordEmailFailure(EMAIL_FROM, err.message);
     return { ok: false, error: err.message };
   }
 }
@@ -960,7 +972,7 @@ export function pickFields<T extends object>(body: any, allowedKeys: readonly (k
 // "viewCount" are deliberately excluded from POUSADA_* — they're computed by
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
-export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl", "menu", "cuisineTypes", "transportOptions", "entertainmentOptions", "serviceNotes", "hasParking", "hasWifi", "facebookUrl", "tiktokUrl", "youtubeUrl", "logoUrl", "themeColorPrimary", "themeColorAccent", "latitude", "longitude", "emailContato"] as const;
+export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl", "menu", "cuisineTypes", "transportOptions", "entertainmentOptions", "serviceNotes", "hasParking", "hasWifi", "facebookUrl", "tiktokUrl", "youtubeUrl", "logoUrl", "themeColorPrimary", "themeColorAccent", "latitude", "longitude", "emailContato", "precosPorMes"] as const;
 // googleCalendarId fica de fora de POUSADA_CREATE_FIELDS de propósito — é
 // um detalhe de organização interna da agência (qual calendário Google essa
 // pousada usa), não algo que o parceiro deveria poder mexer autoeditando o
@@ -968,7 +980,7 @@ export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", 
 // /api/pousadas/:id/google-calendar (cria um calendário novo), mas também
 // editável aqui à mão se o admin preferir apontar pra um que já existe.
 // emailRemetente/emailRemetenteNome: só admin (ver remetenteDaPousada).
-export const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified", "googleCalendarId", "emailRemetente", "emailRemetenteNome", "customDomain", "sitePublicado", "appLodgeId"] as const;
+export const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified", "googleCalendarId", "emailRemetente", "emailRemetenteNome", "customDomain", "sitePublicado", "appLodgeId", "commissionPct", "plano", "conservationPct", "conservationPartner", "featured"] as const;
 export const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images", "unavailableDates"] as const;
 export const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 export const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "language", "age", "preferences"] as const;
@@ -1048,6 +1060,12 @@ export function mapPousadaRow(p: any): Pousada {
     customDomain: p.customDomain || "",
     sitePublicado: p.sitePublicado === true,
     appLodgeId: p.appLodgeId || "",
+    commissionPct: toNumberOrUndefined(p.commissionPct) ?? null,
+    plano: p.plano === "basico" ? "basico" : "gestao",
+    precosPorMes: normalizePrecosPorMes(parseJSONSafe(p.precosPorMes) ?? p.precosPorMes),
+    conservationPct: toNumberOrUndefined(p.conservationPct) ?? null,
+    conservationPartner: p.conservationPartner || "",
+    featured: p.featured === true,
   };
 }
 
@@ -1307,10 +1325,41 @@ export async function checkPousadaAvailability(pousada: Pousada, checkIn: string
 
 // Preço sempre calculado no servidor a partir do cadastro da pousada —
 // nunca a partir de um valor enviado pelo navegador.
+// Diárias somadas noite a noite (preço por temporada, ver src/lib/pricing.ts)
+// + experiência por adulto.
 export function computeBookingTotal(pousada: Pousada, checkIn: string, checkOut: string, adults: number, experienceType?: string): number {
-  const nights = Math.max(1, Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000));
   const exp = experienceType ? (pousada.experiences || []).find(e => e.title === experienceType) : undefined;
-  return pousada.pricePerNight * nights + (exp ? exp.price * adults : 0);
+  return lodgingTotal(pousada, checkIn, checkOut) + (exp ? exp.price * adults : 0);
+}
+
+// Percentuais padrão da plataforma (Vercel). Sem eles, 0 — o painel
+// Financeiro avisa para configurar.
+export const COMISSAO_PADRAO_PCT = Number(process.env.COMISSAO_PADRAO_PCT) || 0;
+export const CONSERVACAO_PADRAO_PCT = Number(process.env.CONSERVACAO_PADRAO_PCT) || 0;
+export const PLANO_GESTAO_VALOR = Number(process.env.PLANO_GESTAO_VALOR) || null;
+
+export const commissionPctOf = (p: Pousada) => (typeof p.commissionPct === "number" ? p.commissionPct : COMISSAO_PADRAO_PCT);
+export const conservationPctOf = (p: Pousada) => (typeof p.conservationPct === "number" ? p.conservationPct : CONSERVACAO_PADRAO_PCT);
+
+// Afiliado ativo pelo código do link (?ref=).
+export async function findAfiliado(code: unknown): Promise<{ code: string; commissionPct: number } | null> {
+  const c = String(code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 40);
+  if (!c) return null;
+  const { data } = await supabase.from("afiliados").select("code, commissionPct, active").eq("code", c).maybeSingle();
+  return data && data.active ? { code: data.code, commissionPct: Number(data.commissionPct) || 0 } : null;
+}
+
+// Campos financeiros gravados em cada reserva no momento em que ela é criada.
+export async function bookingFinance(pousada: Pousada, total: number, refCode?: unknown) {
+  const afiliado = await findAfiliado(refCode).catch(() => null);
+  const s = splitBooking(total, commissionPctOf(pousada), afiliado?.commissionPct || 0, conservationPctOf(pousada));
+  return {
+    commissionPct: s.commissionPct,
+    commissionAmount: s.commission,
+    afiliadoCode: afiliado?.code,
+    afiliadoCommission: afiliado ? s.affiliate : undefined,
+    conservationAmount: s.conservation || undefined,
+  };
 }
 
 // ----------------------------------------------------
@@ -1555,6 +1604,14 @@ export async function applyBookingStatusUpdate(id: string, body: Partial<Booking
   // Email confirmation with PDF voucher (only sends if RESEND_API_KEY is configured)
   if (status === "pago" && oldBooking.status !== "pago") {
     sendBookingConfirmationEmail(updated).catch(err => log.warn("Erro ao enviar email de confirmação:", err.message));
+    // Mesmo aviso pelo WhatsApp (modelo "reserva_confirmada", ver RUNBOOK).
+    sendWhatsAppTemplate(updated.customerPhone, "reserva_confirmada", [
+      (updated.customerName || "").split(" ")[0] || "viajante",
+      updated.pousadaName,
+      String(updated.checkIn).slice(0, 10).split("-").reverse().join("/"),
+      String(updated.checkOut).slice(0, 10).split("-").reverse().join("/"),
+      `${SITE_URL}/turista`,
+    ]).catch(() => {});
   }
 
   return (savedBooking as Booking) || updated;
@@ -1969,6 +2026,11 @@ export async function enviarPedidosDeAvaliacao(): Promise<number> {
     const { data: already } = await supabase.from("lembretes_enviados").select("id").eq("bookingId", booking.id).eq("threshold", REVIEW_REQUEST_THRESHOLD).maybeSingle();
     if (already) continue;
     if (!(await enviarPedidoAvaliacao(booking))) continue;
+    await sendWhatsAppTemplate(booking.customerPhone, "avaliacao_estadia", [
+      (booking.customerName || "").split(" ")[0] || "viajante",
+      booking.pousadaName,
+      `${SITE_URL}/?avaliar=${encodeURIComponent(booking.pousadaId)}#avaliacoes`,
+    ]).catch(() => false);
     const { error } = await supabase.from("lembretes_enviados").insert({ id: `lb_${randomUUID()}`, bookingId: booking.id, threshold: REVIEW_REQUEST_THRESHOLD, sentAt: new Date().toISOString() });
     if (!error) sent++;
   }

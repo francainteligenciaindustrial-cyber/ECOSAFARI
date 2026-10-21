@@ -4,18 +4,15 @@ import { randomUUID } from "crypto";
 import { Pousada, Guide, Atracao, Sighting, Review, Species } from "../../src/types.js";
 import { slugify } from "../../src/lib/slug.js";
 import { normalizeHost, isValidCustomDomain } from "../../src/lib/customDomain.js";
+import { normalizePrecosPorMes } from "../../src/lib/pricing.js";
 import path from "path";
 import fs from "fs";
 import {
-  ATRACAO_FIELDS,
-  GUIDE_FIELDS,
-  POUSADA_CREATE_FIELDS,
-  POUSADA_UPDATE_FIELDS,
-  SITE_URL,
-  SPECIES_FIELDS,
   addNotification,
+  ATRACAO_FIELDS,
   detectImageType,
   distPath,
+  GUIDE_FIELDS,
   injectPousadaMeta,
   isProd,
   log,
@@ -28,12 +25,16 @@ import {
   moverParaLixeira,
   optimizeUploadedImage,
   pickFields,
+  POUSADA_CREATE_FIELDS,
+  POUSADA_UPDATE_FIELDS,
   publicFormLimiter,
   requireAdmin,
   requireAnyUploader,
   requirePartnerAccess,
   requireTourist,
   sanitizeIlikeTerm,
+  SITE_URL,
+  SPECIES_FIELDS,
   supabase,
   toPublicGuide,
   upload,
@@ -42,7 +43,28 @@ import {
   writeSkippingMissingColumns,
 } from "../core.js";
 
+// Reserva concluída (paga/confirmada, check-out no passado) do turista nesta
+// pousada — pelo id do turista ou pelo e-mail da conta.
+async function findCompletedStay(user: { id: string; email?: string }, pousadaId: string): Promise<string | undefined> {
+  const today = new Date().toISOString().slice(0, 10);
+  const statuses = ["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"];
+  const or = [`turistaId.eq.${user.id}`, user.email ? `customerEmail.eq.${user.email}` : null].filter(Boolean).join(",");
+  const { data } = await supabase.from("bookings").select("id").eq("pousadaId", pousadaId).in("status", statuses).lte("checkOut", today).or(or).limit(1);
+  return data?.[0]?.id;
+}
+
 export function registerCatalogoRoutes(app: Express) {
+
+// Pousadas que o turista logado já pode avaliar (estadia concluída) — para o
+// formulário de avaliação só oferecer essas.
+app.get("/api/turista/pousadas-avaliaveis", requireTourist, async (req, res) => {
+  const user = res.locals.touristUser as { id: string; email?: string };
+  const today = new Date().toISOString().slice(0, 10);
+  const or = [`turistaId.eq.${user.id}`, user.email ? `customerEmail.eq.${user.email}` : null].filter(Boolean).join(",");
+  const { data, error } = await supabase.from("bookings").select("pousadaId").in("status", ["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"]).lte("checkOut", today).or(or);
+  if (error) return res.status(500).json({ error: "Erro ao buscar suas estadias." });
+  res.json([...new Set((data || []).map(b => b.pousadaId))]);
+});
 
 // Domínio próprio de pousada → site oficial. O front chama isso só quando o
 // hostname não é da plataforma (ver src/lib/customDomain.ts). mainUrl é o
@@ -220,6 +242,14 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
     if (host && !isValidCustomDomain(host)) return res.status(400).json({ error: "Domínio inválido. Use só o endereço, ex.: pousadavagalume.com" });
     updates.customDomain = host;
   }
+  if ("precosPorMes" in updates) updates.precosPorMes = normalizePrecosPorMes(updates.precosPorMes);
+  for (const f of ["commissionPct", "conservationPct"] as const) {
+    if (f in updates) {
+      const v = (updates as any)[f];
+      (updates as any)[f] = v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v);
+    }
+  }
+  if ("plano" in updates && updates.plano !== "basico" && updates.plano !== "gestao") delete updates.plano;
   // Vínculo com o app: UUID ou vazio (desvincula).
   if (typeof updates.appLodgeId === "string") {
     const id = updates.appLodgeId.trim().toLowerCase();
@@ -480,6 +510,18 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
     return res.status(400).json({ error: "Você já avaliou este item." });
   }
 
+  // Pousada só é avaliada por quem se hospedou: precisa de uma reserva paga
+  // ou confirmada, com check-out já passado, no e-mail da conta (casa também
+  // reservas antigas feitas pela equipe). A avaliação ganha o selo e fica
+  // ligada à reserva. Guias e atrações seguem abertos a quem tem perfil.
+  let stayBookingId: string | undefined;
+  if (pousadaId) {
+    stayBookingId = await findCompletedStay(res.locals.touristUser, pousadaId);
+    if (!stayBookingId) {
+      return res.status(403).json({ error: "Só quem se hospedou nesta pousada pela EcoSafari pode avaliá-la. Você poderá avaliar depois do check-out." });
+    }
+  }
+
   const moderation = await moderateText(String(req.body.comment || ""));
   if (!moderation.ok) {
     return res.status(400).json({ error: moderation.reason });
@@ -496,9 +538,11 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
     date: new Date().toISOString().split("T")[0],
     photoUrl: req.body.photoUrl || undefined,
     turistaId: touristId,
+    verifiedStay: !!stayBookingId,
+    bookingId: stayBookingId,
   };
 
-  const { error } = await supabase.from("reviews").insert(newReview);
+  const { error } = await writeSkippingMissingColumns(newReview, row => supabase.from("reviews").insert(row));
   if (error) {
     log.error("Erro ao salvar avaliação no Supabase:", error.message);
     return res.status(500).json({ error: "Erro ao salvar avaliação" });

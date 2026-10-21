@@ -4,14 +4,13 @@ import { Booking } from "../../src/types.js";
 import { randomUUID } from "crypto";
 import { safeEqual } from "../../src/lib/safeEqual.js";
 import {
-  CONFIRMED_BOOKING_STATUSES,
-  CRON_SECRET,
-  OVERBOOKING_MESSAGE,
-  REMINDER_THRESHOLDS,
   addNotification,
   applyBookingStatusUpdate,
+  bookingFinance,
   checkPousadaAvailability,
   computeBookingTotal,
+  CONFIRMED_BOOKING_STATUSES,
+  CRON_SECRET,
   diasAteData,
   enviarLembreteCancelamento,
   enviarPedidosDeAvaliacao,
@@ -23,11 +22,14 @@ import {
   mapAtracaoRow,
   mapGuideRow,
   mapPousadaRow,
+  OVERBOOKING_MESSAGE,
   purgeLixeiraExpirada,
   registrarPenalidadeCancelamento,
+  REMINDER_THRESHOLDS,
   requireAdmin,
   requirePartnerAccess,
   supabase,
+  writeSkippingMissingColumns,
 } from "../core.js";
 
 export function registerReservasRoutes(app: Express) {
@@ -143,9 +145,12 @@ app.post("/api/bookings", requireAdmin, async (req, res) => {
     status: req.body.status || "pendente_pagamento",
     dateCreated: new Date().toISOString(),
     roomType: roomType || undefined,
+    // Comissão/afiliado/conservação congelados no momento da reserva.
+    ...(await bookingFinance(targetPousada, totalPrice, req.body.afiliadoCode)),
   };
 
-  const { error } = await supabase.from("bookings").insert(newBooking);
+  // Pula colunas ainda não migradas em vez de perder a reserva.
+  const { error } = await writeSkippingMissingColumns(newBooking, row => supabase.from("bookings").insert(row));
   if (isOverbookingError(error)) return res.status(409).json({ error: OVERBOOKING_MESSAGE, available: false });
   if (error) {
     log.error("Erro ao salvar reserva no Supabase:", error.message);

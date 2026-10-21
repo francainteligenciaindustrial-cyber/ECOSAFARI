@@ -35,6 +35,27 @@ const raw = {
   "app.footer.terms": ["Termos de Uso e Cancelamento", "Terms of Use & Cancellation", "Términos de uso y cancelación"],
   "app.footer.candidate": ["Status da Candidatura", "Application status", "Estado de la solicitud"],
 
+  // ---- moeda
+  "currency.label": ["Moeda", "Currency", "Moneda"],
+  "currency.chargedInBRL": ["Valores aproximados em {cur}; a cobrança é feita em reais (R$).", "Approximate amounts in {cur}; you are charged in Brazilian reais (R$).", "Valores aproximados en {cur}; el cobro se hace en reales (R$)."],
+
+  // ---- confiança, conservação, destaque, temporada
+  "trust.verifiedGuest": ["Hóspede verificado", "Verified guest", "Huésped verificado"],
+  "trust.verifiedGuestTitle": ["Avaliação de quem se hospedou pela EcoSafari", "Review from a guest who stayed through EcoSafari", "Reseña de quien se hospedó con EcoSafari"],
+  "reviews.onlyGuests": ["Só quem se hospedou pode avaliar uma pousada. Depois do check-out, sua estadia aparece aqui.", "Only guests who stayed can review a lodge. After check-out, your stay will appear here.", "Solo quien se hospedó puede opinar sobre una posada. Después del check-out, tu estadía aparecerá aquí."],
+  "conservation.perBooking": ["{pct}% de cada reserva vai para a conservação{partner}", "{pct}% of every booking goes to conservation{partner}", "{pct}% de cada reserva va a la conservación{partner}"],
+  "conservation.partnerSuffix": [" — {name}", " — {name}", " — {name}"],
+  "conservation.inThisBooking": ["Para a conservação", "To conservation", "Para la conservación"],
+  "conservation.counterTitle": ["Impacto na conservação", "Conservation impact", "Impacto en la conservación"],
+  "conservation.counterText": ["{total} já destinados a projetos ambientais por {n} reservas feitas na EcoSafari.", "{total} already directed to conservation projects by {n} EcoSafari bookings.", "{total} ya destinados a proyectos ambientales por {n} reservas en EcoSafari."],
+  "featured.kicker": ["Comece pelo Pantanal Norte", "Start with the Northern Pantanal", "Empieza por el Pantanal Norte"],
+  "featured.title": ["Pousadas em destaque", "Featured lodges", "Posadas destacadas"],
+  "featured.subtitle": ["Poconé, Transpantaneira e Porto Jofre: a região com mais avistamentos de onça-pintada do mundo.", "Poconé, Transpantaneira and Porto Jofre: the region with the most jaguar sightings in the world.", "Poconé, Transpantaneira y Porto Jofre: la región con más avistamientos de jaguar del mundo."],
+  "featured.sightings": ["{n} avistamentos registrados no app", "{n} sightings recorded in the app", "{n} avistamientos registrados en la app"],
+  "season.title": ["Diária por mês", "Nightly rate by month", "Tarifa por mes"],
+  "season.high": ["Alta temporada", "High season", "Temporada alta"],
+  "season.from": ["a partir de {price}", "from {price}", "desde {price}"],
+
   // ---- seletor de idioma
   "lang.button": ["Idioma / Language", "Language / Idioma", "Idioma / Language"],
   "lang.auto": ["tradução automática", "machine translation", "traducción automática"],

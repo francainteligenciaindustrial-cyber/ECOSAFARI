@@ -4,16 +4,16 @@ import { Turista, Roteiro, Reserva, Pagamento, GuiaTuristico } from "../../src/t
 import { randomUUID } from "crypto";
 import {
   GUIA_TURISTICO_FIELDS,
-  PAGAMENTO_FIELDS,
-  RESERVA_FIELDS,
-  ROTEIRO_FIELDS,
-  TURISTA_FIELDS,
   log,
   logAdminAction,
   moverParaLixeira,
+  PAGAMENTO_FIELDS,
   pickFields,
   requireAdmin,
+  RESERVA_FIELDS,
+  ROTEIRO_FIELDS,
   supabase,
+  TURISTA_FIELDS,
 } from "../core.js";
 
 export function registerTurismoRoutes(app: Express) {

@@ -1,24 +1,25 @@
 // Integrações: Google Calendar, chatbot (Gemini), app de Coins, saúde e diagnóstico.
 import type { Express } from "express";
+import { parseFromHeader } from "../../src/lib/emailSender.js";
 import { google } from "googleapis";
 import { safeEqual } from "../../src/lib/safeEqual.js";
 import {
   AGENCY_WHATSAPP,
-  APP_COINS_SYNC_SECRET,
-  GEMINI_MODEL,
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  KNOWN_FAKE_IDS,
-  SUPABASE_ANON_KEY,
-  SUPABASE_URL,
   ai,
+  APP_COINS_SYNC_SECRET,
   chatLimiter,
   consumeOAuthState,
   createOAuthState,
   deleteTokens,
+  EMAIL_FROM,
+  GEMINI_MODEL,
   getGuidesContext,
   getOAuthClient,
   getPousadasContext,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  KNOWN_FAKE_IDS,
+  lastEmailFailure,
   loadStoredTokens,
   log,
   logAdminAction,
@@ -26,6 +27,8 @@ import {
   resend,
   saveTokens,
   supabase,
+  SUPABASE_ANON_KEY,
+  SUPABASE_URL,
 } from "../core.js";
 
 export function registerIntegracoesRoutes(app: Express) {
@@ -168,8 +171,15 @@ app.post("/api/auth/google/disconnect", requireAdmin, async (req, res) => {
   res.json({ success: true });
 });
 
+// Diagnóstico do e-mail: remetente em uso (só o endereço) e o último erro do
+// Resend, se houver — nada de destinatário nem chave.
 app.get("/api/resend/status", (req, res) => {
-  res.json({ configured: !!resend });
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    configured: !!resend,
+    from: parseFromHeader(EMAIL_FROM).address,
+    lastFailure: lastEmailFailure,
+  });
 });
 
 // ----------------------------------------------------

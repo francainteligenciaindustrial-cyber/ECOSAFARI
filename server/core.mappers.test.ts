@@ -16,6 +16,7 @@ describe("mapPousadaRow", () => {
     const row: Record<string, unknown> = {
       id: "p1", name: "Pousada", customDomain: "pousada.com", sitePublicado: true, appLodgeId: "uuid",
       emailContato: "c@p.com", emailRemetente: "r@p.com", emailRemetenteNome: "Pousada", latitude: -16.5, longitude: "-56.7",
+      commissionPct: 12, plano: "basico", precosPorMes: { "7": 600 }, conservationPct: 2, conservationPartner: "Onçafari", featured: true,
     };
     for (const f of core.POUSADA_UPDATE_FIELDS) if (!(f in row)) row[f] = f === "latitude" || f === "longitude" ? 1 : `v-${f}`;
     const mapped = core.mapPousadaRow(row) as unknown as Record<string, unknown>;
@@ -27,5 +28,7 @@ describe("mapPousadaRow", () => {
     expect(mapped.customDomain).toBe("pousada.com");
     expect(mapped.sitePublicado).toBe(true);
     expect(mapped.longitude).toBe(-56.7);
+    expect(mapped.plano).toBe("basico");
+    expect(mapped.precosPorMes).toEqual({ "7": 600 });
   });
 });

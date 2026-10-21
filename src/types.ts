@@ -104,6 +104,31 @@ export interface Pousada {
   // UUID da mesma pousada no app EcoSafari Go (banco separado) — vínculo
   // feito pelo admin, liga os avistamentos do app ao calendário e ao mapa.
   appLodgeId?: string;
+  // Receita: comissão da EcoSafari (% — vazio = padrão da plataforma) e
+  // plano da pousada (básico gratuito × gestão pago). Só o admin muda.
+  commissionPct?: number | null;
+  plano?: 'basico' | 'gestao';
+  // Diária por mês ({"7": 600}) — mês sem valor usa pricePerNight.
+  precosPorMes?: Record<string, number> | null;
+  // Conservação: % de cada reserva (dentro da comissão) e projeto apoiado.
+  conservationPct?: number | null;
+  conservationPartner?: string;
+  // Em destaque na home (estratégia Pantanal Norte).
+  featured?: boolean;
+}
+
+// Agência ou influenciador com link de indicação (?ref=CODIGO).
+export interface Afiliado {
+  id: string;
+  code: string;
+  name: string;
+  tipo: 'agencia' | 'influenciador' | 'outro';
+  email?: string;
+  telefone?: string;
+  commissionPct: number;
+  cliques: number;
+  active: boolean;
+  createdAt: string;
 }
 
 // Pedido de criação de site oficial (e/ou logo) feito pelo gestor no portal.
@@ -135,6 +160,7 @@ export interface PedidoSite {
   contatoTelefone?: string;
   status: 'novo' | 'em_contato' | 'em_producao' | 'entregue' | 'cancelado';
   notes?: string;
+  valor?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -152,6 +178,8 @@ export interface Review {
   comment: string;
   date: string;
   photoUrl?: string; // foto real do hóspede, opcional — reforça a prova social do depoimento
+  verifiedStay?: boolean; // selo "hóspede verificado": avaliação ligada a uma estadia concluída
+  bookingId?: string;
   turistaId?: string; // id do turista autenticado que avaliou — obrigatório desde que avaliar passou a exigir perfil de turista
 }
 
@@ -242,6 +270,12 @@ export interface Booking {
   pacoteId?: string;
   cupomCode?: string;
   discountAmount?: number;
+  // Snapshot financeiro no momento da reserva (ver src/lib/finance.ts).
+  commissionPct?: number;
+  commissionAmount?: number;
+  afiliadoCode?: string;
+  afiliadoCommission?: number;
+  conservationAmount?: number;
   // Deve bater com um Pousada.rooms[].type — quando informado, a
   // disponibilidade é checada por unidade daquele tipo de quarto (não só
   // contra a capacidade agregada da pousada). Opcional pra manter

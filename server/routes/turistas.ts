@@ -3,25 +3,24 @@ import type { Express } from "express";
 import { Turista, Pacote, Cupom, Booking, Resgate } from "../../src/types.js";
 import { randomUUID } from "crypto";
 import {
-  ISO_DATE,
-  OVERBOOKING_MESSAGE,
-  SITE_URL,
-  VISITED_BOOKING_STATUSES,
   addNotification,
-  checkPousadaAvailability,
+  bookingFinance,
   checkoutLimiter,
+  checkPousadaAvailability,
   clip,
   computeBookingTotal,
   createBookingCheckoutSession,
   describeAuthError,
   escapeHtml,
   getPousadaGestorEmails,
+  ISO_DATE,
   isOverbookingError,
   isTouristUser,
   isWeakPassword,
   loadPacote,
   log,
   mapPousadaRow,
+  OVERBOOKING_MESSAGE,
   pacotePricePerPerson,
   publicFormLimiter,
   registrarUsoCupom,
@@ -31,10 +30,12 @@ import {
   sanitizeTouristInterests,
   sendEmail,
   shiftDays,
+  SITE_URL,
   stripe,
   supabase,
   supabaseAdminAuth,
   validarCupom,
+  VISITED_BOOKING_STATUSES,
   writeSkippingMissingColumns,
 } from "../core.js";
 
@@ -317,6 +318,9 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
     pacoteId: pacote?.id,
     cupomCode: cupom?.code,
     discountAmount: discountAmount || undefined,
+    // Comissão/afiliado/conservação congelados no momento da reserva; o
+    // afiliado vem do link de indicação (?ref=) guardado no navegador.
+    ...(await bookingFinance(pousada, Math.round((subtotal - discountAmount) * 100) / 100, req.body.afiliadoCode)),
     status: "pendente_pagamento" as const,
     dateCreated: new Date().toISOString(),
     roomType,

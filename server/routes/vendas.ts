@@ -3,7 +3,6 @@ import type { Express } from "express";
 import { Booking } from "../../src/types.js";
 import { randomUUID } from "crypto";
 import {
-  ORIGEM_LABEL,
   cupomLimiter,
   loadPacote,
   log,
@@ -11,6 +10,7 @@ import {
   mapPacoteRow,
   mapPousadaRow,
   ocupacaoMensal,
+  ORIGEM_LABEL,
   requireAdmin,
   requirePartnerAccess,
   sanitizeCupom,
