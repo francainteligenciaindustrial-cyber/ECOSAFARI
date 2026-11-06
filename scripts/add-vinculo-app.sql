@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: VÍNCULO POUSADA DO SITE ↔ POUSADA DO APP ECOSAFARI GO
+-- IPANTANAL: VÍNCULO POUSADA DO SITE ↔ POUSADA DO APP IPANTANAL GO
 -- Rode no SQL Editor do Supabase DO SITE. Pode rodar mais de uma vez.
 --
 -- Guarda o ID (UUID) da pousada no app. O vínculo é feito pelo admin em

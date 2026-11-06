@@ -69,7 +69,7 @@ app.get("/api/turista/pousadas-avaliaveis", requireTourist, async (req, res) => 
 
 // Domínio próprio de pousada → site oficial. O front chama isso só quando o
 // hostname não é da plataforma (ver src/lib/customDomain.ts). mainUrl é o
-// endereço do EcoSafari, para onde vão reserva, cadastro e pagamento.
+// endereço do Ipantanal, para onde vão reserva, cadastro e pagamento.
 app.get("/api/sites/by-host", async (req, res) => {
   const host = normalizeHost(String(req.query.host || ""));
   if (!host) return res.status(400).json({ error: "Informe o host." });
@@ -526,7 +526,7 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
   if (pousadaId) {
     stayBookingId = await findCompletedStay(res.locals.touristUser, pousadaId);
     if (!stayBookingId) {
-      return res.status(403).json({ error: "Só quem se hospedou nesta pousada pela EcoSafari pode avaliá-la. Você poderá avaliar depois do check-out." });
+      return res.status(403).json({ error: "Só quem se hospedou nesta pousada pela Ipantanal pode avaliá-la. Você poderá avaliar depois do check-out." });
     }
   }
 

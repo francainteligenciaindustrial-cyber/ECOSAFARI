@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: SISTEMA DE COINS (favoritos, recompensas, resgates)
+-- IPANTANAL: SISTEMA DE COINS (favoritos, recompensas, resgates)
 -- Rode isso no SQL Editor do Supabase.
 --
 -- As Coins são ganhas no aplicativo separado (foto de avistamento aprovada

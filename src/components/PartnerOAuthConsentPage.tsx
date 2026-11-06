@@ -19,7 +19,7 @@ const SCOPE_LABELS: Record<string, string> = {
 };
 
 // Consent screen for Supabase's OAuth 2.1 Authorization Server — this is
-// what makes "Entrar com EcoSafari" possible from an external app (the
+// what makes "Entrar com Ipantanal" possible from an external app (the
 // mobile app being planned): the external app redirects here with an
 // authorization_id, the user (already logged in or logging in right here)
 // approves or denies, and the browser is sent back to the external app with
@@ -115,7 +115,7 @@ export default function PartnerOAuthConsentPage() {
         <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center">
           <Compass className="h-4 w-4" />
         </div>
-        <span className="font-serif italic font-bold text-editorial-primary">EcoSafari<span className="text-zinc-400 not-italic">.</span></span>
+        <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
       </a>
     </header>
   );
@@ -153,9 +153,9 @@ export default function PartnerOAuthConsentPage() {
       <>
         <div className="flex items-center gap-2 mb-1">
           <Lock className="h-4 w-4 text-editorial-primary" />
-          <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary">Entrar com EcoSafari</h1>
+          <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary">Entrar com Ipantanal</h1>
         </div>
-        <p className="text-editorial-muted text-xs mb-6">Entre com sua conta EcoSafari pra continuar autorizando o aplicativo.</p>
+        <p className="text-editorial-muted text-xs mb-6">Entre com sua conta Ipantanal pra continuar autorizando o aplicativo.</p>
         <form onSubmit={handleLogin} className="flex flex-col gap-3">
           <input
             type="email" required placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
@@ -208,7 +208,7 @@ export default function PartnerOAuthConsentPage() {
         )}
         <div>
           <h1 className="text-sm font-bold text-editorial-text">{details.client.name}</h1>
-          <p className="text-[11px] text-editorial-muted">quer acessar sua conta EcoSafari</p>
+          <p className="text-[11px] text-editorial-muted">quer acessar sua conta Ipantanal</p>
         </div>
       </div>
 

@@ -126,7 +126,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             <h1 className="text-3xl md:text-5xl font-serif font-bold text-editorial-primary tracking-tight">{pousada.name}</h1>
             <div className="flex items-center gap-4 mt-2">
               {/* Site oficial: domínio próprio apontado para o site feito pela
-                  EcoSafari > /site/:slug (site entregue pela equipe) > site
+                  Ipantanal > /site/:slug (site entregue pela equipe) > site
                   próprio da pousada. Sem nenhum, o link não aparece — o site é
                   um serviço contratado (ver PedidoSiteCard). */}
               {officialSiteHref && (

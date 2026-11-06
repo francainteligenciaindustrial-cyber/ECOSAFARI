@@ -56,11 +56,11 @@ async function sendTouristConfirmationEmail(email: string, name?: string): Promi
   }
   const sent = await sendEmail({
     to: email,
-    subject: "Confirme seu email — EcoSafari Brasil",
+    subject: "Confirme seu email — Ipantanal",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #101B4C;">Confirme seu email 🌿</h2>
-        <p>${name ? `Olá, ${escapeHtml(name)}! ` : ""}Clique no botão abaixo para ativar seu perfil de turista na EcoSafari.</p>
+        <p>${name ? `Olá, ${escapeHtml(name)}! ` : ""}Clique no botão abaixo para ativar seu perfil de turista na Ipantanal.</p>
         <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
         <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${link}</p>
         <p style="color: #888; font-size: 12px;">Se você não pediu isso, pode ignorar este email.</p>
@@ -183,10 +183,10 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
 
   const sent = await sendEmail({
       to: email,
-      subject: "Confirme seu email — EcoSafari Brasil",
+      subject: "Confirme seu email — Ipantanal",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #101B4C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
+          <h2 style="color: #101B4C;">Bem-vindo(a) à Ipantanal! 🌿</h2>
           <p>Olá, ${escapeHtml(name)}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e fazer suas reservas.</p>
           <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
           <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${linkData.properties.action_link}</p>
@@ -223,11 +223,11 @@ app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
   }
   await sendEmail({
     to: email,
-    subject: "Redefinir sua senha — EcoSafari Brasil",
+    subject: "Redefinir sua senha — Ipantanal",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #101B4C;">Redefinir senha</h2>
-        <p>Recebemos um pedido para redefinir a senha do seu acesso ao portal EcoSafari.</p>
+        <p>Recebemos um pedido para redefinir a senha do seu acesso ao portal Ipantanal.</p>
         <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Criar nova senha</a></p>
         <p style="color: #888; font-size: 12px;">Se você não pediu isso, ignore este email — sua senha continua a mesma.</p>
       </div>
@@ -252,7 +252,7 @@ app.get("/api/geo/reverse", publicFormLimiter, async (req, res) => {
   if (cached !== undefined) return res.json({ name: cached });
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&accept-language=pt-BR&lat=${lat}&lon=${lng}`;
-    const r = await fetch(url, { headers: { "User-Agent": `EcoSafariBrasil/1.0 (${SITE_URL})` }, signal: AbortSignal.timeout(6000) });
+    const r = await fetch(url, { headers: { "User-Agent": `Ipantanal/1.0 (${SITE_URL})` }, signal: AbortSignal.timeout(6000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const body: any = await r.json();
     const a = body?.address || {};
@@ -572,7 +572,7 @@ app.get("/api/turista/me/export", requireTourist, async (req, res) => {
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
 
-  res.setHeader("Content-Disposition", `attachment; filename="ecosafari-meus-dados-${new Date().toISOString().slice(0, 10)}.json"`);
+  res.setHeader("Content-Disposition", `attachment; filename="ipantanal-meus-dados-${new Date().toISOString().slice(0, 10)}.json"`);
   res.json({
     exportedAt: new Date().toISOString(),
     perfil: profileRes.data,

@@ -80,7 +80,7 @@ export default function ReviewsSection({ targetType, targetId }: ReviewsSectionP
           <div className="bg-white border border-editorial-border p-6 text-center space-y-3">
             <Lock className="h-6 w-6 text-editorial-muted mx-auto" />
             <h3 className="font-serif font-bold text-editorial-primary text-lg">Crie seu perfil para avaliar</h3>
-            <p className="text-editorial-muted text-xs leading-relaxed">Para avaliar, você precisa ter um perfil de turista EcoSafari — é rápido e gratuito.</p>
+            <p className="text-editorial-muted text-xs leading-relaxed">Para avaliar, você precisa ter um perfil de turista Ipantanal — é rápido e gratuito.</p>
             <button
               onClick={() => navigate("/turista")}
               className="w-full bg-editorial-primary hover:opacity-90 text-white text-xs font-bold uppercase tracking-widest py-3 rounded-md transition cursor-pointer"

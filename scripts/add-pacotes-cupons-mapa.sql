@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: PACOTES, CUPONS E MAPA
+-- IPANTANAL: PACOTES, CUPONS E MAPA
 -- Rode no SQL Editor do Supabase. Pode rodar mais de uma vez.
 
 -- 1) Mapa interativo: posição exata de pousadas e atrações. Sem isso o mapa

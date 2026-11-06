@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: CARDÁPIO DE BAR/RESTAURANTE DA POUSADA
+-- IPANTANAL: CARDÁPIO DE BAR/RESTAURANTE DA POUSADA
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Mesmo padrão do menu de atracoes (item + preço, guardado como TEXT com

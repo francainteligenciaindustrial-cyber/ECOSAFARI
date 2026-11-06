@@ -131,7 +131,7 @@ export default function MinhasReservas() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `voucher-ecosafari-${id}.pdf`;
+    a.download = `voucher-ipantanal-${id}.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();

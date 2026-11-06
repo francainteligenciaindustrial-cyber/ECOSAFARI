@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: DETALHAMENTO DE SERVIÇOS E ACOMODAÇÕES DA POUSADA
+-- IPANTANAL: DETALHAMENTO DE SERVIÇOS E ACOMODAÇÕES DA POUSADA
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Aba "Serviços" do portal do parceiro — tipos de culinária, transporte,

@@ -18,7 +18,7 @@ interface PousadaOfficialSiteProps {
   // as edições ainda não salvas, atualizando a cada tecla digitada. A busca
   // real por slug (rota pública /site/:slug) continua intocada.
   previewPousada?: Pousada;
-  // Endereço do EcoSafari quando o site abre num domínio próprio da pousada
+  // Endereço do Ipantanal quando o site abre num domínio próprio da pousada
   // (ex.: pousadavagalume.com): links para o catálogo e para a reserva vão
   // para lá, onde ficam cadastro, login e pagamento.
   mainUrl?: string;
@@ -43,11 +43,11 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
   useEffect(() => {
     if (!pousada?.name || previewPousada) return;
     const previous = document.title;
-    document.title = mainUrl ? pousada.name : `${pousada.name} — EcoSafari Brasil`;
+    document.title = mainUrl ? pousada.name : `${pousada.name} — Ipantanal`;
     return () => { document.title = previous; };
   }, [pousada?.name, previewPousada, mainUrl]);
 
-  // Link para o catálogo/reserva: navegação interna no domínio do EcoSafari,
+  // Link para o catálogo/reserva: navegação interna no domínio do Ipantanal,
   // link absoluto quando o site está no domínio próprio da pousada.
   const platformLink = (target: string) => ({
     href: `${mainUrl || ""}${target}`,
@@ -76,7 +76,7 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
         <h1 className="text-2xl font-serif font-bold text-editorial-primary">Site não encontrado</h1>
         <p className="text-editorial-muted text-sm">Não encontramos essa pousada.</p>
         <a {...platformLink("/")} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-editorial-primary hover:opacity-80 transition cursor-pointer">
-          <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo EcoSafari
+          <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo Ipantanal
         </a>
       </div>
     );
@@ -97,7 +97,7 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
   // custom properties que toda classe bg-editorial-primary/text-editorial-
   // accent/etc já usa por baixo dos panos (ver @theme em src/index.css), só
   // dentro desta página. Sem logo/cor configurada, herda o tema padrão do
-  // EcoSafari normalmente — nada muda pra quem não configurou.
+  // Ipantanal normalmente — nada muda pra quem não configurou.
   const themeStyle: React.CSSProperties | undefined = (pousada.themeColorPrimary || pousada.themeColorAccent)
     ? {
         ...(pousada.themeColorPrimary ? { ["--color-editorial-primary" as any]: pousada.themeColorPrimary } : {}),
@@ -109,7 +109,7 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
     <div id="official-site" className="bg-editorial-bg font-sans text-editorial-text" style={themeStyle}>
       <ScrollReveal rootId="official-site" />
 
-      {/* Minimal site header — no EcoSafari nav, feels like its own domain */}
+      {/* Minimal site header — no Ipantanal nav, feels like its own domain */}
       <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white/70 backdrop-blur-sm sticky top-0 z-20">
         <span className="flex items-center gap-2.5">
           {pousada.logoUrl && (
@@ -379,10 +379,10 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
       {/* Footer */}
       <footer className="py-8 text-center text-editorial-muted text-[10px] uppercase tracking-widest font-bold">
         {previewPousada ? (
-          <span>Listado no catálogo EcoSafari Brasil</span>
+          <span>Listado no catálogo Ipantanal</span>
         ) : (
           <a {...platformLink("/")} className="hover:text-editorial-primary transition cursor-pointer">
-            Listado no catálogo EcoSafari Brasil →
+            Listado no catálogo Ipantanal →
           </a>
         )}
       </footer>

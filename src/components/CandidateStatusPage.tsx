@@ -6,7 +6,7 @@ import { Candidatura } from "../types";
 const STATUS_LABELS: Record<Candidatura["status"], { label: string; color: string }> = {
   pendente: { label: "Em análise", color: "bg-amber-50 text-amber-900 border-amber-200" },
   contatado: { label: "Nossa equipe já entrou em contato", color: "bg-blue-50 text-blue-900 border-blue-200" },
-  aprovado: { label: "Aprovado — bem-vindo à rede EcoSafari!", color: "bg-emerald-50 text-emerald-900 border-emerald-200" },
+  aprovado: { label: "Aprovado — bem-vindo à rede Ipantanal!", color: "bg-emerald-50 text-emerald-900 border-emerald-200" },
   rejeitado: { label: "Não aprovado nesta etapa", color: "bg-zinc-100 text-zinc-600 border-zinc-200" },
 };
 

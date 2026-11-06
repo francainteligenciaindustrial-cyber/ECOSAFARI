@@ -111,7 +111,7 @@ app.delete("/api/admin/afiliados/:id", requireAdmin, async (req, res) => {
 
 // ---------------- Financeiro (Gestão) ----------------
 
-// Mês (pelo check-in) das reservas pagas: bruto, comissão EcoSafari,
+// Mês (pelo check-in) das reservas pagas: bruto, comissão Ipantanal,
 // afiliados, conservação e repasse por pousada; mais mensalidades do plano
 // Gestão e serviços (site/logo) entregues no mês. Reserva antiga sem
 // snapshot usa a comissão atual da pousada.
@@ -160,7 +160,7 @@ app.get("/api/admin/financeiro", requireAdmin, async (req, res) => {
     totais: {
       reservas: sum("reservas"), bruto: sum("bruto"), comissao, afiliados, conservacao, repasse: sum("repasse"),
       mensalidades, assinantesGestao: assinantes.length, servicos, servicosEntregues: (pedidos || []).length,
-      // Receita líquida da EcoSafari no mês.
+      // Receita líquida da Ipantanal no mês.
       receitaLiquida: r2(comissao - afiliados - conservacao + mensalidades + servicos),
     },
     porPousada,
@@ -180,7 +180,7 @@ app.post("/api/pousadas/:id/pedido-plano", requirePartnerAccess("pousada"), asyn
   if (!p) return res.status(404).json({ error: "Pousada não encontrada" });
   const nome = res.locals.actorUser?.user_metadata?.name;
   addNotification("admin", `${p.name} quer contratar o plano Gestão${nome ? ` (${nome})` : ""}.`, "status_update");
-  const text = `Olá! ${nome ? `Sou ${nome}, gestor(a) da` : "Sou gestor(a) da"} ${p.name} e quero contratar o plano Gestão da EcoSafari.`;
+  const text = `Olá! ${nome ? `Sou ${nome}, gestor(a) da` : "Sou gestor(a) da"} ${p.name} e quero contratar o plano Gestão da Ipantanal.`;
   res.json({ whatsappUrl: `https://wa.me/${AGENCY_WHATSAPP.replace(/\D/g, "")}?text=${encodeURIComponent(text)}` });
 });
 

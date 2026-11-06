@@ -34,7 +34,7 @@ export default function CookieConsentBanner() {
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4 md:gap-8">
         <Cookie className="h-6 w-6 flex-shrink-0 hidden sm:block" />
         <p className="text-xs md:text-[13px] leading-relaxed flex-1 text-center md:text-left">
-          Usamos cookies essenciais para o funcionamento do site e, mediante seu consentimento, cookies de análise para entender como os visitantes usam a EcoSafari Brasil. Saiba mais na nossa{" "}
+          Usamos cookies essenciais para o funcionamento do site e, mediante seu consentimento, cookies de análise para entender como os visitantes usam a Ipantanal. Saiba mais na nossa{" "}
           <a
             href="/privacidade"
             onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }}

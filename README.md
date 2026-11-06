@@ -1,4 +1,4 @@
-# EcoSafari Brasil
+# Ipantanal
 
 Plataforma de ecoturismo no Pantanal: catálogo de pousadas, guias e atrações,
 reserva online com pagamento pelo Stripe, pacotes combinados, cupons, mapa
@@ -65,7 +65,7 @@ mais de uma vez. As mais recentes:
 5. `scripts/add-dominio-proprio-pousada.sql` — domínio próprio abrindo o site oficial da pousada
 6. `scripts/add-pedidos-site.sql` — venda do site oficial (Gestão → Pedidos de site)
 7. `scripts/add-servico-logo.sql` — serviço de logo com aprovação de versões pelo cliente
-8. `scripts/add-vinculo-app.sql` — vínculo pousada do site ↔ pousada do app EcoSafari Go
+8. `scripts/add-vinculo-app.sql` — vínculo pousada do site ↔ pousada do app Ipantanal Go
 9. `scripts/add-receita-confianca-crescimento.sql` — comissão, planos, preço por temporada, afiliados, avaliação verificada, conservação e destaque
 10. `scripts/add-local-foto-e-capa.sql` — local da foto nos posts do turista e enquadramento da capa
 11. `scripts/add-google-maps-pousada.sql` — link da ficha no Google Maps (seção "Localização e como chegar")
@@ -85,10 +85,10 @@ do Supabase são `CRON_SECRET` (sem ela o job diário fica desligado),
 `SITE_URL`, `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY` +
 `EMAIL_FROM`. O modelo do chatbot é configurável por `GEMINI_MODEL`.
 
-**Remetentes de e-mail.** Tudo sai do domínio do EcoSafari (`EMAIL_FROM`),
+**Remetentes de e-mail.** Tudo sai do domínio do Ipantanal (`EMAIL_FROM`),
 o único que precisa estar verificado no Resend. Confirmação de reserva e
 pedido de avaliação levam o nome da pousada — "Pesqueiro Vagalume via
-EcoSafari Brasil" — e o "responder para" é o e-mail de contato que a pousada
+Ipantanal" — e o "responder para" é o e-mail de contato que a pousada
 preenche no portal (aba Sobre). Pousadas com domínio próprio verificado no
 Resend podem, como exceção, enviar por ele: o admin define em Gestão →
 Pousadas → Editar. Se esse domínio não estiver verificado, o envio volta

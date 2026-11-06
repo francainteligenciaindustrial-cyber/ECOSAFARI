@@ -1,4 +1,4 @@
-// Avistamentos reais do app EcoSafari Go (banco Supabase separado) para o
+// Avistamentos reais do app Ipantanal Go (banco Supabase separado) para o
 // calendário de melhor época e o mapa. O site só lê números agregados pelas
 // funções de scripts/app-ecosafari-go/estatisticas-publicas.sql, com a chave
 // pública do app — nenhum dado pessoal atravessa.

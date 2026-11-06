@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: TABELA DE SEGREDOS DA APLICAÇÃO (app_secrets)
+-- IPANTANAL: TABELA DE SEGREDOS DA APLICAÇÃO (app_secrets)
 -- Rode isso no SQL Editor do Supabase. Substitui o arquivo local
 -- "google_tokens.json" que o backend usava antes para guardar os tokens
 -- OAuth do Google Calendar — um arquivo em disco não sobrevive ao ambiente

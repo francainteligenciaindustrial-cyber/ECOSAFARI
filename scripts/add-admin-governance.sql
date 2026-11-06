@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: GOVERNANÇA DE ADMINISTRADORES + LOG DE AUDITORIA
+-- IPANTANAL: GOVERNANÇA DE ADMINISTRADORES + LOG DE AUDITORIA
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Conceder acesso de admin deixa de ser uma ação unilateral: qualquer admin

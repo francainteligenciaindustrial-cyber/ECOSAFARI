@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: PENALIDADE DE CANCELAMENTO + LEMBRETES AUTOMÁTICOS
+-- IPANTANAL: PENALIDADE DE CANCELAMENTO + LEMBRETES AUTOMÁTICOS
 -- Rode isso no SQL Editor do Supabase.
 --
 -- prestador_penalidades: registro (ledger) de toda penalidade aplicada a

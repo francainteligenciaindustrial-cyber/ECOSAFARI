@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: TRAVA DE OVERBOOKING NO PRÓPRIO BANCO
+-- IPANTANAL: TRAVA DE OVERBOOKING NO PRÓPRIO BANCO
 -- Rode no SQL Editor do Supabase. Pode rodar mais de uma vez.
 --
 -- O servidor checa a disponibilidade e depois grava — dois passos. Duas

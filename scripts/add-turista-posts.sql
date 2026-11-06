@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: POSTS DO TURISTA + FOTO DE CAPA (perfil estilo Facebook)
+-- IPANTANAL: POSTS DO TURISTA + FOTO DE CAPA (perfil estilo Facebook)
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Texto + foto opcional que o turista publica no próprio perfil — não é um

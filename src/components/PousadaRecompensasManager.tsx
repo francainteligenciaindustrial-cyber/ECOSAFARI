@@ -100,7 +100,7 @@ export default function PousadaRecompensasManager({ pousadaId }: Props) {
         <h3 className="font-bold text-sm text-editorial-text flex items-center gap-2 mb-1">
           <Coins className="h-4 w-4 text-editorial-primary" /> Recompensas em Jaguars
         </h3>
-        <p className="text-editorial-muted text-xs">Brindes ou descontos que um turista pode trocar pelos Jaguars que ganhou no aplicativo EcoSafari.</p>
+        <p className="text-editorial-muted text-xs">Brindes ou descontos que um turista pode trocar pelos Jaguars que ganhou no aplicativo Ipantanal.</p>
       </div>
 
       {/* Validar código de resgate */}

@@ -1,10 +1,10 @@
-// Divisão de cada reserva. A comissão da EcoSafari sai do total; dela saem
+// Divisão de cada reserva. A comissão da Ipantanal sai do total; dela saem
 // a comissão do afiliado (quem indicou) e a parte da conservação — a
 // pousada recebe sempre total − comissão, sem desconto extra.
 
 export interface Split {
   commissionPct: number;
-  commission: number; // EcoSafari (bruto)
+  commission: number; // Ipantanal (bruto)
   affiliate: number; // dentro da comissão
   conservation: number; // dentro da comissão
   platformNet: number; // comissão − afiliado − conservação

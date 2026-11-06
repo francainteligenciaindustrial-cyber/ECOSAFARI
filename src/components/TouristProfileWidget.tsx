@@ -119,7 +119,7 @@ export default function TouristProfileWidget() {
               <span className="flex items-center gap-1.5 text-editorial-primary font-bold text-sm">
                 <Coins className="h-4 w-4" /> {profile?.coins ?? 0} Jaguars
               </span>
-              <span className="text-editorial-muted text-[10px] uppercase tracking-wider">Ganhas no app EcoSafari</span>
+              <span className="text-editorial-muted text-[10px] uppercase tracking-wider">Ganhas no app Ipantanal</span>
             </div>
           </div>
 

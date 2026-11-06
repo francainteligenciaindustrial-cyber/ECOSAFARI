@@ -319,7 +319,7 @@ export default function TuristaProfileView() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `ecosafari-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `ipantanal-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -427,7 +427,7 @@ export default function TuristaProfileView() {
 
             <div className="flex-1 min-w-0 sm:pb-2">
               <h1 className="text-2xl font-serif font-bold text-editorial-text">{localProfile.name}</h1>
-              <p className="text-editorial-primary text-sm font-medium italic">Cada turista é único aqui na EcoSafari</p>
+              <p className="text-editorial-primary text-sm font-medium italic">Cada turista é único aqui na Ipantanal</p>
             </div>
 
             <div className="flex items-center gap-3 sm:pb-2 flex-shrink-0">

@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: CALENDÁRIO GOOGLE DEDICADO POR POUSADA
+-- IPANTANAL: CALENDÁRIO GOOGLE DEDICADO POR POUSADA
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Até então toda reserva confirmada de toda pousada caía no mesmo

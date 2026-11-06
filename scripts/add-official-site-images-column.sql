@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: GALERIA EXCLUSIVA DO SITE OFICIAL (/site/:slug)
+-- IPANTANAL: GALERIA EXCLUSIVA DO SITE OFICIAL (/site/:slug)
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Antes, a página "Site Oficial" de cada pousada (/site/:slug) mostrava a

@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: LIXEIRA (backup de exclusão)
+-- IPANTANAL: LIXEIRA (backup de exclusão)
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Guarda uma cópia completa de tudo que o admin excluir (pousada, guia,

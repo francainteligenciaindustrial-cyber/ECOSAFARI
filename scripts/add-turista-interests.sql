@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: INTERESSES DO PERFIL DE TURISTA
+-- IPANTANAL: INTERESSES DO PERFIL DE TURISTA
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Categorias fixas (passeios/aventuras, fauna/flora) que o turista marca no

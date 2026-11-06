@@ -135,7 +135,7 @@ export default function AdminAuditLogPanel() {
     // Nome do arquivo entrega o período filtrado quando há filtro de data
     // ativo, pra ficar claro no download que não é o log inteiro.
     const suffix = hasDateFilter ? `${dateFrom || "inicio"}_a_${dateTo || "hoje"}` : new Date().toISOString().slice(0, 10);
-    a.download = `log-auditoria-ecosafari-${suffix}.csv`;
+    a.download = `log-auditoria-ipantanal-${suffix}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();

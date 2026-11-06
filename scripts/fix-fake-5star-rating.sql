@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: CORRIGE O BUG DE AVALIAÇÃO "5 ESTRELAS" AUTOMÁTICA
+-- IPANTANAL: CORRIGE O BUG DE AVALIAÇÃO "5 ESTRELAS" AUTOMÁTICA
 -- Rode isso no SQL Editor do Supabase. Idempotente: seguro rodar mais de uma vez.
 --
 -- Toda pousada/guia/atração nascia com rating = 5.0 (era o DEFAULT da

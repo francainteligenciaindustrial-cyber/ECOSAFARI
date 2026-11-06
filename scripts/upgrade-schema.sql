@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: UPGRADE DE SCHEMA (índices, foreign keys, jsonb)
+-- IPANTANAL: UPGRADE DE SCHEMA (índices, foreign keys, jsonb)
 -- Rode isso no SQL Editor do Supabase DEPOIS de já ter rodado
 -- lockdown-rls.sql e de já não ter mais dados fake nas tabelas (senão a
 -- criação das foreign keys abaixo vai falhar com "linha órfã").

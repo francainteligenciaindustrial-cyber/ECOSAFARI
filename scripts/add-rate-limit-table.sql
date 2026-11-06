@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: RATE LIMIT DISTRIBUÍDO
+-- IPANTANAL: RATE LIMIT DISTRIBUÍDO
 -- Rode isso no SQL Editor do Supabase. Dá ao rate limiting um contador
 -- compartilhado entre todas as instâncias da Vercel (hoje cada instância
 -- serverless conta sozinha, em memória — um limite de "10 por 15 min"

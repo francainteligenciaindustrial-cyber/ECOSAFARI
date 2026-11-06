@@ -46,7 +46,7 @@ export default function PaymentConfirmationPage() {
             <Compass className="h-5 w-5" />
           </div>
           <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary">
-            EcoSafari<span className="text-zinc-400 not-italic">.</span>
+            Ipantanal<span className="text-zinc-400 not-italic">.</span>
           </h1>
         </a>
       </header>

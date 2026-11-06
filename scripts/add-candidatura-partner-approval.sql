@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: APROVAÇÃO DE CANDIDATURA VIRA PARCEIRO DE VERDADE
+-- IPANTANAL: APROVAÇÃO DE CANDIDATURA VIRA PARCEIRO DE VERDADE
 -- Rode isso no SQL Editor do Supabase. Idempotente: seguro rodar mais de uma vez.
 --
 -- Suporta POST /api/candidaturas/:id/approve, que substitui o fluxo manual

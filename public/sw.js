@@ -1,4 +1,4 @@
-// Service worker do EcoSafari — deixa o site abrir sem internet (no Pantanal
+// Service worker do Ipantanal — deixa o site abrir sem internet (no Pantanal
 // o sinal some) e acelera visitas repetidas.
 //  - Páginas: rede primeiro; sem rede, a última versão do app guardada.
 //  - /assets/* (JS/CSS com hash no nome): cache primeiro, nunca muda.

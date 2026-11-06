@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: ÍNDICES PARA BUSCA/PAGINAÇÃO NO CATÁLOGO DE POUSADAS
+-- IPANTANAL: ÍNDICES PARA BUSCA/PAGINAÇÃO NO CATÁLOGO DE POUSADAS
 -- Rode isso no SQL Editor do Supabase.
 --
 -- GET /api/pousadas agora aceita ?page= e faz busca (name/location via

@@ -40,7 +40,7 @@ export default function PartnerLoginPanel() {
     }
     if (data.user.app_metadata?.role !== "partner" && data.user.app_metadata?.role !== "colaborador") {
       await supabase.auth.signOut();
-      setLoginError("Esta conta não tem acesso de parceiro. Fale com a equipe EcoSafari.");
+      setLoginError("Esta conta não tem acesso de parceiro. Fale com a equipe Ipantanal.");
       setLoggingIn(false);
       return;
     }
@@ -78,7 +78,7 @@ export default function PartnerLoginPanel() {
 
       {!forgotMode ? (
         <>
-          <p className="text-editorial-muted text-xs mb-6">Entre com o acesso que a equipe EcoSafari criou pra você editar seu próprio perfil.</p>
+          <p className="text-editorial-muted text-xs mb-6">Entre com o acesso que a equipe Ipantanal criou pra você editar seu próprio perfil.</p>
           <form onSubmit={handleLogin} className="flex flex-col gap-3">
             <input
               type="email" required placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}

@@ -3,9 +3,9 @@ import InfoPageLayout from "./InfoPageLayout";
 
 export default function AboutPage() {
   return (
-    <InfoPageLayout kicker="Nossa História" title="Sobre a EcoSafari Brasil">
+    <InfoPageLayout kicker="Nossa História" title="Sobre a Ipantanal">
       <p>
-        A EcoSafari Brasil nasceu da vontade de conectar viajantes do mundo todo à biodiversidade brasileira sem abrir mão da responsabilidade ambiental. Trabalhamos como uma ponte entre pousadas parceiras, guias especializados e visitantes que querem viver experiências reais de observação de vida selvagem — no Pantanal, no Cerrado e na Amazônia.
+        A Ipantanal nasceu da vontade de conectar viajantes do mundo todo à biodiversidade brasileira sem abrir mão da responsabilidade ambiental. Trabalhamos como uma ponte entre pousadas parceiras, guias especializados e visitantes que querem viver experiências reais de observação de vida selvagem — no Pantanal, no Cerrado e na Amazônia.
       </p>
       <p>
         Cada pousada e cada guia que fazem parte da nossa rede passam por uma triagem antes de aparecer no catálogo: verificamos localização, estrutura, práticas de sustentabilidade e o histórico de atuação na região. Isso significa que, quando você reserva conosco, está reservando com quem realmente conhece o território.
@@ -13,7 +13,7 @@ export default function AboutPage() {
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">Nossa Missão</h3>
       <p>
-        Acreditamos que o turismo de observação de vida selvagem, quando bem feito, é uma das ferramentas mais poderosas de conservação: transforma animais selvagens em ativos econômicos vivos para comunidades locais, o que reduz a caça predatória e financia a proteção de habitats. Cada reserva feita através da EcoSafari contribui direta ou indiretamente para a manutenção de áreas de conservação e para a renda de famílias que vivem do turismo responsável.
+        Acreditamos que o turismo de observação de vida selvagem, quando bem feito, é uma das ferramentas mais poderosas de conservação: transforma animais selvagens em ativos econômicos vivos para comunidades locais, o que reduz a caça predatória e financia a proteção de habitats. Cada reserva feita através da Ipantanal contribui direta ou indiretamente para a manutenção de áreas de conservação e para a renda de famílias que vivem do turismo responsável.
       </p>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">Como trabalhamos</h3>

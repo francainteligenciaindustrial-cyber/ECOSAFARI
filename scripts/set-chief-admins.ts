@@ -34,7 +34,7 @@ async function main() {
   // Mesmo padrão do SITE_URL em server.ts: sem a env var definida, cai no
   // domínio real (não localhost) — um link de convite gerado sem isso
   // aponta pra uma página morta, exatamente o bug que já aconteceu antes.
-  const siteUrl = (process.env.SITE_URL || "https://www.ecosafaribrasil.com.br").replace(/\/$/, "");
+  const siteUrl = (process.env.SITE_URL || "https://ipantanal.com.br").replace(/\/$/, "");
 
   for (const email of CHIEF_EMAILS) {
     const match = existing.users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());

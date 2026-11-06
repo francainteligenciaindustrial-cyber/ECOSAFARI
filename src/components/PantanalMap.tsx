@@ -16,7 +16,7 @@ interface Props {
   atracoes: Atracao[];
   species: SpeciesLike[];
   onSelectPousada: (p: Pousada) => void;
-  // Avistamentos aprovados no app EcoSafari Go, agregados (~1 km).
+  // Avistamentos aprovados no app Ipantanal Go, agregados (~1 km).
   sightingPoints?: SightingPoint[];
   // Avistamentos vinculados a cada pousada pelo ID (appLodgeId).
   linkedSpecies?: LinkedSpecies[];

@@ -1,5 +1,5 @@
 // Domínio próprio de pousada (ex.: pousadavagalume.com) apontando para o
-// mesmo deploy do EcoSafari: o front descobre pelo hostname qual site
+// mesmo deploy do Ipantanal: o front descobre pelo hostname qual site
 // oficial mostrar. Hosts da plataforma nunca consultam a API.
 
 export function normalizeHost(host: string): string {

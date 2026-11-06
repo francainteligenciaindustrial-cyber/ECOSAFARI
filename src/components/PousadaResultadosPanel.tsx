@@ -112,7 +112,7 @@ export default function PousadaResultadosPanel({ pousadaId }: { pousadaId: strin
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <RankBars title="Origem das reservas" data={data.origem} />
         <RankBars title="Nacionalidade dos hóspedes" data={data.nacionalidade} />
-        <RankBars title="Como os visitantes chegam ao site (todo o EcoSafari)" data={data.canaisDoSite} />
+        <RankBars title="Como os visitantes chegam ao site (todo o Ipantanal)" data={data.canaisDoSite} />
       </div>
       <details className="bg-white border border-editorial-border rounded-lg p-4 text-xs">
         <summary className="cursor-pointer font-bold text-editorial-primary">Ver tabela mês a mês</summary>

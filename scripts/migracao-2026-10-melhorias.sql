@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: MIGRAÇÃO ÚNICA — MELHORIAS DE OUTUBRO/2026
+-- IPANTANAL: MIGRAÇÃO ÚNICA — MELHORIAS DE OUTUBRO/2026
 -- Rode este arquivo inteiro no SQL Editor do Supabase (Project > SQL Editor
 -- > New query > colar > Run). Pode rodar mais de uma vez sem problema: tudo
 -- usa IF NOT EXISTS.

@@ -105,7 +105,7 @@ export default function PedidoSiteCard({ pousadaId }: { pousadaId: string }) {
   return (
     <div className="border border-editorial-border rounded-lg overflow-hidden">
       <div className="bg-editorial-primary text-white p-5">
-        <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-arara-yellow mb-1">Serviços EcoSafari</p>
+        <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-arara-yellow mb-1">Serviços Ipantanal</p>
         <h3 className="font-serif text-xl font-bold flex items-center gap-2"><Globe className="h-5 w-5" /> Logo e site profissionais para a sua pousada</h3>
         <p className="text-white/80 text-xs mt-2 leading-relaxed">Nosso designer cria a sua logo e, com ela aprovada por você, criamos o site oficial com a sua identidade visual, fotos e reserva online integrada. Depois de pronto, você mesmo ajusta textos e fotos por aqui.</p>
       </div>

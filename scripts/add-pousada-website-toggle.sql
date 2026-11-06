@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: AGENDA DE DISPONIBILIDADE + "SITE PRÓPRIO" DA POUSADA
+-- IPANTANAL: AGENDA DE DISPONIBILIDADE + "SITE PRÓPRIO" DA POUSADA
 -- Rode isso no SQL Editor do Supabase.
 
 -- Datas específicas em que a pousada não aceita reserva (manutenção,
@@ -8,7 +8,7 @@
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "unavailableDates" TEXT;
 
 -- Escolha entre "criar site manualmente" (usa o editor + /site/:slug
--- gerados pela EcoSafari, os campos officialSiteImages/teamPhotoUrl/etc)
+-- gerados pela Ipantanal, os campos officialSiteImages/teamPhotoUrl/etc)
 -- e "já tenho meu próprio site" (aponta pro link real em vez de gerar um).
 -- hasOwnWebsite=false é o padrão: pousadas existentes continuam usando o
 -- site gerado até o parceiro marcar que já tem o próprio.

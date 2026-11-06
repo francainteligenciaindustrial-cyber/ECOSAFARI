@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: TRAVA DE RLS
+-- IPANTANAL: TRAVA DE RLS
 -- Rode isso no SQL Editor do Supabase para remover o acesso público direto
 -- a todas as tabelas. O backend passa a usar a service_role key (que ignora
 -- RLS), então essas políticas públicas não são mais necessárias — e mantê-las

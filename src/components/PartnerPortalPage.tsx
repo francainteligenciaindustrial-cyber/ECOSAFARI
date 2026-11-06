@@ -292,7 +292,7 @@ export default function PartnerPortalPage() {
       .finally(() => setLoadingProfile(false));
   }, [isPartner, activeProperty?.partnerType, activeProperty?.partnerId, properties === null]);
 
-  // "Entrar com EcoSafari" — apps de terceiros (o aplicativo mobile
+  // "Entrar com Ipantanal" — apps de terceiros (o aplicativo mobile
   // planejado, por exemplo) que o parceiro autorizou via a tela de
   // consentimento em /parceiro/oauth/consent. Só relevante se o Servidor
   // OAuth do Supabase estiver habilitado no projeto.
@@ -508,7 +508,7 @@ export default function PartnerPortalPage() {
         <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center">
           <Compass className="h-4 w-4" />
         </div>
-        <span className="font-serif italic font-bold text-editorial-primary">EcoSafari<span className="text-zinc-400 not-italic">.</span></span>
+        <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
       </a>
       {(isPartner || isColaborador) && (
         <button onClick={handleLogout} className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer">
@@ -606,7 +606,7 @@ export default function PartnerPortalPage() {
           <>
             <h1 className="text-2xl font-serif font-bold text-editorial-primary mb-1">Meu Perfil</h1>
             <p className="text-editorial-muted text-xs mb-8">
-              {profile?.atracao?.name || profile?.guia?.name || "Edite as informações que aparecem pra quem visita a EcoSafari."}
+              {profile?.atracao?.name || profile?.guia?.name || "Edite as informações que aparecem pra quem visita a Ipantanal."}
             </p>
           </>
         )}
@@ -713,7 +713,7 @@ export default function PartnerPortalPage() {
                     <div className="text-xs">
                       <label htmlFor="email-contato" className="block text-editorial-text font-semibold mb-1.5">E-mail para respostas dos hóspedes</label>
                       <input id="email-contato" type="email" placeholder="contato@suapousada.com.br" value={form.emailContato} onChange={e => setForm((p: any) => ({ ...p, emailContato: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
-                      <p className="text-editorial-muted text-[11px] mt-1">A confirmação de reserva e o pedido de avaliação saem do EcoSafari com o nome da sua pousada; quando o hóspede responde, a mensagem chega neste e-mail.</p>
+                      <p className="text-editorial-muted text-[11px] mt-1">A confirmação de reserva e o pedido de avaliação saem do Ipantanal com o nome da sua pousada; quando o hóspede responde, a mensagem chega neste e-mail.</p>
                     </div>
                     <RemetenteEmailStatus pousadaId={profile.partnerId} reloadKey={saved} />
                   </FormSection>
@@ -847,7 +847,7 @@ export default function PartnerPortalPage() {
                       <label className="block text-editorial-text font-semibold mb-1.5">Compartilhar a página da pousada</label>
                       <div className="flex flex-wrap items-center gap-2">
                         <a
-                          href={`https://wa.me/?text=${encodeURIComponent(`Conheça a ${profile.pousada?.name || "nossa pousada"} na EcoSafari: ${window.location.origin}/pousadas/${profile.partnerId}`)}`}
+                          href={`https://wa.me/?text=${encodeURIComponent(`Conheça a ${profile.pousada?.name || "nossa pousada"} na Ipantanal: ${window.location.origin}/pousadas/${profile.partnerId}`)}`}
                           target="_blank" rel="noopener noreferrer"
                           className="flex items-center gap-1.5 border border-editorial-border text-editorial-text px-3 py-1.5 rounded-md hover:bg-editorial-secondary transition"
                         >
@@ -884,8 +884,8 @@ export default function PartnerPortalPage() {
                         {form.hasOwnWebsite
                           ? "O botão \"Ver site oficial\" no catálogo vai levar direto pro seu site."
                           : profile.pousada?.sitePublicado
-                            ? "Seu site foi criado pela equipe EcoSafari. Você pode ajustar textos, fotos e cores abaixo — a prévia ao lado atualiza conforme você edita."
-                            : "A equipe EcoSafari cria um site profissional para a sua pousada. Peça abaixo e entraremos em contato."}
+                            ? "Seu site foi criado pela equipe Ipantanal. Você pode ajustar textos, fotos e cores abaixo — a prévia ao lado atualiza conforme você edita."
+                            : "A equipe Ipantanal cria um site profissional para a sua pousada. Peça abaixo e entraremos em contato."}
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -893,7 +893,7 @@ export default function PartnerPortalPage() {
                           onClick={() => setForm((p: any) => ({ ...p, hasOwnWebsite: false }))}
                           className={`flex-1 text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-md border transition cursor-pointer ${!form.hasOwnWebsite ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
                         >
-                          Site feito pela EcoSafari
+                          Site feito pela Ipantanal
                         </button>
                         <button
                           type="button"
@@ -947,7 +947,7 @@ export default function PartnerPortalPage() {
 
                         {/* Logo + paleta próprias — cada Site Oficial pode ter
                             sua própria identidade visual em vez de sempre
-                            herdar o verde/creme padrão do EcoSafari. Vazio =
+                            herdar o verde/creme padrão do Ipantanal. Vazio =
                             usa o tema padrão normalmente. */}
                         <div className="text-xs border-t border-editorial-border pt-4">
                           <label className="block text-editorial-text font-semibold mb-1.5">Logo</label>
@@ -958,7 +958,7 @@ export default function PartnerPortalPage() {
                         </div>
                         <div className="text-xs">
                           <label className="block text-editorial-text font-semibold mb-1.5">Paleta de Cores (opcional)</label>
-                          <p className="text-editorial-muted text-[11px] mb-2">Deixe em branco pra usar a paleta padrão da EcoSafari. Combine com sua logo pra um site com a cara da sua pousada.</p>
+                          <p className="text-editorial-muted text-[11px] mb-2">Deixe em branco pra usar a paleta padrão da Ipantanal. Combine com sua logo pra um site com a cara da sua pousada.</p>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-2">
                               <input type="color" value={form.themeColorPrimary || "#101B4C"} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
@@ -981,7 +981,7 @@ export default function PartnerPortalPage() {
                               onClick={() => setForm((p: any) => ({ ...p, themeColorPrimary: "", themeColorAccent: "" }))}
                               className="text-editorial-muted hover:text-editorial-primary text-[10px] uppercase tracking-widest font-bold mt-2 transition cursor-pointer"
                             >
-                              Usar paleta padrão da EcoSafari
+                              Usar paleta padrão da Ipantanal
                             </button>
                           )}
                         </div>
@@ -1036,7 +1036,7 @@ export default function PartnerPortalPage() {
                   <label className="block text-editorial-text font-semibold mb-1.5">Nome</label>
                   <input type="text" required value={form.name} onChange={e => setForm((p: any) => ({ ...p, name: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                 </div>
-                <p className="text-editorial-muted text-[10px] -mt-2">Email e telefone abaixo são de contato interno da equipe EcoSafari — nunca aparecem na sua página pública.</p>
+                <p className="text-editorial-muted text-[10px] -mt-2">Email e telefone abaixo são de contato interno da equipe Ipantanal — nunca aparecem na sua página pública.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="text-xs">
                     <label className="block text-editorial-text font-semibold mb-1.5">Email</label>
@@ -1172,7 +1172,7 @@ export default function PartnerPortalPage() {
         {!loadingGrants && grants.length > 0 && (
           <div className="mt-8 bg-white border border-editorial-border rounded-lg p-6">
             <h2 className="text-sm font-bold text-editorial-text mb-1">Apps Conectados</h2>
-            <p className="text-editorial-muted text-xs mb-4">Aplicativos externos autorizados a entrar com sua conta EcoSafari.</p>
+            <p className="text-editorial-muted text-xs mb-4">Aplicativos externos autorizados a entrar com sua conta Ipantanal.</p>
             <div className="space-y-2">
               {grants.map(g => (
                 <div key={g.client.id} className="flex items-center justify-between gap-3 bg-editorial-secondary/40 border border-editorial-border rounded-md p-3">

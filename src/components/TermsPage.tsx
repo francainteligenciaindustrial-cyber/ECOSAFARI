@@ -8,7 +8,7 @@ export default function TermsPage() {
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">1. Sobre o serviço</h3>
       <p>
-        A EcoSafari Brasil atua como plataforma de intermediação entre viajantes e pousadas/guias parceiros para experiências de turismo ecológico. A prestação direta do serviço de hospedagem e condução das expedições é realizada pelas pousadas e guias parceiros, que são responsáveis pela qualidade e segurança da execução no local.
+        A Ipantanal atua como plataforma de intermediação entre viajantes e pousadas/guias parceiros para experiências de turismo ecológico. A prestação direta do serviço de hospedagem e condução das expedições é realizada pelas pousadas e guias parceiros, que são responsáveis pela qualidade e segurança da execução no local.
       </p>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">2. Reservas</h3>
@@ -41,7 +41,7 @@ export default function TermsPage() {
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">6. Limitação de responsabilidade</h3>
       <p>
-        A EcoSafari Brasil não se responsabiliza por eventos fora de seu controle direto, incluindo condições climáticas, comportamento imprevisível da fauna silvestre, ou decisões operacionais tomadas pelas pousadas e guias parceiros durante a execução da experiência.
+        A Ipantanal não se responsabiliza por eventos fora de seu controle direto, incluindo condições climáticas, comportamento imprevisível da fauna silvestre, ou decisões operacionais tomadas pelas pousadas e guias parceiros durante a execução da experiência.
       </p>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">7. Contato</h3>

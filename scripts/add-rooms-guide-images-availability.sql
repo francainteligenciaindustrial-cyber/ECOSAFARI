@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: DETALHES PEDIDOS NA ATA DA REUNIÃO (Eco Safari e Jaguar)
+-- IPANTANAL: DETALHES PEDIDOS NA ATA DA REUNIÃO (Eco Safari e Jaguar)
 -- Rode isso no SQL Editor do Supabase. Idempotente: seguro rodar mais de uma vez.
 --
 -- Fecha 3 lacunas encontradas ao comparar o site com a ata da reunião:

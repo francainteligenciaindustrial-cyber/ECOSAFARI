@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: REMETENTE DE E-MAIL POR POUSADA
+-- IPANTANAL: REMETENTE DE E-MAIL POR POUSADA
 -- Rode no SQL Editor do Supabase. Pode rodar mais de uma vez.
 --
 -- E-mails de reserva ao hóspede (confirmação com voucher, pedido de

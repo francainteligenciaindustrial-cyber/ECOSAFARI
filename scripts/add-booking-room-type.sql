@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: RESERVA POR TIPO DE QUARTO
+-- IPANTANAL: RESERVA POR TIPO DE QUARTO
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Até então a checagem de disponibilidade só comparava hóspedes contra a

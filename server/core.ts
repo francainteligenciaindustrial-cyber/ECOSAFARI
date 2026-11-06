@@ -719,7 +719,7 @@ if (RESEND_API_KEY && RESEND_API_KEY !== "MY_RESEND_API_KEY") {
 // Remetente precisa ser de um domínio verificado no Resend — o padrão
 // onboarding@resend.dev só entrega pro email do dono da conta Resend, e pra
 // qualquer outro destinatário a API responde com erro (sem lançar exceção).
-export const EMAIL_FROM = process.env.EMAIL_FROM || "EcoSafari Brasil <onboarding@resend.dev>";
+export const EMAIL_FROM = process.env.EMAIL_FROM || "Ipantanal <onboarding@resend.dev>";
 if (resend && !process.env.EMAIL_FROM) {
   log.warn("EMAIL_FROM não definido — usando onboarding@resend.dev, que só entrega para o email dono da conta Resend. Verifique um domínio no Resend e defina EMAIL_FROM.");
 }
@@ -765,8 +765,8 @@ export async function sendEmail(msg: { to: string; subject: string; html: string
 
 // Remetente dos e-mails de reserva ao hóspede (confirmação/voucher, pedido
 // de avaliação) — mesmo padrão de Booking/Airbnb:
-//  - Padrão: sai do domínio do EcoSafari com o nome da pousada na frente,
-//    "Pesqueiro Vagalume via EcoSafari Brasil <reservas@ecosafari...>", e a
+//  - Padrão: sai do domínio do Ipantanal com o nome da pousada na frente,
+//    "Pesqueiro Vagalume via Ipantanal <reservas@ecosafari...>", e a
 //    resposta do hóspede vai para o e-mail de contato da pousada.
 //  - Exceção: pousada com domínio próprio verificado no Resend, que só o
 //    admin configura (emailRemetente) — o parceiro não consegue apontar para
@@ -1482,8 +1482,8 @@ export async function createCalendarEvent(booking: Booking, req: express.Request
 
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-    const summary = `🐆 EcoSafari: Reserva ${booking.customerName} - ${booking.pousadaName}`;
-    const description = `EcoSafari Brasil - Reserva Confirmada\n\n` +
+    const summary = `🐆 Ipantanal: Reserva ${booking.customerName} - ${booking.pousadaName}`;
+    const description = `Ipantanal - Reserva Confirmada\n\n` +
       `📍 Pousada: ${booking.pousadaName}\n` +
       `👤 Cliente: ${booking.customerName}\n` +
       `✉️ E-mail: ${booking.customerEmail}\n` +
@@ -1747,7 +1747,7 @@ export async function enviarLembreteCancelamento(booking: Booking, dias: number)
     if (!email) continue;
     await sendEmail({
       to: email,
-      subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — EcoSafari`,
+      subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — Ipantanal`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #101B4C;">Sua expedição está chegando 🐆</h2>
@@ -1822,7 +1822,7 @@ export async function ocupacaoMensal(pousada: Pousada, from: Date, months: numbe
 // ----------------------------------------------------
 
 export const ORIGEM_LABEL = (b: { origem?: string | null; pacoteId?: string | null }) =>
-  b.pacoteId ? "Pacote EcoSafari" : b.origem === "site" ? "Reserva online (site)" : "Equipe EcoSafari / WhatsApp";
+  b.pacoteId ? "Pacote Ipantanal" : b.origem === "site" ? "Reserva online (site)" : "Equipe Ipantanal / WhatsApp";
 
 
 // ----------------------------------------------------
@@ -2004,14 +2004,14 @@ export async function enviarPedidoAvaliacao(booking: Booking): Promise<boolean> 
   const result = await sendEmail({
     ...(await remetenteDaPousada(booking.pousadaId)),
     to: booking.customerEmail,
-    subject: `Como foi sua estadia na ${booking.pousadaName}? — EcoSafari`,
+    subject: `Como foi sua estadia na ${booking.pousadaName}? — Ipantanal`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #101B4C;">Obrigado por viajar com a gente, ${primeiroNome}! 🌿</h2>
         <p>Esperamos que a estadia na <strong>${escapeHtml(booking.pousadaName)}</strong> tenha sido inesquecível.</p>
         <p>Leva um minuto: sua avaliação ajuda outros viajantes a escolher e ajuda a pousada a melhorar.</p>
         <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:12px 22px; text-decoration:none; border-radius:4px;">Avaliar minha estadia</a></p>
-        <p style="color:#888; font-size:12px;">Thank you for traveling with EcoSafari! Tap the button above to rate your stay.</p>
+        <p style="color:#888; font-size:12px;">Thank you for traveling with Ipantanal! Tap the button above to rate your stay.</p>
       </div>
     `,
   });
@@ -2088,7 +2088,7 @@ export async function createBookingCheckoutSession(booking: Booking): Promise<st
       currency: "brl",
       duration: "once",
       max_redemptions: 1,
-      name: `Cupom ${booking.cupomCode || "EcoSafari"}`.slice(0, 40),
+      name: `Cupom ${booking.cupomCode || "Ipantanal"}`.slice(0, 40),
     });
     discounts = [{ coupon: coupon.id }];
   }
@@ -2170,7 +2170,7 @@ export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fillColor("#101B4C").fontSize(22).text("EcoSafari Brasil", { align: "left" });
+    doc.fillColor("#101B4C").fontSize(22).text("Ipantanal", { align: "left" });
     doc.fillColor("#666").fontSize(10).text("Voucher de Reserva Confirmada", { align: "left" });
     doc.moveDown(1.5);
 
@@ -2551,10 +2551,10 @@ export async function provisionPartnerLogin(
   if (resend && actionLink) {
     const sent = await sendEmail({
         to: email,
-        subject: "Seu acesso de parceiro EcoSafari",
+        subject: "Seu acesso de parceiro Ipantanal",
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #101B4C;">Bem-vindo(a) à EcoSafari! 🌿</h2>
+            <h2 style="color: #101B4C;">Bem-vindo(a) à Ipantanal! 🌿</h2>
             <p>Seu acesso ao portal do parceiro foi criado. Clique no link abaixo para definir sua senha e acessar seu perfil:</p>
             <p><a href="${actionLink}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
             <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${actionLink}</p>
@@ -2674,8 +2674,8 @@ export function escapeHtml(str: string): string {
 // index.html, so link previews on WhatsApp/Facebook/etc show the right pousada
 // (those crawlers don't run JS, so client-side title updates alone don't work).
 export function injectPousadaMeta(html: string, pousada: Pousada): string {
-  const title = `${pousada.name} — EcoSafari Brasil`;
-  const description = (pousada.description || "Conheça esta pousada parceira da EcoSafari Brasil.").slice(0, 200);
+  const title = `${pousada.name} — Ipantanal`;
+  const description = (pousada.description || "Conheça esta pousada parceira da Ipantanal.").slice(0, 200);
   const image = (pousada.images && pousada.images[0]) || "/species/onca-pintada.png";
 
   return html
@@ -2692,4 +2692,4 @@ export function injectPousadaMeta(html: string, pousada: Pousada): string {
 // SITE_URL: base URL used to build absolute links in the sitemap. Falls back
 // to a placeholder — set this env var once the real domain (item 14) is live
 // so the sitemap doesn't need a code change.
-export const SITE_URL = (process.env.SITE_URL || "https://www.ecosafaribrasil.com.br").replace(/\/$/, "");
+export const SITE_URL = (process.env.SITE_URL || "https://ipantanal.com.br").replace(/\/$/, "");

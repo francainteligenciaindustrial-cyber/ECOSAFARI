@@ -27,13 +27,13 @@ export default function RemetenteEmailStatus({ pousadaId, reloadKey }: { pousada
       <p className="pl-5">
         {info.replyTo
           ? <>Respostas do hóspede vão para <strong className="break-all">{info.replyTo}</strong>.</>
-          : <>Sem e-mail de contato: as respostas vão para a equipe EcoSafari. Preencha "E-mail para respostas dos hóspedes".</>}
+          : <>Sem e-mail de contato: as respostas vão para a equipe Ipantanal. Preencha "E-mail para respostas dos hóspedes".</>}
       </p>
       {info.ownDomain && info.status === "verified" && (
         <p className="pl-5 flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Domínio próprio verificado no Resend.</p>
       )}
       {problem && (
-        <p className="pl-5 flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" /> Domínio próprio ainda não verificado no Resend — até lá os e-mails saem pelo remetente do EcoSafari.</p>
+        <p className="pl-5 flex items-start gap-1"><AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" /> Domínio próprio ainda não verificado no Resend — até lá os e-mails saem pelo remetente do Ipantanal.</p>
       )}
     </div>
   );

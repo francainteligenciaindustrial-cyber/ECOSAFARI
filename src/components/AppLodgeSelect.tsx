@@ -4,7 +4,7 @@ import { adminFetch } from "../lib/adminFetch";
 
 interface AppLodge { id: string; name: string; slug: string }
 
-// Vínculo pousada do site ↔ pousada do app EcoSafari Go, pelo ID do app
+// Vínculo pousada do site ↔ pousada do app Ipantanal Go, pelo ID do app
 // (a lista vem do próprio app; nomes parecidos não confundem). Mostra o slug
 // para diferenciar pousadas de nome igual.
 export default function AppLodgeSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
@@ -23,7 +23,7 @@ export default function AppLodgeSelect({ value, onChange }: { value: string; onC
 
   return (
     <div className="text-xs space-y-1">
-      <label htmlFor="app-lodge" className="block text-zinc-700 font-semibold flex items-center gap-1.5"><Smartphone className="h-3.5 w-3.5" /> Pousada no app EcoSafari Go</label>
+      <label htmlFor="app-lodge" className="block text-zinc-700 font-semibold flex items-center gap-1.5"><Smartphone className="h-3.5 w-3.5" /> Pousada no app Ipantanal Go</label>
       {error ? (
         <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">{error}</p>
       ) : (

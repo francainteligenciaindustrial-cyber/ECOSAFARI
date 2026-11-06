@@ -81,7 +81,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
               {video?.kind === "iframe" ? (
                 <iframe
                   src={video.src}
-                  title={`Vídeo — ${pousada?.name || "EcoSafari"}`}
+                  title={`Vídeo — ${pousada?.name || "Ipantanal"}`}
                   className="absolute inset-0 w-full h-full z-10"
                   allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                   allowFullScreen
@@ -110,7 +110,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                 {/* Top Info */}
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="font-serif font-bold text-lg tracking-tight">Expedições EcoSafari Brasil</h2>
+                    <h2 className="font-serif font-bold text-lg tracking-tight">Expedições Ipantanal</h2>
                     <p className="text-zinc-300 text-xs flex items-center gap-1 mt-0.5"><MapPin className="h-3 w-3 text-[#FBF8F1]" /> Vivências em Alta Resolução</p>
                   </div>
                   {pousada && (
@@ -158,7 +158,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
             <div className="bg-[#FBF8F1]/5 border border-[#FBF8F1]/10 p-6 shadow-sm">
               <h3 className="font-serif font-bold text-lg mb-2">Vivencie o Safári Fotográfico Ecológico</h3>
               <p className="text-[#FBF8F1]/80 text-xs leading-relaxed font-light">
-                Nossos vídeos mostram imagens reais capturadas por biólogos e turistas parceiros em expedições. A EcoSafari financia projetos locais de conservação e monitoramento de grandes carnívoros. Hospedando-se em nossas pousadas parceiras, você ajuda a manter a floresta e o cerrado de pé.
+                Nossos vídeos mostram imagens reais capturadas por biólogos e turistas parceiros em expedições. A Ipantanal financia projetos locais de conservação e monitoramento de grandes carnívoros. Hospedando-se em nossas pousadas parceiras, você ajuda a manter a floresta e o cerrado de pé.
               </p>
             </div>
           </div>

@@ -22,7 +22,7 @@ export default function TuristaAuthPage() {
           <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center">
             <Compass className="h-4 w-4" />
           </div>
-          <span className="font-serif italic font-bold text-editorial-primary">EcoSafari<span className="text-zinc-400 not-italic">.</span></span>
+          <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
         </a>
       </header>
 

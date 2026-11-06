@@ -1,9 +1,9 @@
--- ECOSAFARI BRASIL: LOGO E PALETA DE CORES PRÓPRIA POR POUSADA
+-- IPANTANAL: LOGO E PALETA DE CORES PRÓPRIA POR POUSADA
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Cada pousada pode ter sua própria logo + paleta de cores no Site Oficial
 -- (/site/:slug), em vez de sempre herdar o verde/creme editorial padrão do
--- EcoSafari. Ausente = usa o padrão normalmente (nada muda pra quem não
+-- Ipantanal. Ausente = usa o padrão normalmente (nada muda pra quem não
 -- configura). Ver PousadaOfficialSite.tsx.
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "logoUrl" TEXT;
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "themeColorPrimary" TEXT;

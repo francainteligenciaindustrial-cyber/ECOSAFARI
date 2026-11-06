@@ -453,7 +453,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
     newRecord = {
       id: `p_${randomUUID()}`,
       name: candidatura.pousadaName || candidatura.name,
-      description: candidatura.message || "Nova pousada parceira EcoSafari — perfil em preparação.",
+      description: candidatura.message || "Nova pousada parceira Ipantanal — perfil em preparação.",
       location: candidatura.location || "",
       pricePerNight: 0,
       images: [],
@@ -469,7 +469,7 @@ app.post("/api/candidaturas/:id/approve", requireAdmin, async (req, res) => {
       id: `at_${randomUUID()}`,
       type: candidatura.atracaoType === "restaurante" ? "restaurante" : "parada_legal",
       name: candidatura.atracaoName || candidatura.name,
-      description: candidatura.message || "Nova atração parceira EcoSafari — perfil em preparação.",
+      description: candidatura.message || "Nova atração parceira Ipantanal — perfil em preparação.",
       location: candidatura.location || "",
       images: [],
       rating: 0,

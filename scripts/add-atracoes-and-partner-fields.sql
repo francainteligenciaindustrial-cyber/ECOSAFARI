@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: ATRAÇÕES, PERFIL DE GUIA MAIS RICO E AVALIAÇÕES UNIFICADAS
+-- IPANTANAL: ATRAÇÕES, PERFIL DE GUIA MAIS RICO E AVALIAÇÕES UNIFICADAS
 -- Rode isso no SQL Editor do Supabase. Idempotente: seguro rodar mais de uma vez.
 --
 -- Cobre 3 melhorias:

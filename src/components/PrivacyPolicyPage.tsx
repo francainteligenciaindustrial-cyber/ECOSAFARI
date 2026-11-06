@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
       <p className="text-editorial-muted text-xs italic">Última atualização: julho de 2026. Este documento é um modelo de referência e deve ser revisado por um advogado antes de qualquer uso comercial definitivo.</p>
 
       <p>
-        A EcoSafari Brasil ("nós") respeita a privacidade de quem visita este site, reserva experiências, se cadastra como parceiro ou entra em contato conosco. Esta política explica quais dados coletamos, por que coletamos, e quais direitos você tem sobre eles, em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).
+        A Ipantanal ("nós") respeita a privacidade de quem visita este site, reserva experiências, se cadastra como parceiro ou entra em contato conosco. Esta política explica quais dados coletamos, por que coletamos, e quais direitos você tem sobre eles, em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).
       </p>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">1. Quais dados coletamos</h3>

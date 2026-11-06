@@ -43,7 +43,7 @@ interface DisplaySpecies {
   bestPousadaId: string;
   bestPousadaName: string;
   season?: SeasonLevel[];
-  // Avistamentos aprovados no app EcoSafari Go (Jan..Dez), quando há.
+  // Avistamentos aprovados no app Ipantanal Go (Jan..Dez), quando há.
   monthlyCounts?: number[];
   sightingsTotal?: number;
   seasonFromApp?: boolean;
@@ -102,7 +102,7 @@ export default function PousadaCatalog({
         };
       }), [species, pousadas, lang, t]);
 
-  // Dados reais do app EcoSafari Go: com amostra suficiente, o calendário
+  // Dados reais do app Ipantanal Go: com amostra suficiente, o calendário
   // passa a refletir os avistamentos aprovados, e a pousada indicada vira a
   // que mais registrou a espécie (vínculo feito pelo ID da pousada no app).
   const sightingStats = useSightingStats();
@@ -849,7 +849,7 @@ export default function PousadaCatalog({
             <h2 className="text-3xl md:text-5xl font-serif font-bold tracking-tight mb-6 text-balance text-white">
               {t("promo.title")} <br className="hidden md:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400">
-                EcoSafari Go
+                Ipantanal Go
               </span>
             </h2>
             <p className="text-zinc-300 text-xs md:text-sm leading-relaxed mb-8 font-light max-w-xl">

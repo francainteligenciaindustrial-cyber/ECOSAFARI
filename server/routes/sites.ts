@@ -248,7 +248,7 @@ app.post("/api/admin/pedidos-site/:id/logo-versoes", requireAdmin, async (req, r
     const { data: pousada } = await supabase.from("pousadas").select("name").eq("id", pedido.pousadaId).maybeSingle();
     await sendEmail({
       to: pedido.contatoEmail,
-      subject: `Sua logo está pronta para avaliação — ${pousada?.name || "EcoSafari"}`,
+      subject: `Sua logo está pronta para avaliação — ${pousada?.name || "Ipantanal"}`,
       html: emailBox("Sua logo está pronta para avaliação 🎨",
         `<p>Nosso designer preparou versões da logo da <strong>${escapeHtml(pousada?.name || "sua pousada")}</strong>.</p><p>Entre no portal, abra a pousada e vá em <strong>Editar Site</strong> para escolher uma versão — você pode deixar um comentário junto.</p>`,
         { href: `${SITE_URL}/parceiro`, label: "Avaliar a logo" }),

@@ -260,7 +260,7 @@ export default function App() {
 
   // Domínio próprio de pousada (ex.: pousadavagalume.com): a raiz mostra o
   // site oficial dela; qualquer outra página (reserva, conta, pagamento)
-  // continua no domínio principal do EcoSafari.
+  // continua no domínio principal do Ipantanal.
   if (customSite === undefined) {
     return <LazyFallback />;
   }
@@ -321,7 +321,7 @@ export default function App() {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-zinc-950 text-white">
           <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold animate-pulse">Carregando EcoSafari Go...</p>
+          <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold animate-pulse">Carregando Ipantanal Go...</p>
         </div>
       );
     }
@@ -357,7 +357,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary flex items-center gap-1">
-              EcoSafari<span className="text-zinc-400 not-italic">.</span>
+              Ipantanal<span className="text-zinc-400 not-italic">.</span>
             </h1>
           </div>
         </div>
@@ -580,7 +580,7 @@ export default function App() {
           {/* Logo and Status */}
           <div className="flex flex-col items-center md:items-start gap-4">
             <span className="font-serif font-bold text-lg tracking-normal capitalize text-white">
-              EcoSafari Brasil
+              Ipantanal
             </span>
           </div>
 
@@ -588,7 +588,7 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center gap-6 text-xs font-semibold">
             {/* Email */}
             <a
-              href="mailto:francainteligenciaindustrial@gmail.com?subject=Suporte%20EcoSafari&body=Olá%20equipe%20EcoSafari,%20gostaria%20de%20solicitar%20suporte%20para%20as%20expedições%20e%20reservas."
+              href="mailto:francainteligenciaindustrial@gmail.com?subject=Suporte%20Ipantanal&body=Olá%20equipe%20Ipantanal,%20gostaria%20de%20solicitar%20suporte%20para%20as%20expedições%20e%20reservas."
               className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
@@ -599,7 +599,7 @@ export default function App() {
 
             {/* WhatsApp */}
             <a
-              href="https://wa.me/5565999868334?text=Olá%20equipe%20EcoSafari,%20gostaria%20de%20solicitar%20suporte%20para%20as%20expedições%20e%20reservas."
+              href="https://wa.me/5565999868334?text=Olá%20equipe%20Ipantanal,%20gostaria%20de%20solicitar%20suporte%20para%20as%20expedições%20e%20reservas."
               className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
               target="_blank"
               rel="noopener noreferrer"
@@ -616,13 +616,13 @@ export default function App() {
               rel="noopener noreferrer"
             >
               <Instagram className="h-4 w-4" />
-              <span>@ECOSAFARI</span>
+              <span>@IPANTANAL</span>
             </a>
           </div>
 
           {/* Copyright */}
           <div className="text-center md:text-right text-[9px] text-[#FBF8F1]/60 font-bold">
-            <span className="block mb-1">© 2026 EcoSafari Brasil • WildStay Systems</span>
+            <span className="block mb-1">© 2026 Ipantanal • WildStay Systems</span>
             <span className="text-editorial-dark-muted font-normal italic font-serif tracking-normal capitalize text-xs block mt-1">
               {t("app.footer.tagline")}
             </span>
@@ -644,7 +644,7 @@ export default function App() {
             disclosure). Values come from VITE_COMPANY_CNPJ/VITE_COMPANY_ADDRESS
             (see .env.example) — set them before launch. */}
         <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#FBF8F1]/50 font-normal normal-case tracking-normal">
-          EcoSafari Brasil • CNPJ: {COMPANY_CNPJ} • {COMPANY_ADDRESS}
+          Ipantanal • CNPJ: {COMPANY_CNPJ} • {COMPANY_ADDRESS}
         </div>
       </footer>
 

@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /api/
 
-Sitemap: https://www.ecosafaribrasil.com.br/sitemap.xml
+Sitemap: https://ipantanal.com.br/sitemap.xml

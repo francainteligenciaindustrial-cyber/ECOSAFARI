@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: VENDA DE SITE OFICIAL PARA POUSADAS
+-- IPANTANAL: VENDA DE SITE OFICIAL PARA POUSADAS
 -- Rode no SQL Editor do Supabase. Pode rodar mais de uma vez.
 --
 -- O site oficial da pousada (/site/<slug> ou domínio próprio) deixa de ser

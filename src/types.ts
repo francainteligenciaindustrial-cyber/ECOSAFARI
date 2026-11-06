@@ -36,7 +36,7 @@ export interface Pousada {
   googleMapsUrl?: string;
   // Identidade visual própria do Site Oficial (/site/:slug) — cada pousada
   // pode ter sua própria logo + paleta de cores em vez de sempre herdar o
-  // verde/creme editorial padrão do EcoSafari. Quando ausentes, o Site
+  // verde/creme editorial padrão do Ipantanal. Quando ausentes, o Site
   // Oficial usa o tema padrão normalmente (nada muda pra quem não configura).
   logoUrl?: string;
   themeColorPrimary?: string; // hex — substitui o verde editorial nessa página
@@ -85,7 +85,7 @@ export interface Pousada {
   // uma trava dura em POST /api/bookings.
   unavailableDates?: string[];
   // Escolha do parceiro: "criar site manualmente" (usa o editor do portal +
-  // /site/:slug gerado pela EcoSafari) ou "já tenho meu próprio site" (o
+  // /site/:slug gerado pela Ipantanal) ou "já tenho meu próprio site" (o
   // link em ownWebsiteUrl). Quando hasOwnWebsite é true, "Ver site oficial"
   // no catálogo aponta pra ownWebsiteUrl em vez do /site/:slug gerado.
   hasOwnWebsite?: boolean;
@@ -105,13 +105,13 @@ export interface Pousada {
   // Domínio próprio que abre o site oficial da pousada (ex.:
   // pousadavagalume.com). Só o admin define — ver /api/sites/by-host.
   customDomain?: string;
-  // Site oficial criado pela equipe EcoSafari e no ar (só o admin muda).
+  // Site oficial criado pela equipe Ipantanal e no ar (só o admin muda).
   // Antes disso o portal mostra a oferta do serviço em vez do editor.
   sitePublicado?: boolean;
-  // UUID da mesma pousada no app EcoSafari Go (banco separado) — vínculo
+  // UUID da mesma pousada no app Ipantanal Go (banco separado) — vínculo
   // feito pelo admin, liga os avistamentos do app ao calendário e ao mapa.
   appLodgeId?: string;
-  // Receita: comissão da EcoSafari (% — vazio = padrão da plataforma) e
+  // Receita: comissão da Ipantanal (% — vazio = padrão da plataforma) e
   // plano da pousada (básico gratuito × gestão pago). Só o admin muda.
   commissionPct?: number | null;
   plano?: 'basico' | 'gestao';

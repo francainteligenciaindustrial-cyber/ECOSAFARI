@@ -54,7 +54,7 @@ app.get("/api/pousadas/:id/email-remetente", requirePartnerAccess("pousada"), as
   if (!data) return res.status(404).json({ error: "Pousada não encontrada" });
   const { from, replyTo } = await remetenteDaPousada(req.params.id);
   const own = String(data.emailRemetente || "").trim();
-  // Domínio próprio: consulta o Resend. Padrão (via EcoSafari): o domínio da
+  // Domínio próprio: consulta o Resend. Padrão (via Ipantanal): o domínio da
   // plataforma é o que precisa estar verificado.
   const { status } = await statusDominioRemetente(own || parseFromHeader(EMAIL_FROM).address);
   res.json({ from, replyTo: replyTo || null, ownDomain: !!own, status });

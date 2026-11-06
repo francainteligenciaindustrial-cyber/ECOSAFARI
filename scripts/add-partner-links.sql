@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: MÚLTIPLAS PROPRIEDADES POR LOGIN DE PARCEIRO
+-- IPANTANAL: MÚLTIPLAS PROPRIEDADES POR LOGIN DE PARCEIRO
 -- Rode isso no SQL Editor do Supabase.
 --
 -- Até agora, 1 login de parceiro = 1 pousada/atração/guia (guardado em

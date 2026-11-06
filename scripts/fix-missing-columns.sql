@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: COLUNAS FALTANTES
+-- IPANTANAL: COLUNAS FALTANTES
 -- Essas colunas foram adicionadas ao código em turnos recentes, mas o ALTER
 -- TABLE correspondente nunca chegou a rodar no seu banco Supabase de verdade
 -- (eu só tinha atualizado o texto do script /api/supabase/sql, não bastava).

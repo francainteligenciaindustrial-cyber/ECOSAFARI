@@ -1,4 +1,4 @@
-// Avistamentos reais do app EcoSafari Go (agregados, sem dado pessoal) →
+// Avistamentos reais do app Ipantanal Go (agregados, sem dado pessoal) →
 // formato usado pelo calendário de melhor época e pelo mapa do site.
 // Ver scripts/app-ecosafari-go/estatisticas-publicas.sql (lado do app).
 import type { SeasonLevel } from "../data/wildSpecies";

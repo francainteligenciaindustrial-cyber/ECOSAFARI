@@ -20,7 +20,7 @@ const btn = "inline-flex items-center justify-center gap-2 text-[11px] uppercase
 //    estabelecimento — melhor que um pino chutado);
 //  - nada conhecido: só os botões pelo nome.
 // Também: aeroporto mais próximo e, o que o Google não tem, os animais
-// avistados por perto no app EcoSafari Go.
+// avistados por perto no app Ipantanal Go.
 export default function PousadaLocation({ pousada }: { pousada: Pousada }) {
   const { t } = useI18n();
   const stats = useSightingStats();

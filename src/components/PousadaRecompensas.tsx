@@ -10,7 +10,7 @@ interface Props {
 }
 
 // Vitrine de recompensas trocáveis por Jaguars — os mesmos Jaguars ganhos no
-// aplicativo EcoSafari por foto de avistamento aprovada, aqui viram desconto
+// aplicativo Ipantanal por foto de avistamento aprovada, aqui viram desconto
 // direto com a pousada.
 export default function PousadaRecompensas({ pousadaId }: Props) {
   const { isTourist, profile } = useTouristSession();
@@ -60,8 +60,8 @@ export default function PousadaRecompensas({ pousadaId }: Props) {
       </h2>
       <p className="text-editorial-muted text-xs mb-6">
         {isTourist
-          ? <>Seus Jaguars do aplicativo EcoSafari — você tem <span className="font-bold text-editorial-primary">{coins}</span>.</>
-          : "Entre com seu perfil de turista para resgatar com os Jaguars que você ganhou no aplicativo EcoSafari."}
+          ? <>Seus Jaguars do aplicativo Ipantanal — você tem <span className="font-bold text-editorial-primary">{coins}</span>.</>
+          : "Entre com seu perfil de turista para resgatar com os Jaguars que você ganhou no aplicativo Ipantanal."}
       </p>
 
       {error && <p className="text-red-600 text-xs font-medium mb-4">{error}</p>}

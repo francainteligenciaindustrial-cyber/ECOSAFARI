@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: SERVIÇO DE CRIAÇÃO DE LOGO (antes do site)
+-- IPANTANAL: SERVIÇO DE CRIAÇÃO DE LOGO (antes do site)
 -- Rode no SQL Editor do Supabase DEPOIS de scripts/add-pedidos-site.sql.
 -- Pode rodar mais de uma vez.
 --

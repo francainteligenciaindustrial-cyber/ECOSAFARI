@@ -142,7 +142,7 @@ export default function MobileSimulator({
       {/* Top App Header */}
       <div className="bg-zinc-900 px-4 py-3 flex justify-between items-center border-b border-zinc-800">
         <span className="font-extrabold text-sm text-emerald-400 tracking-tight flex items-center gap-1">
-          <Compass className="h-4.5 w-4.5 animate-spin" /> EcoSafari Go
+          <Compass className="h-4.5 w-4.5 animate-spin" /> Ipantanal Go
         </span>
         <button aria-label="Notificações"
           onClick={() => setActiveScreen("alerts")}
@@ -267,7 +267,7 @@ export default function MobileSimulator({
             {activeScreen === "alerts" && (
               <div className="space-y-4">
                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest block mb-1">Alertas Ecológicos (Push)</span>
-                <p className="text-[10px] text-zinc-400 leading-relaxed mb-4">Avisos e localizações de fauna silvestre reportados por guias e biólogos EcoSafari.</p>
+                <p className="text-[10px] text-zinc-400 leading-relaxed mb-4">Avisos e localizações de fauna silvestre reportados por guias e biólogos Ipantanal.</p>
                 
                 <div className="space-y-3">
                   {simulatedAlerts.map(alert => (

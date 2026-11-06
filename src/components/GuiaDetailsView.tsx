@@ -35,7 +35,7 @@ export default function GuiaDetailsView({ id }: { id: string }) {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-editorial-bg text-center px-6">
         <h1 className="text-2xl font-serif font-bold text-editorial-primary">Guia não encontrado</h1>
         <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-editorial-primary hover:opacity-80 transition cursor-pointer">
-          <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo EcoSafari
+          <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo Ipantanal
         </a>
       </div>
     );
@@ -44,7 +44,7 @@ export default function GuiaDetailsView({ id }: { id: string }) {
   const todayISO = new Date().toISOString().split("T")[0];
   const upcomingUnavailable = (guia.unavailableDates || []).filter(d => d >= todayISO).sort().slice(0, 8);
 
-  const whatsappMessage = `Olá! Vi o perfil do guia ${guia.name} na EcoSafari e gostaria de saber mais sobre expedições com ele(a).`;
+  const whatsappMessage = `Olá! Vi o perfil do guia ${guia.name} na Ipantanal e gostaria de saber mais sobre expedições com ele(a).`;
   const whatsappLink = `https://wa.me/${AGENCY_WHATSAPP_NUMBER}?text=${encodeURIComponent(whatsappMessage)}`;
 
   return (
@@ -52,7 +52,7 @@ export default function GuiaDetailsView({ id }: { id: string }) {
       <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white/70 backdrop-blur-sm sticky top-0 z-20">
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2 cursor-pointer">
           <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center"><Compass className="h-4 w-4" /></div>
-          <span className="font-serif italic font-bold text-editorial-primary">EcoSafari<span className="text-zinc-400 not-italic">.</span></span>
+          <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
         </a>
         <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="hidden sm:flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition">
           <MessageSquare className="h-3.5 w-3.5" /> Fale Conosco
@@ -169,7 +169,7 @@ export default function GuiaDetailsView({ id }: { id: string }) {
       </section>
 
       <footer className="py-8 text-center text-editorial-muted text-[10px] uppercase tracking-widest font-bold">
-        <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="hover:text-editorial-primary transition cursor-pointer">Listado no catálogo EcoSafari Brasil →</a>
+        <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="hover:text-editorial-primary transition cursor-pointer">Listado no catálogo Ipantanal →</a>
       </footer>
     </div>
   );

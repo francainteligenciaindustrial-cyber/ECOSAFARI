@@ -412,7 +412,7 @@ export default function AdminDashboard({
               <fieldset className="border border-zinc-200 rounded-lg p-3 space-y-2 text-xs">
                 <legend className="px-1 font-semibold text-zinc-700">E-mails de reserva ao hóspede</legend>
                 <p className="text-[11px] text-zinc-500">
-                  Padrão: saem do domínio do EcoSafari como "{editPousadaForm.name || "Pousada"} via EcoSafari", e as respostas vão para o e-mail de contato abaixo.
+                  Padrão: saem do domínio do Ipantanal como "{editPousadaForm.name || "Pousada"} via Ipantanal", e as respostas vão para o e-mail de contato abaixo.
                 </p>
                 <div>
                   <label htmlFor="remetente-contato" className="block text-zinc-700 font-semibold mb-1">E-mail para respostas dos hóspedes</label>
@@ -480,7 +480,7 @@ export default function AdminDashboard({
                   className="w-full bg-zinc-50 border border-zinc-200 rounded-lg p-2.5 focus:outline-none focus:border-emerald-500"
                 />
                 <p className="text-[11px] text-zinc-500">
-                  Só o endereço, sem http nem www. O domínio passa a abrir o site oficial desta pousada; reserva, cadastro e pagamento continuam no EcoSafari. Antes, adicione o domínio na Vercel (Settings → Domains) e aponte o DNS — passo a passo no RUNBOOK.md.
+                  Só o endereço, sem http nem www. O domínio passa a abrir o site oficial desta pousada; reserva, cadastro e pagamento continuam no Ipantanal. Antes, adicione o domínio na Vercel (Settings → Domains) e aponte o DNS — passo a passo no RUNBOOK.md.
                 </p>
               </fieldset>
 
@@ -663,7 +663,7 @@ export default function AdminDashboard({
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-200 pb-5">
           <div>
             <h1 className="text-xl font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-editorial-primary" /> Painel de Controle EcoSafari
+              <Building2 className="h-5 w-5 text-editorial-primary" /> Painel de Controle Ipantanal
             </h1>
             <p className="text-zinc-500 text-xs mt-1">Gestão de pousadas parceiras, guias turísticos, alocação de equipe e agenda de reservas.</p>
           </div>

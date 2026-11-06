@@ -1,8 +1,8 @@
--- ECOSAFARI BRASIL: RECEITA, CONFIANÇA E CRESCIMENTO
+-- IPANTANAL: RECEITA, CONFIANÇA E CRESCIMENTO
 -- Rode no SQL Editor do Supabase DO SITE. Pode rodar mais de uma vez.
 
 -- 1) Receita -------------------------------------------------------------
--- Comissão da EcoSafari por pousada (NULL = padrão da plataforma, variável
+-- Comissão da Ipantanal por pousada (NULL = padrão da plataforma, variável
 -- COMISSAO_PADRAO_PCT na Vercel).
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "commissionPct" NUMERIC CHECK ("commissionPct" IS NULL OR ("commissionPct" >= 0 AND "commissionPct" <= 50));
 
@@ -58,7 +58,7 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "verifiedStay" BOOLEAN NOT NULL DEF
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "bookingId" TEXT;
 
 -- 5) Conservação: % de cada reserva destinado a um projeto ambiental (sai da
---    comissão da EcoSafari). NULL = padrão (CONSERVACAO_PADRAO_PCT).
+--    comissão da Ipantanal). NULL = padrão (CONSERVACAO_PADRAO_PCT).
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "conservationPct" NUMERIC CHECK ("conservationPct" IS NULL OR ("conservationPct" >= 0 AND "conservationPct" <= 20));
 ALTER TABLE pousadas ADD COLUMN IF NOT EXISTS "conservationPartner" TEXT;
 

@@ -30,8 +30,8 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
   }, []);
 
   const whatsappMessage = pousada
-    ? `Olá! Vim do site da EcoSafari Brasil e tenho interesse na ${pousada.name}.`
-    : "Olá! Vim do site da EcoSafari Brasil e gostaria de mais informações.";
+    ? `Olá! Vim do site da Ipantanal e tenho interesse na ${pousada.name}.`
+    : "Olá! Vim do site da Ipantanal e gostaria de mais informações.";
 
   return (
     <div id="whatsapp-gate-page" className="bg-editorial-primary min-h-screen text-[#FBF8F1] py-10 font-sans">
@@ -57,7 +57,7 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
           {video.kind === "iframe" ? (
             <iframe
               src={video.src}
-              title={`Vídeo de apresentação — ${pousada?.name || "EcoSafari"}`}
+              title={`Vídeo de apresentação — ${pousada?.name || "Ipantanal"}`}
               className="w-full h-full"
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
@@ -78,7 +78,7 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
           {video.kind === "file" && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 flex flex-col justify-between p-6 pointer-events-none">
             <div>
-              <h2 className="font-serif font-bold text-lg tracking-tight">Expedições EcoSafari Brasil</h2>
+              <h2 className="font-serif font-bold text-lg tracking-tight">Expedições Ipantanal</h2>
               {pousada && (
                 <p className="text-zinc-300 text-xs flex items-center gap-1 mt-0.5">
                   <MapPin className="h-3 w-3 text-[#FBF8F1]" /> {pousada.name}

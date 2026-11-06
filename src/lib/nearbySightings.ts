@@ -1,5 +1,5 @@
 // "Quais animais são mais vistos perto de cada pousada" — base do mapa do
-// site. Junta duas fontes de avistamentos aprovados do app EcoSafari Go:
+// site. Junta duas fontes de avistamentos aprovados do app Ipantanal Go:
 //  1. registros vinculados à pousada pelo ID (appLodgeId → pousadaCounts);
 //  2. pontos com coordenadas a até RADIUS_KM da pousada (só quando a
 //     posição da pousada é exata — posição aproximada pela cidade não serve

@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: CATÁLOGO DE PRODUTOS E CONSUMO DO HÓSPEDE
+-- IPANTANAL: CATÁLOGO DE PRODUTOS E CONSUMO DO HÓSPEDE
 -- Rode isso no SQL Editor do Supabase.
 --
 -- produtos: itens vendáveis cadastrados por cada pousada (frigobar,

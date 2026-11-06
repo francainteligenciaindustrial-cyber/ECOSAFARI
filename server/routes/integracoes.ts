@@ -60,7 +60,7 @@ app.post("/api/pousadas/:id/google-calendar", requireAdmin, async (req, res) => 
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
     const created = await calendar.calendars.insert({
-      requestBody: { summary: `EcoSafari — ${pousadaRow.name}`, timeZone: "America/Cuiaba" },
+      requestBody: { summary: `Ipantanal — ${pousadaRow.name}`, timeZone: "America/Cuiaba" },
     });
     const googleCalendarId = created.data.id;
     if (!googleCalendarId) {
@@ -299,7 +299,7 @@ app.post("/api/integrity/purge-fake-data", requireAdmin, async (req, res) => {
 // convenience URL), so it was pure information disclosure to anyone who
 // guessed the path.
 app.get("/api/supabase/sql", requireAdmin, (req, res) => {
-  const sql = `-- ECOSAFARI BRASIL: COPIE E COLE ESTE SCRIPT NO EDITOR SQL DO SEU PAINEL SUPABASE PARA CRIAR AS TABELAS E POLÍTICAS DE SEGURANÇA (RLS)
+  const sql = `-- IPANTANAL: COPIE E COLE ESTE SCRIPT NO EDITOR SQL DO SEU PAINEL SUPABASE PARA CRIAR AS TABELAS E POLÍTICAS DE SEGURANÇA (RLS)
 
 -- 1. TABELA DE POUSADAS
 CREATE TABLE IF NOT EXISTS pousadas (
@@ -715,7 +715,7 @@ app.post("/api/chat", chatLimiter, async (req, res) => {
   // agency using only public catalog data, and always steers anything about
   // an actual booking/payment/personal request to the real agency WhatsApp.
   const [pousadasContext, guidesContext] = await Promise.all([getPousadasContext(), getGuidesContext()]);
-  const systemInstruction = `Você é a "Sofia", assistente de suporte do site da agência de turismo ecológico "EcoSafari Brasil".
+  const systemInstruction = `Você é a "Sofia", assistente de suporte do site da agência de turismo ecológico "Ipantanal".
 Seu papel é responder dúvidas PÚBLICAS sobre o site, as pousadas parceiras e os guias disponíveis: localizações, preços de diária, experiências e atividades disponíveis, estrutura das pousadas, dúvidas gerais de viagem (documentação, vacinas, o que levar, melhor época para avistamentos), e qual guia combina melhor com o que o visitante procura.
 
 Catálogo público de pousadas parceiras:
@@ -758,7 +758,7 @@ Regras importantes:
 
   // Fallback (no Gemini key configured, or the call failed): a simple canned
   // reply that always points to the real WhatsApp for anything beyond public info.
-  const reply = `Olá! 🌿 Sou a Sofia, assistente de suporte da EcoSafari Brasil. Posso ajudar com dúvidas gerais sobre nossas pousadas parceiras e experiências.\n\nPara reservas, pagamentos ou qualquer atendimento personalizado, fale direto com nossa equipe no WhatsApp oficial: *${AGENCY_WHATSAPP}* 😊`;
+  const reply = `Olá! 🌿 Sou a Sofia, assistente de suporte da Ipantanal. Posso ajudar com dúvidas gerais sobre nossas pousadas parceiras e experiências.\n\nPara reservas, pagamentos ou qualquer atendimento personalizado, fale direto com nossa equipe no WhatsApp oficial: *${AGENCY_WHATSAPP}* 😊`;
 
   res.json({ reply });
 });

@@ -1,4 +1,4 @@
-# Runbook — EcoSafari Brasil
+# Runbook — Ipantanal
 
 Documento operacional: o que fazer quando algo dá errado em produção. Não é
 documentação de arquitetura (isso está espalhado em comentários no código,
@@ -98,7 +98,7 @@ cadastro e pagamento continuam no domínio principal (`SITE_URL`).
    Não mexa nos registros de e-mail (`send`, `rsend`, `resend._domainkey`).
 4. Gestão → Pousadas → Editar → "Domínio próprio do site oficial":
    `pousadavagalume.com`.
-5. `SITE_URL` na Vercel precisa ser o domínio principal do EcoSafari (hoje
+5. `SITE_URL` na Vercel precisa ser o domínio principal do Ipantanal (hoje
    `https://ecosafari.vercel.app`) — é para onde o botão Reservar leva.
 
 ## 10. Backup e recuperação de dados

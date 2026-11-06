@@ -175,7 +175,7 @@ export default function PartnerSignupPage() {
     const applicantName = type === "pousada" ? (pousadaForm.pousadaName || pousadaForm.name) : type === "atracao" ? (atracaoForm.atracaoName || atracaoForm.name) : guiaForm.name;
     const typeLabel = type === "guia" ? "guia turístico" : type === "pousada" ? "pousada" : "atração";
     const waMessage = encodeURIComponent(
-      `Olá! Acabei de me cadastrar como ${typeLabel} parceira no site da EcoSafari Brasil (${applicantName}). Gostaria de conversar sobre os próximos passos.`
+      `Olá! Acabei de me cadastrar como ${typeLabel} parceira no site da Ipantanal (${applicantName}). Gostaria de conversar sobre os próximos passos.`
     );
 
     return (
@@ -184,7 +184,7 @@ export default function PartnerSignupPage() {
           <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
           <h1 className="text-2xl font-serif font-bold text-editorial-primary mb-2">Cadastro recebido!</h1>
           <p className="text-editorial-muted text-sm mb-6">
-            Obrigado pelo interesse em fazer parte da EcoSafari Brasil. Nossa equipe vai analisar suas informações e entrar em contato em breve.
+            Obrigado pelo interesse em fazer parte da Ipantanal. Nossa equipe vai analisar suas informações e entrar em contato em breve.
           </p>
 
           {statusLink && (
@@ -248,7 +248,7 @@ export default function PartnerSignupPage() {
               <Compass className="h-5 w-5" />
             </div>
             <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary">
-              EcoSafari<span className="text-zinc-400 not-italic">.</span>
+              Ipantanal<span className="text-zinc-400 not-italic">.</span>
             </h1>
           </a>
         </header>
@@ -259,7 +259,7 @@ export default function PartnerSignupPage() {
             Cadastre-se para prestar serviços conosco
           </h2>
           <p className="text-white/80 text-sm mb-8 leading-relaxed">
-            Você é guia turístico, representa uma pousada ou uma atração (restaurante, parada legal) e quer fazer parte da rede EcoSafari Brasil? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
+            Você é guia turístico, representa uma pousada ou uma atração (restaurante, parada legal) e quer fazer parte da rede Ipantanal? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
           </p>
 
         {/* Why partner with us — cold traffic from an ad needs the "what's
@@ -268,7 +268,7 @@ export default function PartnerSignupPage() {
           <div className="bg-white border border-editorial-border rounded-lg p-4">
             <Wallet className="h-5 w-5 text-editorial-primary mb-2" />
             <p className="text-xs font-bold text-editorial-text mb-1">Sem custo de adesão</p>
-            <p className="text-[11px] text-editorial-muted leading-relaxed">Cadastro e participação na rede EcoSafari são 100% gratuitos.</p>
+            <p className="text-[11px] text-editorial-muted leading-relaxed">Cadastro e participação na rede Ipantanal são 100% gratuitos.</p>
           </div>
           <div className="bg-white border border-editorial-border rounded-lg p-4">
             <Sparkles className="h-5 w-5 text-editorial-primary mb-2" />

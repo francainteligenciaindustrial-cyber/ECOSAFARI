@@ -1,4 +1,4 @@
--- ECOSAFARI BRASIL: TABELA DE ORIGEM DOS VISITANTES
+-- IPANTANAL: TABELA DE ORIGEM DOS VISITANTES
 -- Guarda as respostas da pesquisa "como você chegou até nós?" mostrada no
 -- primeiro acesso do site. Rode isso no SQL Editor do Supabase:
 
