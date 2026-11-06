@@ -6,12 +6,15 @@ export function normalizeHost(host: string): string {
   return host.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "").replace(/^www\./, "");
 }
 
-// Domínios da própria plataforma. VITE_PLATFORM_HOSTS (separados por
-// vírgula) acrescenta o domínio definitivo do EcoSafari quando existir.
+// Domínios da própria plataforma (o portal, não o site de uma pousada).
+// ipantanal.com.br é o oficial; ipantanal.com redireciona para ele.
+// VITE_PLATFORM_HOSTS (separados por vírgula) acrescenta outros sem deploy de código.
+export const PLATFORM_DOMAINS = ["ipantanal.com.br", "ipantanal.com", "ecosafaribrasil.com.br"];
+
 export function isPlatformHost(hostname: string, extra: string = ""): boolean {
   const host = normalizeHost(hostname);
   if (!host || host === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.endsWith(".vercel.app")) return true;
-  const configured = ["ecosafaribrasil.com.br", ...extra.split(",")].map(normalizeHost).filter(Boolean);
+  const configured = [...PLATFORM_DOMAINS, ...extra.split(",")].map(normalizeHost).filter(Boolean);
   return configured.includes(host);
 }
 

@@ -8,6 +8,11 @@ describe("domínio próprio de pousada", () => {
   });
   it("reconhece os hosts da plataforma", () => {
     expect(isPlatformHost("ecosafari.vercel.app")).toBe(true);
+    // Domínio oficial (com e sem www) nunca é tratado como site de pousada.
+    expect(isPlatformHost("ipantanal.com.br")).toBe(true);
+    expect(isPlatformHost("www.ipantanal.com.br")).toBe(true);
+    expect(isPlatformHost("ipantanal.com")).toBe(true);
+    expect(isValidCustomDomain("ipantanal.com.br")).toBe(false);
     expect(isPlatformHost("localhost")).toBe(true);
     expect(isPlatformHost("www.ecosafaribrasil.com.br")).toBe(true);
     expect(isPlatformHost("app.outro.com", "app.outro.com")).toBe(true);
