@@ -1750,7 +1750,7 @@ export async function enviarLembreteCancelamento(booking: Booking, dias: number)
       subject: `Faltam ${dias} dias para a expedição de ${booking.customerName} — Ipantanal`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #101B4C;">Sua expedição está chegando 🐆</h2>
+          <h2 style="color: #0B1412;">Sua expedição está chegando 🐆</h2>
           <p>Olá, ${escapeHtml(dest.name)}! Faltam <strong>${dias} dias</strong> para a reserva de <strong>${escapeHtml(booking.customerName)}</strong> (${booking.checkIn} a ${booking.checkOut}).</p>
           <p>Se precisar cancelar a partir de agora, a política de cancelamento se aplica: <strong>${consequencia}</strong>.</p>
           <p style="color: #888; font-size: 12px;">Cancelamentos com 45 dias ou mais de antecedência não têm nenhuma penalidade.</p>
@@ -2007,10 +2007,10 @@ export async function enviarPedidoAvaliacao(booking: Booking): Promise<boolean> 
     subject: `Como foi sua estadia na ${booking.pousadaName}? — Ipantanal`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #101B4C;">Obrigado por viajar com a gente, ${primeiroNome}! 🌿</h2>
+        <h2 style="color: #0B1412;">Obrigado por viajar com a gente, ${primeiroNome}! 🌿</h2>
         <p>Esperamos que a estadia na <strong>${escapeHtml(booking.pousadaName)}</strong> tenha sido inesquecível.</p>
         <p>Leva um minuto: sua avaliação ajuda outros viajantes a escolher e ajuda a pousada a melhorar.</p>
-        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:12px 22px; text-decoration:none; border-radius:4px;">Avaliar minha estadia</a></p>
+        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:12px 22px; text-decoration:none; border-radius:4px;">Avaliar minha estadia</a></p>
         <p style="color:#888; font-size:12px;">Thank you for traveling with Ipantanal! Tap the button above to rate your stay.</p>
       </div>
     `,
@@ -2170,11 +2170,11 @@ export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fillColor("#101B4C").fontSize(22).text("Ipantanal", { align: "left" });
+    doc.fillColor("#0B1412").fontSize(22).text("Ipantanal", { align: "left" });
     doc.fillColor("#666").fontSize(10).text("Voucher de Reserva Confirmada", { align: "left" });
     doc.moveDown(1.5);
 
-    doc.strokeColor("#101B4C").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.strokeColor("#0B1412").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(1);
 
     doc.fillColor("#111").fontSize(14).text(`Reserva #${booking.id}`, { underline: false });
@@ -2196,10 +2196,10 @@ export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
     row("Status:", "Pagamento confirmado");
 
     doc.moveDown(1);
-    doc.strokeColor("#101B4C").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.strokeColor("#0B1412").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(1);
 
-    doc.fontSize(14).fillColor("#101B4C").text(`Total pago: R$ ${booking.totalPrice.toLocaleString('pt-BR')}`);
+    doc.fontSize(14).fillColor("#0B1412").text(`Total pago: R$ ${booking.totalPrice.toLocaleString('pt-BR')}`);
     doc.moveDown(1.5);
 
     doc.fontSize(9).fillColor("#888").text(
@@ -2222,7 +2222,7 @@ export async function sendBookingConfirmationEmail(booking: Booking) {
     subject: `Reserva confirmada — ${booking.pousadaName} (#${booking.id})`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #101B4C;">Pagamento confirmado! 🌿</h2>
+        <h2 style="color: #0B1412;">Pagamento confirmado! 🌿</h2>
         <p>Olá, ${escapeHtml(booking.customerName)}! Sua reserva na <strong>${escapeHtml(booking.pousadaName)}</strong> está confirmada.</p>
         <p><strong>Check-in:</strong> ${booking.checkIn}<br/>
         <strong>Check-out:</strong> ${booking.checkOut}<br/>
@@ -2561,9 +2561,9 @@ export async function provisionPartnerLogin(
         subject: "Seu acesso de parceiro Ipantanal",
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #101B4C;">Bem-vindo(a) à Ipantanal! 🌿</h2>
+            <h2 style="color: #0B1412;">Bem-vindo(a) à Ipantanal! 🌿</h2>
             <p>Seu acesso ao portal do parceiro foi criado. Clique no link abaixo para definir sua senha e acessar seu perfil:</p>
-            <p><a href="${actionLink}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
+            <p><a href="${actionLink}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
             <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${actionLink}</p>
           </div>
         `,

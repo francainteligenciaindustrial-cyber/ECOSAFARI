@@ -192,7 +192,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
               fetchPriority="high"
               className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
             />
-            <div className="absolute bottom-4 left-4 bg-editorial-primary/95 text-[#FBF8F1] text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-none font-bold">
+            <div className="absolute bottom-4 left-4 bg-editorial-primary/95 text-[#F4F6F5] text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-none font-bold">
               {t("details.mainView")}
             </div>
             {images.length > 1 && (

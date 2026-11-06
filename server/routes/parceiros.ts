@@ -770,9 +770,9 @@ app.post("/api/colaboradores/signup", publicFormLimiter, async (req, res) => {
         subject: `Novo colaborador aguardando aprovação — ${pousada.name}`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #101B4C;">Novo cadastro de colaborador</h2>
+            <h2 style="color: #0B1412;">Novo cadastro de colaborador</h2>
             <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(services.join(", "))}) quer trabalhar com a <strong>${escapeHtml(pousada.name)}</strong>.</p>
-            <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Analisar no portal</a></p>
+            <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Analisar no portal</a></p>
           </div>
         `,
       });
@@ -827,9 +827,9 @@ app.post("/api/pousadas/:id/colaboradores/:colabId/decisao", requirePartnerAcces
     subject: approved ? `Cadastro aprovado — ${pousadaName}` : `Sobre seu cadastro — ${pousadaName}`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #101B4C;">${approved ? "Cadastro aprovado! 🌿" : "Sobre seu cadastro"}</h2>
+        <h2 style="color: #0B1412;">${approved ? "Cadastro aprovado! 🌿" : "Sobre seu cadastro"}</h2>
         <p>${escapeHtml(message.replace(` Acesse com seu email e senha: ${SITE_URL}/parceiro`, ""))}</p>
-        ${approved ? `<p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Entrar no sistema</a></p>` : ""}
+        ${approved ? `<p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Entrar no sistema</a></p>` : ""}
       </div>
     `,
   });

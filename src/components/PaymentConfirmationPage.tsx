@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Compass, CheckCircle2, XCircle, LoaderCircle, Download, MessageSquare, ArrowLeft } from "lucide-react";
 import { Booking } from "../types";
 import { navigate } from "../lib/router";
+import BrandLogo from "./BrandLogo";
 
 const WHATSAPP_NUMBER = "5565999868334";
 
@@ -42,11 +43,8 @@ export default function PaymentConfirmationPage() {
     <div className="min-h-screen bg-editorial-bg font-sans text-editorial-text">
       <header className="h-20 bg-editorial-bg border-b border-editorial-border flex items-center px-6 md:px-10">
         <a href="/" onClick={(e) => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-3 cursor-pointer">
-          <div className="bg-editorial-primary p-2 rounded-lg text-white shadow-sm flex items-center justify-center">
-            <Compass className="h-5 w-5" />
-          </div>
-          <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary">
-            Ipantanal<span className="text-zinc-400 not-italic">.</span>
+          <h1 className="flex items-center">
+            <BrandLogo />
           </h1>
         </a>
       </header>

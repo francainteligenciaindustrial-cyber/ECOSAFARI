@@ -20,6 +20,7 @@ import { useI18n } from "./i18n/I18nProvider";
 import InstallPrompt from "./components/InstallPrompt";
 import { useCustomSite } from "./lib/useCustomSite";
 import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./types";
+import BrandLogo from "./components/BrandLogo";
 
 // Code-split: AdminDashboard (~2000 lines) is dead weight in the bundle for
 // the ~99% of visitors who never touch /admin, and MobileSimulator is a
@@ -352,12 +353,9 @@ export default function App() {
         
         {/* Brand logo */}
         <div className="flex items-center gap-3">
-          <div className="bg-editorial-primary p-2 rounded-lg text-white shadow-sm flex items-center justify-center">
-            <Compass className="h-5 w-5" />
-          </div>
           <div>
-            <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary flex items-center gap-1">
-              Ipantanal<span className="text-zinc-400 not-italic">.</span>
+            <h1 className="flex items-center">
+              <BrandLogo />
             </h1>
           </div>
         </div>
@@ -574,7 +572,7 @@ export default function App() {
       </main>
 
       {/* Footer (Editorial Aesthetic style) */}
-      <footer className="arara-edge-top arara-stripes bg-editorial-primary text-[#FBF8F1] py-12 px-6 md:px-10 text-[10px] uppercase tracking-widest font-sans">
+      <footer className="arara-edge-top arara-stripes bg-editorial-primary text-[#F4F6F5] py-12 px-6 md:px-10 text-[10px] uppercase tracking-widest font-sans">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
           
           {/* Logo and Status */}
@@ -621,7 +619,7 @@ export default function App() {
           </div>
 
           {/* Copyright */}
-          <div className="text-center md:text-right text-[9px] text-[#FBF8F1]/60 font-bold">
+          <div className="text-center md:text-right text-[9px] text-[#F4F6F5]/60 font-bold">
             <span className="block mb-1">© 2026 Ipantanal • WildStay Systems</span>
             <span className="text-editorial-dark-muted font-normal italic font-serif tracking-normal capitalize text-xs block mt-1">
               {t("app.footer.tagline")}
@@ -631,7 +629,7 @@ export default function App() {
         </div>
 
         {/* Institutional links */}
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-white/10 text-[9px] text-[#FBF8F1]/70 font-bold">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-white/10 text-[9px] text-[#F4F6F5]/70 font-bold">
           <a href="/sobre" onClick={(e) => { e.preventDefault(); navigate("/sobre"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.about")}</a>
           <a href="/faq" onClick={(e) => { e.preventDefault(); navigate("/faq"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.faq")}</a>
           <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.privacy")}</a>
@@ -643,7 +641,7 @@ export default function App() {
             site to look legitimate (and for LGPD's data-controller
             disclosure). Values come from VITE_COMPANY_CNPJ/VITE_COMPANY_ADDRESS
             (see .env.example) — set them before launch. */}
-        <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#FBF8F1]/50 font-normal normal-case tracking-normal">
+        <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#F4F6F5]/50 font-normal normal-case tracking-normal">
           Ipantanal • CNPJ: {COMPANY_CNPJ} • {COMPANY_ADDRESS}
         </div>
       </footer>

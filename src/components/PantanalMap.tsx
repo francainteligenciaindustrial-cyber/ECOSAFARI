@@ -22,7 +22,7 @@ interface Props {
   linkedSpecies?: LinkedSpecies[];
 }
 
-const COLORS = { pousada: "#101B4C", atracao: "#F28C00", species: "#3F8A2E", app: "#1580B5" };
+const COLORS = { pousada: "#0B1412", atracao: "#F28C00", species: "#3F8A2E", app: "#1580B5" };
 
 const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 // Mesma espécie? Pelos apelidos conhecidos (src/data/wildSpecies.ts) ou pelo nome.
@@ -62,7 +62,7 @@ function popupContent(title: string, subtitle: string, opts: { action?: { label:
   box.style.minWidth = "180px";
   const h = document.createElement("strong");
   h.textContent = title;
-  h.style.cssText = "display:block;font-family:'Playfair Display',Georgia,serif;color:#101B4C;font-size:14px";
+  h.style.cssText = "display:block;font-family:'Space Grotesk',Inter,sans-serif;color:#0B1412;font-size:14px";
   const p = document.createElement("span");
   p.textContent = subtitle;
   p.style.cssText = "display:block;font-size:11px;color:#5E6670;margin-top:2px";
@@ -98,7 +98,7 @@ function popupContent(title: string, subtitle: string, opts: { action?: { label:
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = opts.action.label;
-    b.style.cssText = "margin-top:8px;background:#101B4C;color:#fff;border:0;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;cursor:pointer";
+    b.style.cssText = "margin-top:8px;background:#0B1412;color:#fff;border:0;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;cursor:pointer";
     b.addEventListener("click", opts.action.onClick);
     box.append(b);
   }

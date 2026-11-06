@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Compass, Users, Building2, MapPin, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet, ChefHat, LoaderCircle, Ship, Palette, Wrench } from "lucide-react";
 import { trackMetaEvent } from "../lib/metaPixel";
+import BrandLogo from "./BrandLogo";
 
 const WHATSAPP_NUMBER = "5565999868334";
 const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
@@ -269,11 +270,8 @@ export default function PartnerSignupPage() {
       <div className="relative z-10">
         <header className="h-20 bg-editorial-bg border-b border-editorial-border flex items-center px-6 md:px-10">
           <a href="/" className="flex items-center gap-3">
-            <div className="bg-editorial-primary p-2 rounded-lg text-white shadow-sm flex items-center justify-center">
-              <Compass className="h-5 w-5" />
-            </div>
-            <h1 className="text-2xl font-serif italic tracking-tighter font-bold text-editorial-primary">
-              Ipantanal<span className="text-zinc-400 not-italic">.</span>
+            <h1 className="flex items-center">
+              <BrandLogo />
             </h1>
           </a>
         </header>

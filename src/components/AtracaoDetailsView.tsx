@@ -4,6 +4,7 @@ import { Atracao } from "../types";
 import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
 import TopReviewQuote from "./TopReviewQuote";
+import BrandLogo from "./BrandLogo";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 const TYPE_LABELS: Record<Atracao["type"], string> = { parada_legal: "Parada Legal", restaurante: "Restaurante" };
@@ -48,8 +49,7 @@ export default function AtracaoDetailsView({ id }: { id: string }) {
     <div className="bg-editorial-bg font-sans text-editorial-text min-h-screen">
       <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white/70 backdrop-blur-sm sticky top-0 z-20">
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2 cursor-pointer">
-          <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center"><Compass className="h-4 w-4" /></div>
-          <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
+          <BrandLogo />
         </a>
         <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="hidden sm:flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition">
           <MessageSquare className="h-3.5 w-3.5" /> Fale Conosco

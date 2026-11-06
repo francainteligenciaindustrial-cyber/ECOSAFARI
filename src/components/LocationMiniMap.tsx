@@ -17,11 +17,11 @@ export default function LocationMiniMap({ lat, lng, label, approximate = false }
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
     if (approximate) {
-      L.circle([lat, lng], { radius: 9000, color: "#101B4C", weight: 2, dashArray: "6 6", fillOpacity: 0.12 }).addTo(map);
+      L.circle([lat, lng], { radius: 9000, color: "#0B1412", weight: 2, dashArray: "6 6", fillOpacity: 0.12 }).addTo(map);
     } else {
       const icon = L.divIcon({
         className: "",
-        html: '<span style="display:block;width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-editorial-primary,#101B4C);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45)"></span>',
+        html: '<span style="display:block;width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--color-editorial-primary,#0B1412);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.45)"></span>',
         iconSize: [22, 22],
         iconAnchor: [11, 22],
       });

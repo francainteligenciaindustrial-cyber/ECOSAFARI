@@ -34,26 +34,26 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
     : "Olá! Vim do site da Ipantanal e gostaria de mais informações.";
 
   return (
-    <div id="whatsapp-gate-page" className="bg-editorial-primary min-h-screen text-[#FBF8F1] py-10 font-sans">
+    <div id="whatsapp-gate-page" className="bg-editorial-primary min-h-screen text-[#F4F6F5] py-10 font-sans">
       <div className="max-w-4xl mx-auto px-6">
 
         {/* Navigation */}
-        <div className="flex items-center justify-between mb-8 border-b border-[#FBF8F1]/10 pb-6">
+        <div className="flex items-center justify-between mb-8 border-b border-[#F4F6F5]/10 pb-6">
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#FBF8F1]/80 hover:text-white transition cursor-pointer"
+            className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#F4F6F5]/80 hover:text-white transition cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo
           </button>
 
-          <div className="bg-[#FBF8F1]/10 border border-[#FBF8F1]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#FBF8F1] font-bold flex items-center gap-1.5 animate-pulse">
+          <div className="bg-[#F4F6F5]/10 border border-[#F4F6F5]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#F4F6F5] font-bold flex items-center gap-1.5 animate-pulse">
             <Sparkles className="h-3.5 w-3.5" /> EcoCinema Auto-Executável
           </div>
         </div>
 
         {/* Video */}
         {video && (
-        <div className="relative aspect-video bg-black border border-[#FBF8F1]/10 shadow-2xl overflow-hidden mb-8">
+        <div className="relative aspect-video bg-black border border-[#F4F6F5]/10 shadow-2xl overflow-hidden mb-8">
           {video.kind === "iframe" ? (
             <iframe
               src={video.src}
@@ -81,7 +81,7 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
               <h2 className="font-serif font-bold text-lg tracking-tight">Expedições Ipantanal</h2>
               {pousada && (
                 <p className="text-zinc-300 text-xs flex items-center gap-1 mt-0.5">
-                  <MapPin className="h-3 w-3 text-[#FBF8F1]" /> {pousada.name}
+                  <MapPin className="h-3 w-3 text-[#F4F6F5]" /> {pousada.name}
                 </p>
               )}
             </div>
@@ -91,11 +91,11 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
         )}
 
         {/* Call to action card */}
-        <div className="bg-[#FBF8F1]/10 border border-[#FBF8F1]/25 p-8 text-center">
+        <div className="bg-[#F4F6F5]/10 border border-[#F4F6F5]/25 p-8 text-center">
           {videoEnded ? (
             <>
               <h3 className="font-serif font-bold text-white text-xl mb-2">Pronto para planejar sua expedição?</h3>
-              <p className="text-[#FBF8F1]/85 text-xs mb-6 max-w-md mx-auto leading-relaxed font-light">
+              <p className="text-[#F4F6F5]/85 text-xs mb-6 max-w-md mx-auto leading-relaxed font-light">
                 Fale agora com nossa equipe no WhatsApp oficial para tirar dúvidas, escolher datas e fechar sua reserva.
               </p>
               <a
@@ -111,7 +111,7 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
             <button
               type="button"
               onClick={() => setVideoEnded(true)}
-              className="text-[#FBF8F1]/80 hover:text-white text-xs uppercase tracking-widest font-bold underline underline-offset-4 cursor-pointer"
+              className="text-[#F4F6F5]/80 hover:text-white text-xs uppercase tracking-widest font-bold underline underline-offset-4 cursor-pointer"
             >
               Pular vídeo e falar com a equipe
             </button>

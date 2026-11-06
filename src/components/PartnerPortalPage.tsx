@@ -32,6 +32,7 @@ import CoordinatesInput from "./CoordinatesInput";
 import RemetenteEmailStatus from "./RemetenteEmailStatus";
 import PedidoSiteCard from "./PedidoSiteCard";
 import { slugify } from "../lib/slug";
+import BrandLogo from "./BrandLogo";
 
 // Agrupa os campos do formulário em cartões com título em vez de uma pilha
 // só de inputs soltos — mesma ideia visual usada no resto do admin, só
@@ -505,10 +506,7 @@ export default function PartnerPortalPage() {
   const header = (
     <header className="h-16 flex items-center justify-between px-6 md:px-10 border-b border-editorial-border bg-white">
       <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2 cursor-pointer">
-        <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center">
-          <Compass className="h-4 w-4" />
-        </div>
-        <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
+        <BrandLogo />
       </a>
       {(isPartner || isColaborador) && (
         <button onClick={handleLogout} className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-bold text-editorial-muted hover:text-editorial-text transition cursor-pointer">
@@ -961,17 +959,17 @@ export default function PartnerPortalPage() {
                           <p className="text-editorial-muted text-[11px] mb-2">Deixe em branco pra usar a paleta padrão da Ipantanal. Combine com sua logo pra um site com a cara da sua pousada.</p>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="flex items-center gap-2">
-                              <input type="color" value={form.themeColorPrimary || "#101B4C"} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
+                              <input type="color" value={form.themeColorPrimary || "#0B1412"} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
                               <div className="flex-1">
                                 <label className="block text-editorial-text font-semibold mb-1">Cor principal</label>
-                                <input type="text" placeholder="#101B4C" value={form.themeColorPrimary} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                                <input type="text" placeholder="#0B1412" value={form.themeColorPrimary} onChange={e => setForm((p: any) => ({ ...p, themeColorPrimary: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <input type="color" value={form.themeColorAccent || "#A35F00"} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
+                              <input type="color" value={form.themeColorAccent || "#087A55"} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-9 h-9 rounded border border-editorial-border cursor-pointer flex-shrink-0" />
                               <div className="flex-1">
                                 <label className="block text-editorial-text font-semibold mb-1">Cor de destaque</label>
-                                <input type="text" placeholder="#A35F00" value={form.themeColorAccent} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                                <input type="text" placeholder="#087A55" value={form.themeColorAccent} onChange={e => setForm((p: any) => ({ ...p, themeColorAccent: e.target.value }))} className="w-full border border-editorial-border rounded-md p-1.5 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                               </div>
                             </div>
                           </div>

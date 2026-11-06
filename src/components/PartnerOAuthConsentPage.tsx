@@ -3,6 +3,7 @@ import { Compass, LoaderCircle, ShieldCheck, Lock, Check, X } from "lucide-react
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { navigate } from "../lib/router";
+import BrandLogo from "./BrandLogo";
 
 interface AuthorizationDetails {
   authorization_id: string;
@@ -112,10 +113,7 @@ export default function PartnerOAuthConsentPage() {
   const header = (
     <header className="h-16 flex items-center px-6 md:px-10 border-b border-editorial-border bg-white">
       <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2 cursor-pointer">
-        <div className="bg-editorial-primary p-1.5 rounded-lg text-white flex items-center justify-center">
-          <Compass className="h-4 w-4" />
-        </div>
-        <span className="font-serif italic font-bold text-editorial-primary">Ipantanal<span className="text-zinc-400 not-italic">.</span></span>
+        <BrandLogo />
       </a>
     </header>
   );

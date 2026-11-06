@@ -59,9 +59,9 @@ async function sendTouristConfirmationEmail(email: string, name?: string): Promi
     subject: "Confirme seu email — Ipantanal",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #101B4C;">Confirme seu email 🌿</h2>
+        <h2 style="color: #0B1412;">Confirme seu email 🌿</h2>
         <p>${name ? `Olá, ${escapeHtml(name)}! ` : ""}Clique no botão abaixo para ativar seu perfil de turista na Ipantanal.</p>
-        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
         <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${link}</p>
         <p style="color: #888; font-size: 12px;">Se você não pediu isso, pode ignorar este email.</p>
       </div>
@@ -186,9 +186,9 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
       subject: "Confirme seu email — Ipantanal",
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #101B4C;">Bem-vindo(a) à Ipantanal! 🌿</h2>
+          <h2 style="color: #0B1412;">Bem-vindo(a) à Ipantanal! 🌿</h2>
           <p>Olá, ${escapeHtml(name)}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e fazer suas reservas.</p>
-          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
           <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${linkData.properties.action_link}</p>
         </div>
       `,
@@ -226,9 +226,9 @@ app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
     subject: "Redefinir sua senha — Ipantanal",
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #101B4C;">Redefinir senha</h2>
+        <h2 style="color: #0B1412;">Redefinir senha</h2>
         <p>Recebemos um pedido para redefinir a senha do seu acesso ao portal Ipantanal.</p>
-        <p><a href="${link}" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Criar nova senha</a></p>
+        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Criar nova senha</a></p>
         <p style="color: #888; font-size: 12px;">Se você não pediu isso, ignore este email — sua senha continua a mesma.</p>
       </div>
     `,
@@ -434,11 +434,11 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
       subject: `Nova reserva online — ${pousada.name}`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #101B4C;">Nova reserva pelo site 🌿</h2>
+          <h2 style="color: #0B1412;">Nova reserva pelo site 🌿</h2>
           <p><strong>${escapeHtml(newBooking.customerName)}</strong> reservou de <strong>${checkIn}</strong> a <strong>${checkOut}</strong> (${adults} adulto(s), ${children} criança(s))${roomType ? ` — ${escapeHtml(roomType)}` : ""}.</p>
           ${detailsSummary ? `<p style="color:#555">${escapeHtml(detailsSummary)}</p>` : ""}
           <p>A reserva aparece na sua Agenda de Reservas. Ela fica como "pendente de pagamento" até o hóspede pagar.</p>
-          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Abrir minha agenda</a></p>
+          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Abrir minha agenda</a></p>
         </div>
       `,
     });
