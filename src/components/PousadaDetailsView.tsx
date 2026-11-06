@@ -112,7 +112,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
           <div>
             <div className="flex items-center gap-2 mb-2 text-[10px] text-editorial-muted font-bold uppercase tracking-widest flex-wrap">
-              <span className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-2 py-0.5 rounded-none">{t("details.officialPartner")}</span>
+              <span className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-2 py-0.5 rounded-2xl">{t("details.officialPartner")}</span>
               {pousada.verified && (
                 <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full" title={t("details.verifiedTitle")}>
                   <BadgeCheck className="h-3 w-3" /> {t("common.verified")}
@@ -165,13 +165,13 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             <FavoriteButton pousadaId={pousada.id} />
             {pousada.rating > 0 ? (
               <>
-                <div className="flex items-center gap-1 text-editorial-primary bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-none font-serif text-sm font-bold">
+                <div className="flex items-center gap-1 text-editorial-primary bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-full font-serif text-sm font-bold">
                   <Star className="h-4 w-4 fill-amber-500 text-amber-500" /> {pousada.rating} / 5.0
                 </div>
                 <span className="text-xs text-editorial-muted font-medium">{t("details.basedOnReviews")}</span>
               </>
             ) : (
-              <div className="flex items-center gap-1 text-editorial-muted bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-none font-serif text-sm font-bold">
+              <div className="flex items-center gap-1 text-editorial-muted bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-full font-serif text-sm font-bold">
                 <Star className="h-4 w-4" /> {t("details.noReviews")}
               </div>
             )}
@@ -182,7 +182,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
         <div className="mb-10">
           <div
             onClick={() => setLightboxIndex(0)}
-            className="h-[420px] md:h-[480px] overflow-hidden rounded-none border border-editorial-border relative cursor-pointer group mb-4"
+            className="h-[420px] md:h-[480px] overflow-hidden rounded-2xl border border-editorial-border relative cursor-pointer group mb-4"
           >
             <PictureImg
               src={images[0]}
@@ -192,11 +192,11 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
               fetchPriority="high"
               className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
             />
-            <div className="absolute bottom-4 left-4 bg-editorial-primary/95 text-[#F4F6F5] text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-none font-bold">
+            <div className="absolute bottom-4 left-4 bg-editorial-primary/95 text-[#F4F6F5] text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-full font-bold">
               {t("details.mainView")}
             </div>
             {images.length > 1 && (
-              <div className="absolute bottom-4 right-4 bg-black/70 text-white text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-none font-bold flex items-center gap-1.5">
+              <div className="absolute bottom-4 right-4 bg-black/70 text-white text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5">
                 <Images className="h-3.5 w-3.5" /> {t("details.photos", { n: images.length })}
               </div>
             )}
@@ -224,7 +224,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                       key={idx}
                       onClick={() => setLightboxIndex(idx + 1)}
                       aria-label={t("details.photoN", { n: idx + 2 })}
-                      className="aspect-square overflow-hidden border border-editorial-border relative cursor-pointer group"
+                      className="aspect-square overflow-hidden border border-editorial-border rounded-2xl relative cursor-pointer group"
                     >
                       <PictureImg
                         src={img}
@@ -298,7 +298,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
           <div className="lg:col-span-8 space-y-8">
             
             {/* Overview / Long description */}
-            <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
+            <div className="bg-white p-8 rounded-2xl border border-editorial-border shadow-sm">
               <h2 className="text-2xl font-serif font-bold text-editorial-primary mb-4">{t("details.about")}</h2>
               <p lang="pt-BR" className="text-editorial-muted leading-relaxed mb-4 whitespace-pre-line text-xs font-light">
                 {pousada.longDescription || pousada.description}
@@ -314,7 +314,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {(pousada.features || []).map((feat, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-editorial-muted text-xs font-medium">
-                      <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border p-1">
+                      <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border rounded-lg p-1">
                         <Check className="h-3 w-3" />
                       </div>
                       {feat}
@@ -419,19 +419,19 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
 
             {/* Featured experiences (photo + pitch, alternating sides) */}
             {hasPousadaHighlights(pousada.id) && (
-              <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
+              <div className="bg-white p-8 rounded-2xl border border-editorial-border shadow-sm">
                 <PousadaHighlights pousadaId={pousada.id} />
               </div>
             )}
 
             {/* Activities available */}
-            <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
+            <div className="bg-white p-8 rounded-2xl border border-editorial-border shadow-sm">
               <h2 className="text-2xl font-serif font-bold text-editorial-primary mb-4">{t("details.activities")}</h2>
               <p className="text-editorial-muted text-xs mb-6">{t("details.activitiesText")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(pousada.activities || []).map((act, idx) => (
-                  <div key={idx} className="border border-editorial-border hover:border-editorial-primary hover:bg-editorial-secondary/10 p-5 rounded-none flex items-start gap-3 transition">
-                    <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border p-2 font-bold text-xs mt-0.5">
+                  <div key={idx} className="border border-editorial-border hover:border-editorial-primary hover:bg-editorial-secondary/10 p-5 rounded-2xl flex items-start gap-3 transition">
+                    <div className="bg-editorial-secondary text-editorial-primary border border-editorial-border rounded-xl p-2 font-bold text-xs mt-0.5">
                       {idx + 1}
                     </div>
                     <div>
@@ -444,7 +444,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             </div>
 
             {/* Possibilities of safari/fauna experiences (Exclusive upgrades) */}
-            <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
+            <div className="bg-white p-8 rounded-2xl border border-editorial-border shadow-sm">
               <h2 className="text-2xl font-serif font-bold text-editorial-primary mb-2">{t("details.experiences")}</h2>
               <p className="text-editorial-muted text-xs mb-6">{t("details.experiencesText")}</p>
               
@@ -457,7 +457,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
                     aria-pressed={selectedExperience === exp.title}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedExperience(exp.title); } }}
                     onClick={() => setSelectedExperience(exp.title)}
-                    className={`border p-5 rounded-none cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                    className={`border p-5 rounded-2xl cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                       selectedExperience === exp.title
                         ? "border-editorial-primary bg-editorial-secondary/40 shadow-sm"
                         : "border-editorial-border hover:border-editorial-muted bg-white"
@@ -486,14 +486,14 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
 
           {/* Booking / Calendar widget column */}
           <div className="lg:col-span-4">
-            <div className="bg-white p-6 rounded-none border border-editorial-border shadow-sm sticky top-6 space-y-6">
+            <div className="bg-white p-6 rounded-2xl border border-editorial-border shadow-sm sticky top-6 space-y-6">
               <div>
                 <h3 className="font-serif font-bold text-editorial-primary text-lg mb-1">{t("details.bookTitle")}</h3>
                 <p className="text-editorial-muted text-xs">{t("details.bookText")}</p>
               </div>
 
               {/* Price info */}
-              <div className="bg-editorial-secondary p-4 border border-editorial-border rounded-none space-y-2 text-xs">
+              <div className="bg-editorial-secondary p-4 border border-editorial-border rounded-2xl space-y-2 text-xs">
                 <div className="flex justify-between text-editorial-muted">
                   <span>{t("details.nightly")}</span>
                   <span>{formatMoney(pousada.pricePerNight)}</span>
@@ -513,14 +513,14 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
               <a
                 href={`/reservar/${encodeURIComponent(pousada.id)}`}
                 onClick={e => { e.preventDefault(); navigate(`/reservar/${encodeURIComponent(pousada.id)}`); }}
-                className="w-full bg-editorial-primary hover:opacity-90 text-white font-bold py-3 rounded-none text-xs uppercase tracking-widest transition duration-200 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                className="w-full bg-editorial-primary hover:opacity-90 text-white font-bold py-3 rounded-full text-xs uppercase tracking-widest transition duration-200 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 <CalendarCheck className="h-4.5 w-4.5" /> {t("details.bookOnline")}
               </a>
 
               <button
                 onClick={() => onOpenBot(pousada, selectedExperience)}
-                className="w-full bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold py-3 rounded-none text-xs transition duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold py-3 rounded-full text-xs transition duration-200 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <MessageSquare className="h-4.5 w-4.5" /> {t("details.whatsapp")}
               </button>

@@ -392,7 +392,7 @@ export default function MobileSimulator({
       
       {/* Description Column */}
       <div className="max-w-md px-6 text-center lg:text-left font-sans">
-        <span className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-3 py-1 rounded-none text-[9px] font-bold uppercase tracking-widest mb-3 inline-block">
+        <span className="bg-editorial-secondary text-editorial-primary border border-editorial-border px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest mb-3 inline-block">
           Módulo Integrado 6
         </span>
         <h2 className="text-3xl font-serif font-bold text-editorial-primary tracking-tight mb-4">Aplicativo Móvel do Hóspede</h2>
@@ -400,7 +400,7 @@ export default function MobileSimulator({
           Simulamos ao lado a interface do smartphone de um hóspede em campo. Ele pode interagir com o feed social de avistamentos de fauna, registrar check-in via satélite nas pousadas parceiras, e receber alertas de conservação e localização em tempo real.
         </p>
 
-        <div className="space-y-4 text-left bg-white p-6 border border-editorial-border text-xs text-editorial-muted shadow-sm rounded-none">
+        <div className="space-y-4 text-left bg-white p-6 border border-editorial-border text-xs text-editorial-muted shadow-sm rounded-2xl">
           <div className="flex gap-2 items-center">
             <span className="text-sm">📸</span>
             <p className="font-light"><strong className="font-bold text-editorial-primary">Avistamentos:</strong> Compartilhe suas fotos tiradas durante as expedições.</p>

@@ -54,7 +54,7 @@ export default function PousadaRecompensas({ pousadaId }: Props) {
   const coins = profile?.coins ?? 0;
 
   return (
-    <div className="bg-white p-8 rounded-none border border-editorial-border shadow-sm">
+    <div className="bg-white p-8 rounded-2xl border border-editorial-border shadow-sm">
       <h2 className="text-2xl font-serif font-bold text-editorial-primary mb-1 flex items-center gap-2">
         <Gift className="h-5 w-5" /> Resgate com Jaguars
       </h2>

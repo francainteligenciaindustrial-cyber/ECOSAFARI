@@ -322,10 +322,10 @@ export default function PousadaCatalog({
           </h1>
           <span aria-hidden="true" className="block w-14 h-[3px] bg-arara-yellow mb-8" />
           <div className="flex flex-wrap gap-3 sm:gap-4 justify-center text-[10px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.2em] font-semibold">
-            <a href="#catalogo" className="bg-arara-yellow text-arara-black hover:bg-arara-orange px-4 sm:px-6 py-2.5 sm:py-3 rounded-none transition duration-200 shadow-sm flex items-center gap-2">
+            <a href="#catalogo" className="bg-arara-yellow text-arara-black hover:bg-arara-orange px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl transition duration-200 shadow-sm flex items-center gap-2">
               <Compass className="h-4 w-4" /> {t("catalog.hero.cta")}
             </a>
-            <a href="#mapa" className="border border-[#EAF2EF]/60 text-[#F4F6F5] hover:bg-white/10 px-4 sm:px-6 py-2.5 sm:py-3 rounded-none transition duration-200 flex items-center gap-2">
+            <a href="#mapa" className="border border-[#EAF2EF]/60 text-[#F4F6F5] hover:bg-white/10 px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl transition duration-200 flex items-center gap-2">
               <MapPin className="h-4 w-4" /> {t("catalog.hero.ctaMap")}
             </a>
           </div>
@@ -455,7 +455,7 @@ export default function PousadaCatalog({
             <div
               key={pousada.id}
               onClick={() => onSelectPousada(pousada)}
-              className="bg-white border border-editorial-border overflow-hidden hover:shadow-sm transition duration-300 flex flex-col group h-full cursor-pointer"
+              className="bg-white border border-editorial-border rounded-3xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition duration-300 flex flex-col group h-full cursor-pointer"
             >
               {/* Image Container with Tag */}
               <div className="relative h-32 sm:h-48 md:h-64 overflow-hidden">
@@ -465,10 +465,10 @@ export default function PousadaCatalog({
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
                 />
-                <div className="hidden sm:flex absolute top-4 left-4 bg-editorial-primary/95 text-[#F4F6F5] px-3 py-1 text-[9px] uppercase tracking-wider font-bold items-center gap-1 shadow-sm">
+                <div className="hidden sm:flex absolute top-4 left-4 bg-editorial-primary/85 backdrop-blur-sm rounded-full text-[#F4F6F5] px-3 py-1 text-[9px] uppercase tracking-wider font-bold items-center gap-1 shadow-sm">
                   <MapPin className="h-3 w-3" /> {pousada.location || t("catalog.locationUnknown")}
                 </div>
-                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-[#F4F6F5] text-editorial-text px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shadow-sm border border-editorial-border">
+                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-[#F4F6F5] rounded-full text-editorial-text px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 shadow-sm border border-editorial-border">
                   {pousada.rating > 0 ? (
                     <><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" /> {pousada.rating}</>
                   ) : (
@@ -505,7 +505,7 @@ export default function PousadaCatalog({
                   {/* Key Features Tags */}
                   <div className="hidden sm:flex flex-wrap gap-1.5 mb-6">
                     {(pousada.features || []).slice(0, 3).map((f, i) => (
-                      <span key={i} className="bg-editorial-secondary text-editorial-muted px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold border border-editorial-border">
+                      <span key={i} className="bg-editorial-secondary text-editorial-muted px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold border border-editorial-border rounded-full">
                         {f}
                       </span>
                     ))}
@@ -527,14 +527,14 @@ export default function PousadaCatalog({
                   <div className="flex items-center gap-2">
                     <button aria-label={t("catalog.videoCta")}
                       onClick={(e) => { e.stopPropagation(); onSelectVideo(pousada); }}
-                      className="hidden sm:flex bg-editorial-beige hover:bg-editorial-border/60 text-editorial-primary p-2.5 rounded-none border border-editorial-border transition items-center gap-1 cursor-pointer"
+                      className="hidden sm:flex bg-editorial-beige hover:bg-editorial-border/60 text-editorial-primary p-2.5 rounded-full border border-editorial-border transition items-center gap-1 cursor-pointer"
                       title={t("catalog.videoCta")}
                     >
                       <PlayCircle className="h-4 w-4" />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelectPousada(pousada); }}
-                      className="w-full sm:w-auto justify-center bg-editorial-primary hover:bg-editorial-primary/90 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-none text-[10px] sm:text-xs uppercase tracking-wider font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
+                      className="w-full sm:w-auto justify-center bg-editorial-primary hover:bg-editorial-primary/90 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-full text-[10px] sm:text-xs uppercase tracking-wider font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
                     >
                       {t("common.details")} <ChevronRight className="h-3 w-3" />
                     </button>
@@ -550,7 +550,7 @@ export default function PousadaCatalog({
             no matches yet) shouldn't just render a blank grid, which reads
             as broken rather than "nothing here yet". */}
         {!catalogLoading && catalogItems.length === 0 && (
-          <div className="text-center py-20 border border-dashed border-editorial-border bg-white/40">
+          <div className="text-center py-20 border border-dashed border-editorial-border bg-white/40 rounded-3xl">
             <Compass className="h-8 w-8 text-editorial-muted mx-auto mb-3" />
             <p className="text-editorial-text font-serif text-lg font-bold mb-1">
               {pousadas.length === 0 ? t("catalog.empty.soonTitle") : t("catalog.empty.filterTitle")}
@@ -613,7 +613,7 @@ export default function PousadaCatalog({
                   <div
                     key={atracao.id}
                     onClick={() => navigate(`/atracoes/${atracao.id}`)}
-                    className="group bg-white border border-editorial-border overflow-hidden cursor-pointer hover:shadow-lg transition"
+                    className="group bg-white border border-editorial-border rounded-3xl overflow-hidden cursor-pointer hover:shadow-lg transition"
                   >
                     <div className="h-28 sm:h-44 bg-zinc-200 overflow-hidden relative">
                       {atracao.images[0] ? (
@@ -694,7 +694,7 @@ export default function PousadaCatalog({
 
       {/* Wildlife Species Showcase (O que avistar) Section */}
       <ErrorBoundary variant="section" sectionLabel="a vitrine de espécies">
-      <section className="arara-stripes bg-[#0A1133] text-[#F4F6F5] py-14 md:py-24 border-t border-editorial-border/10 relative overflow-hidden">
+      <section className="bg-[#0B1412] text-[#F4F6F5] py-14 md:py-24 border-t border-editorial-border/10 relative overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-editorial-primary/10 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -722,7 +722,7 @@ export default function PousadaCatalog({
                 last card's text). */}
             <button
               onClick={scrollSpeciesLeft}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0A1133]/85 hover:bg-amber-500 hover:text-[#0A1133] hover:border-amber-500 text-amber-500 hidden md:flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0B1412]/85 hover:bg-amber-500 hover:text-[#0B1412] hover:border-amber-500 text-amber-500 hidden md:flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label={t("common.previous")}
             >
               <ChevronLeft className="h-6 w-6" />
@@ -731,7 +731,7 @@ export default function PousadaCatalog({
             {/* Right Button */}
             <button
               onClick={scrollSpeciesRight}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0A1133]/85 hover:bg-amber-500 hover:text-[#0A1133] hover:border-amber-500 text-amber-500 hidden md:flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-12 md:h-12 rounded-full border border-amber-500/30 bg-[#0B1412]/85 hover:bg-amber-500 hover:text-[#0B1412] hover:border-amber-500 text-amber-500 hidden md:flex items-center justify-center transition-all duration-300 focus:outline-none backdrop-blur-sm shadow-lg cursor-pointer"
               aria-label={t("common.next")}
             >
               <ChevronRight className="h-6 w-6" />
@@ -746,7 +746,7 @@ export default function PousadaCatalog({
               {displaySpecies.map((specie) => (
                 <div
                   key={specie.id}
-                  className="bg-[#1A201C]/90 border border-white/5 w-[46%] min-w-[150px] sm:w-[290px] md:w-[350px] flex-shrink-0 flex flex-col justify-between snap-start hover:border-amber-500/25 transition-all duration-500 group rounded-none"
+                  className="bg-[#1A201C]/90 border border-white/5 w-[46%] min-w-[150px] sm:w-[290px] md:w-[350px] flex-shrink-0 flex flex-col justify-between snap-start hover:border-amber-500/25 transition-all duration-500 group rounded-2xl"
                 >
                   {/* Image container */}
                   <div className="relative h-32 sm:h-60 md:h-64 overflow-hidden">
@@ -814,7 +814,7 @@ export default function PousadaCatalog({
               <h2 className="text-3xl md:text-4xl font-serif font-bold text-editorial-primary mt-1 tracking-tight">{t("map.title")}</h2>
               <p className="text-editorial-muted text-xs mt-2">{t("map.subtitle")}</p>
             </div>
-            <Suspense fallback={<div className="h-[520px] flex items-center justify-center border border-editorial-border text-editorial-muted text-xs">{t("map.loading")}</div>}>
+            <Suspense fallback={<div className="h-[520px] flex items-center justify-center border border-editorial-border rounded-3xl text-editorial-muted text-xs">{t("map.loading")}</div>}>
               <PantanalMap pousadas={completePousadas} atracoes={atracoes} species={displaySpecies} onSelectPousada={onSelectPousada} sightingPoints={mapPoints} linkedSpecies={mapLinkedSpecies} />
             </Suspense>
           </div>
@@ -839,7 +839,7 @@ export default function PousadaCatalog({
             <p className="text-zinc-400 text-xs md:text-sm leading-relaxed mb-6 max-w-xl">{t("promo.headlineText")}</p>
             <ol className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10 max-w-2xl">
               {([1, 2, 3] as const).map(n => (
-                <li key={n} className="relative bg-white/[0.04] border border-white/10 p-4">
+                <li key={n} className="relative bg-white/[0.04] border border-white/10 rounded-2xl p-4">
                   <span className="absolute -top-3 left-4 w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-amber-400 text-[#0e120f] text-[11px] font-bold flex items-center justify-center">{n}</span>
                   <h3 className="font-serif font-semibold text-white text-sm mt-1 mb-1">{t(`promo.step${n}.title` as MessageKey)}</h3>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">{t(`promo.step${n}.text` as MessageKey)}</p>
@@ -858,21 +858,21 @@ export default function PousadaCatalog({
 
             {/* Feature list */}
             <div className="grid grid-cols-3 gap-2 sm:gap-6 mb-8 sm:mb-10 max-w-2xl">
-              <div className="bg-[#1A201C]/60 border border-white/5 p-2.5 sm:p-4 rounded-none">
+              <div className="bg-[#1A201C]/60 border border-white/5 p-2.5 sm:p-4 rounded-2xl">
                 <span className="text-base sm:text-lg mb-1 sm:mb-2 block">📸</span>
                 <h4 className="font-serif font-semibold text-white text-[11px] sm:text-xs leading-tight mb-1">{t("promo.feed.title")}</h4>
                 <p className="text-zinc-400 text-[9px] sm:text-[10px] leading-snug sm:leading-relaxed">
                   {t("promo.feed.text")}
                 </p>
               </div>
-              <div className="bg-[#1A201C]/60 border border-white/5 p-2.5 sm:p-4 rounded-none">
+              <div className="bg-[#1A201C]/60 border border-white/5 p-2.5 sm:p-4 rounded-2xl">
                 <span className="text-base sm:text-lg mb-1 sm:mb-2 block">🛰️</span>
                 <h4 className="font-serif font-semibold text-white text-[11px] sm:text-xs leading-tight mb-1">{t("promo.checkin.title")}</h4>
                 <p className="text-zinc-400 text-[9px] sm:text-[10px] leading-snug sm:leading-relaxed">
                   {t("promo.checkin.text")}
                 </p>
               </div>
-              <div className="bg-[#1A201C]/60 border border-white/5 p-2.5 sm:p-4 rounded-none">
+              <div className="bg-[#1A201C]/60 border border-white/5 p-2.5 sm:p-4 rounded-2xl">
                 <span className="text-base sm:text-lg mb-1 sm:mb-2 block">🚨</span>
                 <h4 className="font-serif font-semibold text-white text-[11px] sm:text-xs leading-tight mb-1">{t("promo.alerts.title")}</h4>
                 <p className="text-zinc-400 text-[9px] sm:text-[10px] leading-snug sm:leading-relaxed">
@@ -968,12 +968,12 @@ export default function PousadaCatalog({
       {/* Species Detail Modal */}
       {selectedSpecies && (
         <div role="dialog" aria-modal="true" aria-label={selectedSpecies.name} className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-6 z-50 animate-fadeIn">
-          <div className="bg-[#0A1133] text-[#F4F6F5] border border-white/10 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
+          <div className="bg-[#0B1412] text-[#F4F6F5] border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col md:flex-row relative">
             
             {/* Close Button */}
             <button
               onClick={() => setSelectedSpecies(null)}
-              className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#0A1133] border border-white/10 text-[#F4F6F5] p-2 rounded-full transition cursor-pointer"
+              className="absolute top-4 right-4 z-30 bg-black/60 hover:bg-amber-500 hover:text-[#0B1412] border border-white/10 text-[#F4F6F5] p-2 rounded-full transition cursor-pointer"
               aria-label={t("common.close")}
             >
               <X className="h-5 w-5" />
@@ -1025,7 +1025,7 @@ export default function PousadaCatalog({
                 )}
 
                 {/* Best Lodge Card */}
-                <div className="bg-[#1A201C] border border-white/5 p-4 rounded-none mb-6">
+                <div className="bg-[#1A201C] border border-white/5 p-4 rounded-2xl mb-6">
                   <span className="text-amber-500 text-[9px] font-bold uppercase tracking-widest block mb-1">
                     {t("species.whereToSee")}
                   </span>
@@ -1052,7 +1052,7 @@ export default function PousadaCatalog({
                       setSelectedSpecies(null);
                     }
                   }}
-                  className="flex-1 bg-white hover:bg-amber-500 hover:text-[#0A1133] text-[#0A1133] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
+                  className="flex-1 bg-white hover:bg-amber-500 hover:text-[#0B1412] text-[#0B1412] font-bold uppercase tracking-widest text-xs py-3.5 px-4 transition-all duration-300 text-center cursor-pointer"
                 >
                   {t("species.visitLodge")}
                 </button>
@@ -1092,26 +1092,26 @@ export default function PousadaCatalog({
             {/* Avaliar exige perfil de turista — sem ele, mostramos um
                 convite pra criar um em vez do formulário. */}
             {checkingTourist ? (
-              <div className="bg-white p-6 flex justify-center border border-editorial-border">
+              <div className="bg-white p-6 flex justify-center border border-editorial-border rounded-2xl">
                 <LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" />
               </div>
             ) : !isTourist ? (
-              <div className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border text-center space-y-3">
+              <div className="bg-white text-editorial-text p-6 rounded-2xl shadow-sm border border-editorial-border text-center space-y-3">
                 <Lock className="h-6 w-6 text-editorial-muted mx-auto" />
                 <h3 className="font-serif font-bold text-editorial-primary text-lg">{t("reviews.createTitle")}</h3>
                 <p className="text-editorial-muted text-xs leading-relaxed">{t("reviews.createText")}</p>
                 <button
                   type="button"
                   onClick={() => navigate("/turista")}
-                  className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
+                  className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-full transition duration-200 cursor-pointer"
                 >
                   {t("reviews.createCta")}
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmitReview} className="bg-white text-editorial-text p-6 rounded-none shadow-sm border border-editorial-border space-y-4">
+              <form onSubmit={handleSubmitReview} className="bg-white text-editorial-text p-6 rounded-2xl shadow-sm border border-editorial-border space-y-4">
                 {reviewSuccess && (
-                  <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 p-3 rounded-none text-xs text-center font-bold">
+                  <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 p-3 rounded-2xl text-xs text-center font-bold">
                     {t("reviews.success")}
                   </div>
                 )}
@@ -1125,7 +1125,7 @@ export default function PousadaCatalog({
                     id="review-pousada"
                     value={selectedPousadaForReview}
                     onChange={e => setSelectedPousadaForReview(e.target.value)}
-                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
+                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-xl p-2 focus:outline-none focus:border-editorial-primary"
                   >
                     {pousadas.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
@@ -1158,7 +1158,7 @@ export default function PousadaCatalog({
                     required
                     rows={3}
                     placeholder={t("reviews.placeholder")}
-                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary resize-none"
+                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-xl p-2 focus:outline-none focus:border-editorial-primary resize-none"
                   ></textarea>
                 </div>
 
@@ -1170,7 +1170,7 @@ export default function PousadaCatalog({
                     value={photoUrlInput}
                     onChange={e => setPhotoUrlInput(e.target.value)}
                     placeholder={t("reviews.photoPlaceholder")}
-                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-none p-2 focus:outline-none focus:border-editorial-primary"
+                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-xl p-2 focus:outline-none focus:border-editorial-primary"
                   />
                   <p className="text-editorial-muted text-[9px] mt-1">{t("reviews.photoHint")}</p>
                 </div>
@@ -1179,7 +1179,7 @@ export default function PousadaCatalog({
 
                 <button
                   type="submit"
-                  className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-none transition duration-200 cursor-pointer"
+                  className="w-full bg-editorial-primary hover:bg-editorial-primary/90 text-white text-[11px] font-bold uppercase tracking-widest py-3 rounded-full transition duration-200 cursor-pointer"
                   disabled={submittingReview}
                 >
                   {submittingReview ? t("reviews.sending") : t("reviews.submit")}
@@ -1191,7 +1191,7 @@ export default function PousadaCatalog({
           {/* List of reviews column */}
           <div className="lg:col-span-7 flex lg:block gap-3 overflow-x-auto snap-x snap-mandatory -mx-6 px-6 pb-2 lg:mx-0 lg:px-0 lg:pb-0 lg:space-y-6 lg:max-h-[600px] lg:overflow-x-visible lg:overflow-y-auto lg:pr-4 scrollbar-thin">
             {reviews.length === 0 && (
-              <div className="w-full text-center py-16 border border-dashed border-editorial-border">
+              <div className="w-full text-center py-16 border border-dashed border-editorial-border rounded-3xl">
                 <Star className="h-7 w-7 text-editorial-muted mx-auto mb-3" />
                 <p className="text-editorial-text font-serif font-bold mb-1">{t("reviews.emptyTitle")}</p>
                 <p className="text-editorial-muted text-xs max-w-xs mx-auto">{t("reviews.emptyText")}</p>
@@ -1214,7 +1214,7 @@ export default function PousadaCatalog({
               };
 
               return (
-                <div key={review.id} className="bg-white text-editorial-text border border-editorial-border p-4 sm:p-6 rounded-none shadow-sm transition min-w-[85%] sm:min-w-[60%] lg:min-w-0 snap-start flex-shrink-0">
+                <div key={review.id} className="bg-white text-editorial-text border border-editorial-border p-4 sm:p-6 rounded-2xl shadow-sm transition min-w-[85%] sm:min-w-[60%] lg:min-w-0 snap-start flex-shrink-0">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-editorial-border pb-3">
                     <div className="flex items-center gap-3">
                       {review.photoUrl ? (

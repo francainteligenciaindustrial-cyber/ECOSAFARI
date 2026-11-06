@@ -83,7 +83,7 @@ export default function AdminAgendaTab({ pousadas, onRefreshData, googleCalendar
             </div>
 
             {/* Google Calendar Connection Status Banner */}
-            <div className="bg-editorial-secondary border border-editorial-border p-5 rounded-none flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-editorial-secondary border border-editorial-border p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex-1">
                 <h4 className="font-serif font-bold text-editorial-primary text-sm flex items-center gap-2">
                   <span className="relative flex h-2 w-2">

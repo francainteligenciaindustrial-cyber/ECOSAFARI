@@ -125,7 +125,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
                   <div className="flex items-center gap-4">
                     <button aria-label={isPlaying ? "Pausar" : "Reproduzir"}
                       onClick={handlePlayPause}
-                      className="bg-[#F4F6F5] text-editorial-primary p-2.5 rounded-none hover:scale-105 transition cursor-pointer"
+                      className="bg-[#F4F6F5] text-editorial-primary p-2.5 rounded-2xl hover:scale-105 transition cursor-pointer"
                     >
                       {isPlaying ? <Pause className="h-4 w-4 fill-editorial-primary" /> : <Play className="h-4 w-4 fill-editorial-primary" />}
                     </button>

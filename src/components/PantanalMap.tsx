@@ -294,11 +294,11 @@ export default function PantanalMap({ pousadas: pousadasProp, atracoes: atracoes
         </label>
       </div>
       {offline && <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 mb-2">{t("map.offline")}</p>}
-      <div ref={containerRef} className="h-[420px] md:h-[520px] border border-editorial-border relative z-0" role="region" aria-label={t("map.title")} />
+      <div ref={containerRef} className="h-[420px] md:h-[520px] border border-editorial-border rounded-3xl overflow-hidden relative z-0" role="region" aria-label={t("map.title")} />
 
       {/* "Tal animal é mais visto perto de tal pousada" */}
       {filterName ? (
-        <div className="mt-4 border border-editorial-border bg-editorial-bg/60 p-4">
+        <div className="mt-4 border border-editorial-border rounded-2xl bg-editorial-bg/60 p-4">
           <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-editorial-primary mb-2">{t("map.whereToSee", { name: filterName })}</h3>
           {ranking.length > 0 ? (
             <ol className="space-y-1.5 text-sm">
@@ -321,7 +321,7 @@ export default function PantanalMap({ pousadas: pousadasProp, atracoes: atracoes
           <h3 className="text-[10px] uppercase tracking-[0.2em] font-bold text-editorial-primary mb-2">{t("map.bestNear")}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {withSightings.map(({ p }) => (
-              <button key={p.id} type="button" onClick={() => onSelectRef.current(p)} className="text-left border border-editorial-border bg-white p-3 hover:border-editorial-primary transition cursor-pointer">
+              <button key={p.id} type="button" onClick={() => onSelectRef.current(p)} className="text-left border border-editorial-border rounded-2xl bg-white p-3 hover:border-editorial-primary transition cursor-pointer">
                 <span className="block font-serif font-bold text-editorial-primary">{p.name}</span>
                 <span className="flex flex-wrap gap-1.5 mt-2">
                   {(nearby[p.id] || []).slice(0, 4).map(s => (

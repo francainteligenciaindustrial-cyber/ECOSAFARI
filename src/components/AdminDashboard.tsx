@@ -839,7 +839,7 @@ export default function AdminDashboard({
 
         {/* NAVIGATION SIDEBAR */}
         <aside className="w-full md:w-56 flex-shrink-0 md:sticky md:top-6">
-          <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1 md:gap-4 bg-white border border-zinc-200 md:border-0 md:bg-transparent rounded-lg md:rounded-none p-2 md:p-0">
+          <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-1 md:gap-4 bg-white border border-zinc-200 md:border-0 md:bg-transparent rounded-lg md:rounded-2xl p-2 md:p-0">
             {ADMIN_TAB_GROUPS.map(group => {
               const tabs = ADMIN_TABS.filter(t => t.group === group);
               if (tabs.length === 0) return null;

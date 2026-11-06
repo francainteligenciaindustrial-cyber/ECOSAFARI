@@ -75,10 +75,7 @@
 .arara-edge-bottom::after { bottom: -1px; }
 .arara-edge-top::before { top: 0; }
 
-/* Listras finas do rosto da arara — textura discreta para fundos escuros. */
-.arara-stripes {
-  background-image: repeating-linear-gradient(-28deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 14px);
-}
+
 
 /* Foco visível para quem navega pelo teclado. Muitos campos usam
    focus:outline-none (só trocam a borda, que some no foco por Tab em
@@ -143,3 +140,35 @@ body.skiptranslate > .skiptranslate {
   transform: none;
   transition: opacity 0.7s ease-out, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+
+/* Rodapé: nome IPANTANAL gigante (SiteFooter.tsx). Base quase invisível; o
+   brilho (contorno + preenchimento verde) aparece só ao redor do mouse,
+   por máscara radial em --mx/--my. Sem mouse (toque) fica só a base. */
+.ipantanal-wordmark { --mx: 50%; --my: 60%; }
+.ipantanal-wordmark__base,
+.ipantanal-wordmark__glow,
+.ipantanal-wordmark__stroke {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.ipantanal-wordmark__base { position: relative; color: #111C19; }
+.ipantanal-wordmark__glow,
+.ipantanal-wordmark__stroke {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  -webkit-mask-image: radial-gradient(circle 240px at var(--mx) var(--my), #000 0%, transparent 75%);
+  mask-image: radial-gradient(circle 240px at var(--mx) var(--my), #000 0%, transparent 75%);
+}
+.ipantanal-wordmark__glow { color: rgba(46, 229, 157, 0.14); }
+.ipantanal-wordmark__stroke {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(214, 255, 238, 0.85);
+  filter: drop-shadow(0 0 10px rgba(46, 229, 157, 0.55));
+}
+.ipantanal-wordmark:hover .ipantanal-wordmark__glow,
+.ipantanal-wordmark:hover .ipantanal-wordmark__stroke { opacity: 1; }

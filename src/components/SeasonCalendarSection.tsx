@@ -54,7 +54,7 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
           {rows.map(s => {
             const appOnly = s.id.startsWith("app:");
             return (
-              <li key={s.id} className="bg-white border border-editorial-border p-3">
+              <li key={s.id} className="bg-white border border-editorial-border rounded-2xl p-3">
                 <button
                   type="button"
                   disabled={appOnly}
@@ -98,7 +98,7 @@ export default function SeasonCalendarSection({ species, onOpenSpecies }: { spec
           })}
         </ul>
 
-        <div className="hidden md:block overflow-x-auto border border-editorial-border bg-white">
+        <div className="hidden md:block overflow-x-auto border border-editorial-border rounded-3xl bg-white">
           <table className="w-full min-w-[720px] text-xs">
             <thead>
               <tr className="text-[10px] uppercase tracking-widest text-editorial-muted">

@@ -43,7 +43,7 @@ export function bookingUrl(pousadaId: string, year: number, month: number): stri
 }
 
 const LEVEL_STYLES: Record<"dark" | "light", Record<SeasonLevel, string>> = {
-  dark: { 2: "bg-amber-500 text-[#0A1133]", 1: "bg-amber-500/30 text-amber-100", 0: "bg-white/5 text-zinc-500" },
+  dark: { 2: "bg-amber-500 text-[#0B1412]", 1: "bg-amber-500/30 text-amber-100", 0: "bg-white/5 text-zinc-500" },
   light: { 2: "bg-editorial-primary text-white", 1: "bg-editorial-primary/20 text-editorial-primary", 0: "bg-editorial-secondary text-editorial-muted" },
 };
 

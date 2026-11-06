@@ -42,7 +42,7 @@ export default function ReferralStatsWidget() {
 
   if (total === 0) {
     return (
-      <div className="bg-white border border-editorial-border p-5 rounded-none">
+      <div className="bg-white border border-editorial-border p-5 rounded-2xl">
         <h3 className="font-bold text-sm text-zinc-800 flex items-center gap-2 mb-1">
           <TrendingUp className="h-4 w-4 text-editorial-primary" /> De onde vêm nossos visitantes
         </h3>
@@ -64,7 +64,7 @@ export default function ReferralStatsWidget() {
   });
 
   return (
-    <div className="bg-white border border-editorial-border p-5 rounded-none">
+    <div className="bg-white border border-editorial-border p-5 rounded-2xl">
       <h3 className="font-bold text-sm text-zinc-800 flex items-center gap-2 mb-5">
         <TrendingUp className="h-4 w-4 text-editorial-primary" /> De onde vêm nossos visitantes
         <span className="text-[10px] text-zinc-400 font-normal">({total} respostas)</span>

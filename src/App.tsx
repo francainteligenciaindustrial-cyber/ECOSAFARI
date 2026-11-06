@@ -21,6 +21,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import { useCustomSite } from "./lib/useCustomSite";
 import { Pousada, Sighting, Review, Species, PublicBookingSummary } from "./types";
 import BrandLogo from "./components/BrandLogo";
+import SiteFooter from "./components/SiteFooter";
 
 // Code-split: AdminDashboard (~2000 lines) is dead weight in the bundle for
 // the ~99% of visitors who never touch /admin, and MobileSimulator is a
@@ -572,79 +573,7 @@ export default function App() {
       </main>
 
       {/* Footer (Editorial Aesthetic style) */}
-      <footer className="arara-edge-top arara-stripes bg-editorial-primary text-[#F4F6F5] py-12 px-6 md:px-10 text-[10px] uppercase tracking-widest font-sans">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
-          
-          {/* Logo and Status */}
-          <div className="flex flex-col items-center md:items-start gap-4">
-            <span className="font-serif font-bold text-lg tracking-normal capitalize text-white">
-              Ipantanal
-            </span>
-          </div>
-
-          {/* Contact Direct Links as requested */}
-          <div className="flex flex-col sm:flex-row items-center gap-6 text-xs font-semibold">
-            {/* Email */}
-            <a
-              href="mailto:francainteligenciaindustrial@gmail.com?subject=Suporte%20Ipantanal&body=Olá%20equipe%20Ipantanal,%20gostaria%20de%20solicitar%20suporte%20para%20as%20expedições%20e%20reservas."
-              className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Mail className="h-4 w-4" />
-              <span>FRANCAINTELIGENCIAINDUSTRIAL@GMAIL.COM</span>
-            </a>
-
-            {/* WhatsApp */}
-            <a
-              href="https://wa.me/5565999868334?text=Olá%20equipe%20Ipantanal,%20gostaria%20de%20solicitar%20suporte%20para%20as%20expedições%20e%20reservas."
-              className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span>WHATSAPP</span>
-            </a>
-
-            {/* Instagram */}
-            <a
-              href="https://instagram.com/ecosafari"
-              className="flex items-center gap-2 hover:text-emerald-400 transition-colors"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Instagram className="h-4 w-4" />
-              <span>@IPANTANAL</span>
-            </a>
-          </div>
-
-          {/* Copyright */}
-          <div className="text-center md:text-right text-[9px] text-[#F4F6F5]/60 font-bold">
-            <span className="block mb-1">© 2026 Ipantanal • WildStay Systems</span>
-            <span className="text-editorial-dark-muted font-normal italic font-serif tracking-normal capitalize text-xs block mt-1">
-              {t("app.footer.tagline")}
-            </span>
-          </div>
-
-        </div>
-
-        {/* Institutional links */}
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-8 pt-6 border-t border-white/10 text-[9px] text-[#F4F6F5]/70 font-bold">
-          <a href="/sobre" onClick={(e) => { e.preventDefault(); navigate("/sobre"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.about")}</a>
-          <a href="/faq" onClick={(e) => { e.preventDefault(); navigate("/faq"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.faq")}</a>
-          <a href="/privacidade" onClick={(e) => { e.preventDefault(); navigate("/privacidade"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.privacy")}</a>
-          <a href="/termos" onClick={(e) => { e.preventDefault(); navigate("/termos"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.terms")}</a>
-          <a href="/status-candidatura" onClick={(e) => { e.preventDefault(); navigate("/status-candidatura"); }} className="hover:text-emerald-400 transition-colors cursor-pointer">{t("app.footer.candidate")}</a>
-        </div>
-
-        {/* Institutional identity — required for a public booking/payment
-            site to look legitimate (and for LGPD's data-controller
-            disclosure). Values come from VITE_COMPANY_CNPJ/VITE_COMPANY_ADDRESS
-            (see .env.example) — set them before launch. */}
-        <div className="max-w-7xl mx-auto text-center mt-6 pt-6 border-t border-white/10 text-[9px] text-[#F4F6F5]/50 font-normal normal-case tracking-normal">
-          Ipantanal • CNPJ: {COMPANY_CNPJ} • {COMPANY_ADDRESS}
-        </div>
-      </footer>
+      <SiteFooter />
 
       <CookieConsentBanner />
       <InstallPrompt />

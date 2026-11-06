@@ -60,7 +60,7 @@ export default function PousadaLocation({ pousada }: { pousada: Pousada }) {
   };
 
   return (
-    <div className={`bg-white border border-editorial-border shadow-sm grid grid-cols-1 ${center ? "md:grid-cols-5" : ""}`}>
+    <div className={`bg-white border border-editorial-border rounded-3xl overflow-hidden shadow-sm grid grid-cols-1 ${center ? "md:grid-cols-5" : ""}`}>
       {center && (
         <div className="md:col-span-3 bg-editorial-secondary">
           <Suspense fallback={<div className="h-64 flex items-center justify-center text-editorial-muted text-xs">{t("map.loading")}</div>}>

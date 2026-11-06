@@ -34,7 +34,7 @@ export default function PacotesSection() {
         {pacotes.map(p => {
           const href = `/reservar/${encodeURIComponent(p.pousadaId)}?pacote=${encodeURIComponent(p.id)}`;
           return (
-            <article key={p.id} className="bg-white border border-editorial-border flex flex-col min-w-[82%] sm:min-w-[60%] md:min-w-0 snap-start">
+            <article key={p.id} className="bg-white border border-editorial-border rounded-3xl overflow-hidden flex flex-col min-w-[82%] sm:min-w-[60%] md:min-w-0 snap-start">
               <div className="h-44 bg-editorial-secondary overflow-hidden relative">
                 {p.imageUrl ? (
                   <PictureImg src={p.imageUrl} alt="" className="w-full h-full object-cover" />
