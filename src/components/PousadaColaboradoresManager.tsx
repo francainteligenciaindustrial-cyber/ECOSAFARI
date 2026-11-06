@@ -12,6 +12,7 @@ interface Colaborador {
   services: string[];
   languages: string[];
   specialties: string[];
+  atracoesInteresse?: { id: string; name: string }[];
   bio?: string;
   status: "pendente" | "aprovado" | "reprovado";
   decisionNote?: string;
@@ -120,6 +121,7 @@ export default function PousadaColaboradoresManager({ pousadaId }: { pousadaId: 
               </p>
               {c.languages.length > 0 && <p><span className="text-editorial-muted">Idiomas:</span> {c.languages.join(", ")}</p>}
               {c.specialties.length > 0 && <p><span className="text-editorial-muted">Especialidades:</span> {c.specialties.join(", ")}</p>}
+              {(c.atracoesInteresse || []).length > 0 && <p><span className="text-editorial-muted">Pontos turísticos de interesse:</span> {c.atracoesInteresse!.map(a => a.name).join(", ")}</p>}
               {c.bio && <p className="text-editorial-text whitespace-pre-line">{c.bio}</p>}
               {c.decisionNote && <p className="text-editorial-muted italic">Observação: {c.decisionNote}</p>}
 

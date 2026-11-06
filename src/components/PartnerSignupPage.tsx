@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Users, Building2, MapPin, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet, ChefHat, LoaderCircle } from "lucide-react";
+import { Compass, Users, Building2, MapPin, CheckCircle2, ArrowLeft, MessageSquare, Sparkles, Handshake, Wallet, ChefHat, LoaderCircle, Ship, Palette, Wrench } from "lucide-react";
 import { trackMetaEvent } from "../lib/metaPixel";
 
 const WHATSAPP_NUMBER = "5565999868334";
@@ -7,7 +7,27 @@ const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | u
 
 type PartnerType = "guia" | "pousada" | "atracao" | "colaborador";
 
-const COLAB_SERVICE_OPTIONS = ["Camareira", "Cozinheiro(a)", "Piloteiro", "Garçom/Garçonete", "Diarista", "Cantor(a)/Músico", "Fotógrafo(a)", "Guia local", "Recepção", "Manutenção", "Motorista"];
+const COLAB_SERVICE_OPTIONS = ["Piloteiro(a)", "Cozinheiro(a)", "Artista (música, dança, artesanato)", "Camareira", "Garçom/Garçonete", "Diarista", "Fotógrafo(a)", "Guia local", "Recepção", "Manutenção", "Motorista"];
+
+// Tipos de cadastro. Piloteiro, cozinheiro, artista e "outro serviço" usam o
+// mesmo formulário de prestador (com o serviço já marcado); guia, pousada e
+// ponto turístico têm formulário próprio.
+type SignupKind = "guia" | "piloteiro" | "cozinheiro" | "artista" | "prestador" | "pousada" | "atracao";
+const KIND_TO_TYPE: Record<SignupKind, PartnerType> = {
+  guia: "guia", piloteiro: "colaborador", cozinheiro: "colaborador", artista: "colaborador", prestador: "colaborador", pousada: "pousada", atracao: "atracao",
+};
+const KIND_PRESET_SERVICE: Partial<Record<SignupKind, string>> = {
+  piloteiro: "Piloteiro(a)", cozinheiro: "Cozinheiro(a)", artista: "Artista (música, dança, artesanato)",
+};
+const KIND_BUTTONS: { kind: SignupKind; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { kind: "guia", label: "Guia de turismo", Icon: Users },
+  { kind: "piloteiro", label: "Piloteiro(a)", Icon: Ship },
+  { kind: "cozinheiro", label: "Cozinheiro(a)", Icon: ChefHat },
+  { kind: "artista", label: "Artista", Icon: Palette },
+  { kind: "prestador", label: "Outro serviço", Icon: Wrench },
+  { kind: "pousada", label: "Represento uma pousada", Icon: Building2 },
+  { kind: "atracao", label: "Represento um ponto turístico", Icon: MapPin },
+];
 
 const LANGUAGE_OPTIONS = ["Português", "Inglês", "Espanhol", "Francês", "Alemão", "Italiano", "Mandarim", "Japonês", "Russo", "Árabe", "Libras"];
 const SPECIALTY_OPTIONS = ["Observação de aves", "Safári fotográfico", "Trilhas", "Pesca esportiva", "Passeio de barco", "Focagem noturna", "Cavalgada", "Flora e plantas medicinais", "Cultura indígena", "Turismo de aventura"];
@@ -81,7 +101,12 @@ function useRecaptcha() {
 
 export default function PartnerSignupPage() {
   const initialParams = new URLSearchParams(window.location.search);
-  const [type, setType] = useState<PartnerType>(initialParams.get("tipo") === "colaborador" ? "colaborador" : "guia");
+  const [kind, setKind] = useState<SignupKind>(() => {
+    const tipo = initialParams.get("tipo") || "";
+    if (tipo === "colaborador") return "prestador";
+    return (Object.keys(KIND_TO_TYPE) as SignupKind[]).includes(tipo as SignupKind) ? (tipo as SignupKind) : "guia";
+  });
+  const type = KIND_TO_TYPE[kind];
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -259,7 +284,7 @@ export default function PartnerSignupPage() {
             Cadastre-se para prestar serviços conosco
           </h2>
           <p className="text-white/80 text-sm mb-8 leading-relaxed">
-            Você é guia turístico, representa uma pousada ou uma atração (restaurante, parada legal) e quer fazer parte da rede Ipantanal? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para nossa equipe, que entrará em contato.
+            Você é guia de turismo, piloteiro(a), cozinheiro(a), artista, presta outro serviço, ou representa uma pousada ou um ponto turístico e quer fazer parte da rede Ipantanal? Preencha o formulário abaixo — leva menos de 2 minutos e suas informações vão direto para análise.
           </p>
 
         {/* Why partner with us — cold traffic from an ad needs the "what's
@@ -282,48 +307,27 @@ export default function PartnerSignupPage() {
           </div>
         </div>
 
-        {/* Type toggle */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          <button
-            type="button"
-            onClick={() => setType("guia")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
-              type === "guia" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
-            }`}
-          >
-            <Users className="h-4 w-4" /> Sou Guia Turístico
-          </button>
-          <button
-            type="button"
-            onClick={() => setType("pousada")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
-              type === "pousada" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
-            }`}
-          >
-            <Building2 className="h-4 w-4" /> Represento uma Pousada
-          </button>
-          <button
-            type="button"
-            onClick={() => setType("atracao")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
-              type === "atracao" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
-            }`}
-          >
-            <MapPin className="h-4 w-4" /> Represento uma Atração
-          </button>
-          <button
-            type="button"
-            onClick={() => setType("colaborador")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 border text-xs uppercase tracking-widest font-bold transition cursor-pointer ${
-              type === "colaborador" ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
-            }`}
-          >
-            <ChefHat className="h-4 w-4" /> Sou Colaborador(a)
-          </button>
+        {/* Tipo de cadastro */}
+        <p className="text-white/70 text-[10px] uppercase tracking-[0.2em] font-bold mb-2">Eu sou / represento</p>
+        <div role="radiogroup" aria-label="Tipo de cadastro" className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {KIND_BUTTONS.map(({ kind: k, label, Icon }) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={kind === k}
+              onClick={() => { setKind(k); setError(""); }}
+              className={`flex items-center justify-center gap-2 px-2 py-3 border text-[11px] uppercase tracking-widest font-bold text-center leading-tight transition cursor-pointer ${
+                kind === k ? "bg-white text-editorial-primary border-white" : "bg-white/10 text-white border-white/30 hover:bg-white/20"
+              }`}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" /> {label}
+            </button>
+          ))}
         </div>
 
         {type === "colaborador" ? (
-          <ColaboradorSignupForm getRecaptchaToken={getRecaptchaToken} presetPousadaId={initialParams.get("pousada") || ""} />
+          <ColaboradorSignupForm key={kind} getRecaptchaToken={getRecaptchaToken} presetPousadaId={initialParams.get("pousada") || ""} presetService={KIND_PRESET_SERVICE[kind]} />
         ) : (
 
         <form onSubmit={handleSubmit} className="bg-white border border-editorial-border p-6 md:p-8 rounded-lg space-y-4">
@@ -354,7 +358,7 @@ export default function PartnerSignupPage() {
                 <Textarea value={guiaForm.message} onChange={e => setGuiaForm({ ...guiaForm, message: e.target.value })} />
               </Field>
             </>
-          ) : (
+          ) : type === "pousada" ? (
             <>
               <Field label="Nome da pousada" required>
                 <Input required value={pousadaForm.pousadaName} onChange={e => setPousadaForm({ ...pousadaForm, pousadaName: e.target.value })} />
@@ -382,11 +386,11 @@ export default function PartnerSignupPage() {
                 <Textarea value={pousadaForm.message} onChange={e => setPousadaForm({ ...pousadaForm, message: e.target.value })} />
               </Field>
             </>
-          )}
+          ) : null}
 
           {type === "atracao" && (
             <>
-              <Field label="Nome da atração" required>
+              <Field label="Nome do ponto turístico / atração" required>
                 <Input required value={atracaoForm.atracaoName} onChange={e => setAtracaoForm({ ...atracaoForm, atracaoName: e.target.value })} />
               </Field>
               <Field label="Tipo" required>
@@ -456,12 +460,48 @@ function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} rows={3} className="w-full border border-editorial-border px-3 py-2.5 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary resize-none" />;
 }
 
-// Cadastro de colaborador: cria o login (email + senha) já na hora, mas a
-// conta só passa a valer depois que o gestor da pousada escolhida aprovar.
-function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId }: { getRecaptchaToken: (action: string) => Promise<string | undefined>; presetPousadaId: string }) {
+// Balões de escolha múltipla para uma lista fixa (pousadas, atrações).
+function ChoiceChips({ label, required, options, value, onToggle, empty }: { label: string; required?: boolean; options: { id: string; name: string }[]; value: string[]; onToggle: (id: string) => void; empty?: string }) {
+  return (
+    <div role="group" aria-label={label} className="space-y-2">
+      <span className="block text-[10px] uppercase tracking-widest font-bold text-editorial-muted">
+        {label}{required && <span className="text-editorial-primary"> *</span>}
+      </span>
+      {options.length === 0 && empty ? (
+        <p className="text-xs text-editorial-muted">{empty}</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {options.map(o => {
+            const active = value.includes(o.id);
+            return (
+              <button
+                key={o.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onToggle(o.id)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition cursor-pointer ${active ? "bg-editorial-primary text-white border-editorial-primary" : "bg-white text-editorial-text border-editorial-border hover:bg-editorial-secondary"}`}
+              >
+                {active ? "✓ " : ""}{o.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Cadastro de prestador de serviço: cria o login (email + senha) já na
+// hora, mas a conta só passa a valer depois que o gestor de uma das
+// pousadas escolhidas aprovar.
+function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId, presetService }: { getRecaptchaToken: (action: string) => Promise<string | undefined>; presetPousadaId: string; presetService?: string }) {
   const [pousadas, setPousadas] = useState<{ id: string; name: string }[]>([]);
-  const [form, setForm] = useState({ name: "", age: "", phone: "", email: "", password: "", confirmPassword: "", bio: "", pousadaId: presetPousadaId });
-  const [services, setServices] = useState<string[]>([]);
+  const [atracoes, setAtracoes] = useState<{ id: string; name: string }[]>([]);
+  const [form, setForm] = useState({ name: "", age: "", phone: "", email: "", password: "", confirmPassword: "", bio: "" });
+  // Pousadas e pontos turísticos que a pessoa conhece ou quer atender (balões).
+  const [pousadaIds, setPousadaIds] = useState<string[]>(presetPousadaId ? [presetPousadaId] : []);
+  const [atracaoIds, setAtracaoIds] = useState<string[]>([]);
+  const [services, setServices] = useState<string[]>(presetService ? [presetService] : []);
   const [languages, setLanguages] = useState<string[]>(["Português"]);
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -473,7 +513,12 @@ function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId }: { getReca
       .then(res => (res.ok ? res.json() : []))
       .then((list: { id: string; name: string }[]) => setPousadas((Array.isArray(list) ? list : []).map(p => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name))))
       .catch(() => setPousadas([]));
+    fetch("/api/atracoes")
+      .then(res => (res.ok ? res.json() : []))
+      .then((list: { id: string; name: string }[]) => setAtracoes((Array.isArray(list) ? list : []).map(a => ({ id: a.id, name: a.name })).sort((a, b) => a.name.localeCompare(b.name))))
+      .catch(() => setAtracoes([]));
   }, []);
+  const toggleId = (list: string[], id: string) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -481,6 +526,7 @@ function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId }: { getReca
     e.preventDefault();
     if (submitting) return;
     setError("");
+    if (pousadaIds.length === 0) return setError("Selecione pelo menos uma pousada onde quer prestar serviço.");
     if (services.length === 0) return setError("Selecione pelo menos um serviço que você presta.");
     if (form.password.length < 8) return setError("A senha precisa ter pelo menos 8 caracteres.");
     if (form.password !== form.confirmPassword) return setError("As senhas não coincidem.");
@@ -490,7 +536,7 @@ function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId }: { getReca
       const res = await fetch("/api/colaboradores/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, age: Number(form.age), services, languages, specialties, recaptchaToken }),
+        body: JSON.stringify({ ...form, age: Number(form.age), pousadaIds, atracaoIds, services, languages, specialties, recaptchaToken }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return setError(body.error || "Não foi possível enviar seu cadastro.");
@@ -508,19 +554,29 @@ function ColaboradorSignupForm({ getRecaptchaToken, presetPousadaId }: { getReca
       <div className="bg-white border border-editorial-border p-8 rounded-lg text-center">
         <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto mb-3" />
         <h2 className="font-serif text-2xl font-bold text-editorial-primary mb-2">Cadastro enviado!</h2>
-        <p className="text-sm text-editorial-muted max-w-md mx-auto">O gestor da pousada vai analisar seu perfil. Você recebe a resposta por email e, se aprovado, já entra no sistema com o email e a senha que acabou de criar.</p>
+        <p className="text-sm text-editorial-muted max-w-md mx-auto">O gestor de cada pousada escolhida vai analisar seu perfil. Você recebe a resposta por email e, se aprovado, já entra no sistema com o email e a senha que acabou de criar.</p>
       </div>
     );
   }
 
   return (
     <form onSubmit={submit} className="bg-white border border-editorial-border p-6 md:p-8 rounded-lg space-y-4">
-      <Field label="Pousada onde quer trabalhar" required>
-        <select required value={form.pousadaId} onChange={set("pousadaId")} className="w-full border border-editorial-border bg-white px-3 py-2.5 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary">
-          <option value="">Selecione...</option>
-          {pousadas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </Field>
+      <ChoiceChips
+        label="Pousadas que você conhece ou onde quer prestar serviço (selecione todas)"
+        required
+        options={pousadas}
+        value={pousadaIds}
+        onToggle={id => setPousadaIds(prev => toggleId(prev, id))}
+        empty="Carregando pousadas..."
+      />
+      {atracoes.length > 0 && (
+        <ChoiceChips
+          label="Pontos turísticos / atrações de interesse (opcional)"
+          options={atracoes}
+          value={atracaoIds}
+          onToggle={id => setAtracaoIds(prev => toggleId(prev, id))}
+        />
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4">
         <Field label="Nome completo" required><Input required maxLength={120} value={form.name} onChange={set("name")} /></Field>
         <Field label="Idade" required><Input required type="number" min={16} max={100} value={form.age} onChange={set("age")} /></Field>

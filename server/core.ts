@@ -2470,6 +2470,9 @@ export async function provisionPartnerLogin(
   if (!supabaseAdminAuth) return { userId: null, actionLink: null, emailSent: false, error: "SUPABASE_SERVICE_ROLE_KEY não configurada." };
 
   let userId: string | null = null;
+  // Flags que convivem com qualquer papel e não podem se perder quando a
+  // conta ganha um acesso novo (ex.: turista que virou guia continua turista).
+  let keptFlags: Record<string, unknown> = {};
 
   const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
     email,
@@ -2499,8 +2502,12 @@ export async function provisionPartnerLogin(
     // from whatever record they already manage onto a different one, just
     // because someone reused their email on a second invite/candidatura.
     const existingMeta = match.app_metadata || {};
+    for (const flag of ["isAdmin", "isChief", "isTourist"]) if (existingMeta[flag] === true) keptFlags[flag] = true;
+    // Conta de turista "pura" (role tourist): virar parceiro não é conflito —
+    // a mesma conta passa a ser parceiro E continua turista (isTourist).
+    if (existingMeta.role === "tourist") keptFlags.isTourist = true;
     const isSameGrant = Object.entries(appMetadata).every(([k, v]) => existingMeta[k] === v);
-    if (existingMeta.role && !isSameGrant) {
+    if (existingMeta.role && existingMeta.role !== "tourist" && !isSameGrant) {
       // Exceção: se já é parceiro e o convite novo também é de parceiro
       // (só que de outra propriedade), não é conflito — é dono de mais de
       // uma pousada/atração/guia. Soma como propriedade extra em
@@ -2519,7 +2526,7 @@ export async function provisionPartnerLogin(
     userId = match.id;
   }
 
-  const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: appMetadata });
+  const { error: updateErr } = await supabaseAdminAuth.auth.admin.updateUserById(userId, { app_metadata: { ...keptFlags, ...appMetadata } });
   if (updateErr) {
     return {
       userId,
@@ -2604,6 +2611,7 @@ export const mapColaborador = (c: any) => ({
   services: parseJSONSafe(c.services) || [],
   languages: parseJSONSafe(c.languages) || [],
   specialties: parseJSONSafe(c.specialties) || [],
+  atracoesInteresse: parseJSONSafe(c.atracoesInteresse) || [],
 });
 
 // Guards against a known failure mode: a stale/duplicate deployment of an

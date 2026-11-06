@@ -42,6 +42,7 @@ import {
   supabaseAdminAuth,
   toCleanList,
   verifyRecaptcha,
+  writeSkippingMissingColumns,
 } from "../core.js";
 import { parseFromHeader } from "../../src/lib/emailSender.js";
 
@@ -696,9 +697,11 @@ app.post("/api/pousadas/:id/vendas", requirePartnerAccess("pousada"), async (req
   res.status(201).json({ ...venda, items });
 });
 
-// Cadastro público de colaborador (camareira, cozinheira, piloteiro,
-// cantor, fotógrafo...). A conta nasce sem acesso a nada: só vira
-// "aprovado" quando um gestor da pousada escolhida aprovar.
+// Cadastro público de colaborador / prestador de serviço (piloteiro,
+// cozinheiro, artista, camareira, fotógrafo...). A conta nasce sem acesso a
+// nada: só vira "aprovado" quando o gestor de uma das pousadas escolhidas
+// aprovar. O candidato pode marcar várias pousadas (uma linha por pousada,
+// cada gestor decide a sua) e as atrações em que tem interesse.
 app.post("/api/colaboradores/signup", publicFormLimiter, async (req, res) => {
   if (!supabaseAdminAuth) return res.status(503).json({ error: "Cadastro indisponível no momento." });
   if (!(await verifyRecaptcha(req.body.recaptchaToken))) return res.status(400).json({ error: "Não foi possível validar o envio. Recarregue a página e tente de novo." });
@@ -709,37 +712,50 @@ app.post("/api/colaboradores/signup", publicFormLimiter, async (req, res) => {
   const password = String(req.body.password || "");
   const age = Math.trunc(Number(req.body.age));
   const bio = clip(req.body.bio, 1500);
-  const pousadaId = clip(req.body.pousadaId, 100);
+  const pousadaIds = Array.from(new Set(
+    (Array.isArray(req.body.pousadaIds) ? req.body.pousadaIds : [req.body.pousadaId]).map((v: unknown) => clip(v, 100)).filter(Boolean) as string[]
+  )).slice(0, 15);
+  const atracaoIds = Array.from(new Set(
+    (Array.isArray(req.body.atracaoIds) ? req.body.atracaoIds : []).map((v: unknown) => clip(v, 100)).filter(Boolean) as string[]
+  )).slice(0, 15);
   const services = toCleanList(req.body.services, COLAB_SERVICES_MAX, 60);
   const languages = toCleanList(req.body.languages, 15, 40);
   const specialties = toCleanList(req.body.specialties, 15, 60);
 
-  if (!name || !phone || !pousadaId || services.length === 0) return res.status(400).json({ error: "Preencha nome, telefone, pousada e pelo menos um serviço." });
+  if (!name || !phone || pousadaIds.length === 0 || services.length === 0) return res.status(400).json({ error: "Preencha nome, telefone, pelo menos uma pousada e um serviço." });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Informe um email válido." });
   if (!Number.isInteger(age) || age < 16 || age > 100) return res.status(400).json({ error: "Informe uma idade válida." });
   if (password.length < 8 || isWeakPassword(password)) return res.status(400).json({ error: "Use uma senha com pelo menos 8 caracteres, misturando letras e números." });
   if (password !== String(req.body.confirmPassword || "")) return res.status(400).json({ error: "As senhas não coincidem." });
 
-  const { data: pousada } = await supabase.from("pousadas").select("id, name").eq("id", pousadaId).maybeSingle();
-  if (!pousada) return res.status(400).json({ error: "Pousada não encontrada." });
+  const { data: pousadasRows } = await supabase.from("pousadas").select("id, name").in("id", pousadaIds);
+  const pousadas = (pousadasRows || []) as { id: string; name: string }[];
+  if (pousadas.length !== pousadaIds.length) return res.status(400).json({ error: "Alguma das pousadas escolhidas não foi encontrada." });
+  const { data: atracoesRows } = atracaoIds.length ? await supabase.from("atracoes").select("id, name").in("id", atracaoIds) : { data: [] as any[] };
+  const atracoes = ((atracoesRows || []) as { id: string; name: string }[]).map(a => ({ id: a.id, name: a.name }));
 
   const { data: created, error: createErr } = await supabaseAdminAuth.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    app_metadata: { role: "colaborador", colaboradorStatus: "pendente", pousadaId },
+    app_metadata: { role: "colaborador", colaboradorStatus: "pendente", pousadaId: pousadas[0].id },
     user_metadata: { name },
   });
   if (createErr || !created.user) {
     return res.status(400).json({ error: "Não foi possível concluir o cadastro com esse email. Se você já tem conta, use outro email ou fale com a equipe." });
   }
 
-  const row = {
-    id: `col_${randomUUID()}`, userId: created.user.id, pousadaId, name, email, phone, age,
+  const createdAt = new Date().toISOString();
+  const rows = pousadas.map(p => ({
+    id: `col_${randomUUID()}`, userId: created.user.id, pousadaId: p.id, name, email, phone, age,
     services: JSON.stringify(services), languages: JSON.stringify(languages), specialties: JSON.stringify(specialties),
-    bio, status: "pendente", createdAt: new Date().toISOString(),
-  };
-  const { error: insertErr } = await supabase.from("colaboradores").insert(row);
+    atracoesInteresse: JSON.stringify(atracoes),
+    bio, status: "pendente", createdAt,
+  }));
+  // atracoesInteresse é coluna nova: sem a migração, a inserção segue sem ela.
+  const { error: insertErr } = await writeSkippingMissingColumns({ ...rows[0] }, cols =>
+    supabase.from("colaboradores").insert(rows.map(r => Object.fromEntries(Object.entries(r).filter(([k]) => k in cols))))
+  );
   if (insertErr) {
     await supabaseAdminAuth.auth.admin.deleteUser(created.user.id).catch(() => {});
     log.error("Erro ao salvar colaborador:", insertErr.message);
@@ -747,18 +763,20 @@ app.post("/api/colaboradores/signup", publicFormLimiter, async (req, res) => {
     return res.status(pending ? 503 : 500).json({ error: pending ? "Cadastro de colaboradores ainda não está ativo. Tente novamente mais tarde." : "Erro ao salvar seu cadastro." });
   }
 
-  for (const gestorEmail of await getPousadaGestorEmails(pousadaId)) {
-    await sendEmail({
-      to: gestorEmail,
-      subject: `Novo colaborador aguardando aprovação — ${pousada.name}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #101B4C;">Novo cadastro de colaborador</h2>
-          <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(services.join(", "))}) quer trabalhar com a <strong>${escapeHtml(pousada.name)}</strong>.</p>
-          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Analisar no portal</a></p>
-        </div>
-      `,
-    });
+  for (const pousada of pousadas) {
+    for (const gestorEmail of await getPousadaGestorEmails(pousada.id)) {
+      await sendEmail({
+        to: gestorEmail,
+        subject: `Novo colaborador aguardando aprovação — ${pousada.name}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #101B4C;">Novo cadastro de colaborador</h2>
+            <p><strong>${escapeHtml(name)}</strong> (${escapeHtml(services.join(", "))}) quer trabalhar com a <strong>${escapeHtml(pousada.name)}</strong>.</p>
+            <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#101B4C; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Analisar no portal</a></p>
+          </div>
+        `,
+      });
+    }
   }
   res.status(201).json({ success: true });
 });
@@ -785,9 +803,16 @@ app.post("/api/pousadas/:id/colaboradores/:colabId/decisao", requirePartnerAcces
   if (error) return res.status(500).json({ error: "Erro ao registrar a decisão." });
 
   if (supabaseAdminAuth) {
+    // O mesmo colaborador pode ter se candidatado a várias pousadas: a conta
+    // fica "aprovado" se qualquer uma aprovou (reprovação de uma não derruba
+    // a aprovação de outra).
+    const { data: allRows } = await supabase.from("colaboradores").select("pousadaId, status").eq("userId", colab.userId);
+    const statuses = (allRows || []) as { pousadaId: string; status: string }[];
+    const approvedRow = statuses.find(r => r.status === "aprovado");
+    const overall = approvedRow ? "aprovado" : statuses.some(r => r.status === "pendente") ? "pendente" : "reprovado";
     const { data: authUser } = await supabaseAdminAuth.auth.admin.getUserById(colab.userId);
     await supabaseAdminAuth.auth.admin.updateUserById(colab.userId, {
-      app_metadata: { ...(authUser?.user?.app_metadata || {}), role: "colaborador", colaboradorStatus: decision, pousadaId: colab.pousadaId },
+      app_metadata: { ...(authUser?.user?.app_metadata || {}), role: "colaborador", colaboradorStatus: overall, pousadaId: approvedRow?.pousadaId || colab.pousadaId },
     });
   }
 
@@ -820,7 +845,10 @@ app.post("/api/pousadas/:id/colaboradores/:colabId/decisao", requirePartnerAcces
 app.get("/api/colaborador/me", authLimiter, async (req, res) => {
   const user = await getPartnerUserFromRequest(req);
   if (!user || user.app_metadata?.role !== "colaborador") return res.status(403).json({ error: "Esta conta não é de colaborador." });
-  const { data } = await supabase.from("colaboradores").select("*").eq("userId", user.id).maybeSingle();
+  // Várias candidaturas (uma por pousada): mostra a aprovada, senão a mais recente.
+  const { data: rows } = await supabase.from("colaboradores").select("*").eq("userId", user.id).order("createdAt", { ascending: false });
+  const list = (rows || []) as any[];
+  const data = list.find(r => r.status === "aprovado") || list[0];
   if (!data) return res.status(404).json({ error: "Cadastro de colaborador não encontrado." });
   const { data: pousada } = await supabase.from("pousadas").select("name").eq("id", data.pousadaId).maybeSingle();
   res.json({ ...mapColaborador(data), pousadaName: pousada?.name || "" });
