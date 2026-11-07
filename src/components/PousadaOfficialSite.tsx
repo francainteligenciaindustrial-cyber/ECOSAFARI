@@ -8,6 +8,7 @@ import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 import ScrollReveal from "./ScrollReveal";
 import PousadaLocation from "./PousadaLocation";
+import ReviewPhotos from "./ReviewPhotos";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -305,8 +306,9 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
                 <div key={review.id} className="bg-white border border-editorial-border p-6 relative">
                   <Quote className="h-5 w-5 text-editorial-primary/30 mb-3" />
                   <p className="text-sm text-editorial-text leading-relaxed mb-5">{review.comment}</p>
+                  {review.images && review.images.length > 0 && <div className="-mt-3 mb-5"><ReviewPhotos images={review.images} alt={`Foto de ${review.userName}`} /></div>}
                   <div className="flex items-center gap-3">
-                    {review.photoUrl ? (
+                    {review.photoUrl && !(review.images && review.images.length) ? (
                       <img src={review.photoUrl} alt={review.userName} referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover border border-editorial-border" />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-editorial-secondary border border-editorial-border flex items-center justify-center text-editorial-primary font-serif font-bold text-sm">

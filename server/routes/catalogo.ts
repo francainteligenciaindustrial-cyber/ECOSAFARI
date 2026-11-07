@@ -43,6 +43,7 @@ import {
   viewLimiter,
   viteDevServer,
   writeSkippingMissingColumns,
+  SUPABASE_URL,
 } from "../core.js";
 
 // Reserva concluída (paga/confirmada, check-out no passado) do turista nesta
@@ -493,11 +494,12 @@ app.post("/api/sightings/:id/like", publicFormLimiter, async (req, res) => {
 // nenhum no front-end, e não deveria vazar numa rota sem autenticação.
 app.get("/api/reviews", async (req, res) => {
   res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=120");
-  const { data, error } = await supabase
-    .from("reviews")
-    .select("id,pousadaId,atracaoId,guideId,userName,rating,comment,date,photoUrl");
+  const cols = "id,pousadaId,atracaoId,guideId,userName,rating,comment,date,photoUrl";
+  // "images" (fotos da avaliação) entra quando a migração já rodou.
+  let { data, error } = await supabase.from("reviews").select(`${cols},images`);
+  if (error && /images/.test(error.message)) ({ data, error } = await supabase.from("reviews").select(cols) as any);
   if (error) return res.status(500).json({ error: "Erro ao buscar avaliações" });
-  res.json(data);
+  res.json((data || []).map((r: any) => ({ ...r, images: Array.isArray(r.images) ? r.images : [] })));
 });
 
 // A review targets exactly one of pousada/atração/guia — this table backs
@@ -547,6 +549,14 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
     return res.status(400).json({ error: moderation.reason });
   }
 
+  // Fotos da avaliação: só as enviadas para o nosso armazenamento
+  // (POST /api/upload-image, já moderadas) — nada de link externo.
+  const storagePrefix = `${SUPABASE_URL}/storage/v1/object/public/site-media/uploads/`;
+  const images = (Array.isArray(req.body.images) ? req.body.images : [])
+    .map((u: unknown) => String(u || ""))
+    .filter((u: string) => !!SUPABASE_URL && u.startsWith(storagePrefix) && u.length < 400)
+    .slice(0, 5);
+
   const newReview: Review = {
     id: `r_${randomUUID()}`,
     pousadaId: pousadaId || undefined,
@@ -556,7 +566,8 @@ app.post("/api/reviews", requireTourist, async (req, res) => {
     rating: req.body.rating || 5,
     comment: req.body.comment,
     date: new Date().toISOString().split("T")[0],
-    photoUrl: req.body.photoUrl || undefined,
+    photoUrl: images[0] || undefined,
+    images: images.length ? images : undefined,
     turistaId: touristId,
     verifiedStay: !!stayBookingId,
     bookingId: stayBookingId,

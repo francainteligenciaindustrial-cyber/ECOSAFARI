@@ -20,6 +20,8 @@ import PacotesSection from "./PacotesSection";
 import { useSightingStats, matchSpeciesStats, unmatchedSpeciesStats, publishablePoints, publishableSpecies } from "../lib/useSightingStats";
 import { seasonFromMonthly } from "../lib/sightingStats";
 import ScrollReveal from "./ScrollReveal";
+import ReviewMediaPicker from "./ReviewMediaPicker";
+import ReviewPhotos from "./ReviewPhotos";
 import type { MessageKey } from "../i18n/messages";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
@@ -153,7 +155,8 @@ export default function PousadaCatalog({
   const [priceMax, setPriceMax] = useState("");
   const [ratingInput, setRatingInput] = useState(5);
   const [commentInput, setCommentInput] = useState("");
-  const [photoUrlInput, setPhotoUrlInput] = useState("");
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
+  const [uploadingReviewImages, setUploadingReviewImages] = useState(false);
   const [selectedPousadaForReview, setSelectedPousadaForReview] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState("");
@@ -268,6 +271,7 @@ export default function PousadaCatalog({
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim() || submittingReview) return;
+    if (uploadingReviewImages) { setReviewError(t("reviews.photosWait")); return; }
 
     setSubmittingReview(true);
     setReviewError("");
@@ -279,7 +283,7 @@ export default function PousadaCatalog({
           pousadaId: selectedPousadaForReview,
           rating: ratingInput,
           comment: commentInput,
-          photoUrl: photoUrlInput.trim() || undefined
+          images: reviewImages
         })
       });
 
@@ -291,7 +295,7 @@ export default function PousadaCatalog({
       onAddReview(body);
 
       setCommentInput("");
-      setPhotoUrlInput("");
+      setReviewImages([]);
       setRatingInput(5);
       setReviewSuccess(true);
       setTimeout(() => setReviewSuccess(false), 4000);
@@ -1165,16 +1169,13 @@ export default function PousadaCatalog({
                 </div>
 
                 <div>
-                  <label htmlFor="review-photo" className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">{t("reviews.photoLabel")}</label>
-                  <input
-                    id="review-photo"
-                    type="url"
-                    value={photoUrlInput}
-                    onChange={e => setPhotoUrlInput(e.target.value)}
-                    placeholder={t("reviews.photoPlaceholder")}
-                    className="w-full bg-editorial-secondary text-editorial-text text-xs border border-editorial-border rounded-xl p-2 focus:outline-none focus:border-editorial-primary"
+                  <p className="block text-editorial-primary text-[10px] uppercase tracking-wider font-bold mb-1">{t("reviews.photosTitle")}</p>
+                  <ReviewMediaPicker
+                    value={reviewImages}
+                    onChange={setReviewImages}
+                    onUploadingChange={setUploadingReviewImages}
+                    labels={{ add: t("reviews.photosAdd"), hint: t("reviews.photosHint"), limit: t("reviews.photosLimit"), remove: t("reviews.photosRemove") }}
                   />
-                  <p className="text-editorial-muted text-[9px] mt-1">{t("reviews.photoHint")}</p>
                 </div>
 
                 {reviewError && <p className="text-red-600 text-xs font-medium">{reviewError}</p>}
@@ -1219,7 +1220,7 @@ export default function PousadaCatalog({
                 <div key={review.id} className="bg-white text-editorial-text border border-editorial-border p-4 sm:p-6 rounded-2xl shadow-sm transition min-w-[85%] sm:min-w-[60%] lg:min-w-0 snap-start flex-shrink-0">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 border-b border-editorial-border pb-3">
                     <div className="flex items-center gap-3">
-                      {review.photoUrl ? (
+                      {review.photoUrl && !(review.images && review.images.length) ? (
                         <img
                           src={review.photoUrl}
                           alt={review.userName}
@@ -1253,6 +1254,7 @@ export default function PousadaCatalog({
                   <p className="text-editorial-muted text-xs leading-relaxed italic font-serif">
                     "{review.comment}"
                   </p>
+                  <ReviewPhotos images={review.images} alt={`Foto de ${review.userName}`} />
                   <span className="text-editorial-muted text-[9px] font-mono block mt-4 text-right">{review.date}</span>
                 </div>
               );

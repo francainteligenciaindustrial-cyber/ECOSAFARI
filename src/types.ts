@@ -188,6 +188,7 @@ export interface Review {
   comment: string;
   date: string;
   photoUrl?: string; // foto real do hóspede, opcional — reforça a prova social do depoimento
+  images?: string[]; // fotos enviadas junto da avaliação (até 5), mostradas em miniatura
   verifiedStay?: boolean; // selo "hóspede verificado": avaliação ligada a uma estadia concluída
   bookingId?: string;
   turistaId?: string; // id do turista autenticado que avaliou — obrigatório desde que avaliar passou a exigir perfil de turista
