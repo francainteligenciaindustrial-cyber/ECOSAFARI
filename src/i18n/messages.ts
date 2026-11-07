@@ -257,6 +257,8 @@ const raw = {
 
   // ---- FAQ da home
   "faq.kicker": ["Dúvidas Comuns", "Common questions", "Dudas frecuentes"],
+  "testimonials.kicker": ["Quem já viveu o Pantanal", "Travelers who've been there", "Quienes ya vivieron el Pantanal"],
+  "testimonials.title": ["O que dizem os viajantes", "What travelers are saying", "Lo que dicen los viajeros"],
   "faq.title": ["Perguntas Frequentes", "Frequently Asked Questions", "Preguntas frecuentes"],
   "faq.subtitle": ["Tudo o que você precisa saber para planejar sua jornada de conservação e aventura.", "Everything you need to plan your conservation and adventure trip.", "Todo lo que necesitas saber para planificar tu viaje de conservación y aventura."],
   "faq.q1": ["Como chego à pousada no interior do Mato Grosso?", "How do I get to a lodge in rural Mato Grosso?", "¿Cómo llego a la posada en el interior de Mato Grosso?"],

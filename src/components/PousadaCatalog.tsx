@@ -22,6 +22,7 @@ import { seasonFromMonthly } from "../lib/sightingStats";
 import ScrollReveal from "./ScrollReveal";
 import ReviewMediaPicker from "./ReviewMediaPicker";
 import ReviewPhotos from "./ReviewPhotos";
+import TestimonialsMarquee from "./TestimonialsMarquee";
 import type { MessageKey } from "../i18n/messages";
 
 // Code-split — see App.tsx for why (same component, lazy-loaded separately
@@ -1264,6 +1265,22 @@ export default function PousadaCatalog({
         </div>
       </section>
       </ErrorBoundary>
+
+      {/* Depoimentos correndo (avaliações reais) — entre avaliações e FAQ */}
+      <TestimonialsMarquee
+        kicker={t("testimonials.kicker")}
+        title={t("testimonials.title")}
+        itens={reviews.map(review => ({
+          review,
+          alvo: review.pousadaId
+            ? pousadas.find(p => p.id === review.pousadaId)?.name
+            : review.atracaoId
+            ? atracoes.find(a => a.id === review.atracaoId)?.name
+            : review.guideId
+            ? guiasPublicos.find(g => g.id === review.guideId)?.name
+            : null,
+        }))}
+      />
 
       {/* FAQ Section */}
       <section id="faq" className="bg-white py-20 border-t border-editorial-border">
