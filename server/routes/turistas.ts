@@ -61,7 +61,7 @@ async function sendTouristConfirmationEmail(email: string, name?: string): Promi
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #0B1412;">Confirme seu email 🌿</h2>
         <p>${name ? `Olá, ${escapeHtml(name)}! ` : ""}Clique no botão abaixo para ativar seu perfil de turista na Ipantanal.</p>
-        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:999px;">Confirmar meu email</a></p>
         <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${link}</p>
         <p style="color: #888; font-size: 12px;">Se você não pediu isso, pode ignorar este email.</p>
       </div>
@@ -144,13 +144,18 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   }
 
   const interests = sanitizeTouristInterests(req.body.interests);
-  const newTurista: Turista = {
+  // Novidades por e-mail só com aceite explícito (LGPD): caixa desmarcada
+  // por padrão no cadastro, editável depois no perfil.
+  const marketingOptIn = req.body.marketingOptIn === true;
+  const newTurista = {
     id: created.user.id, name, email, whatsapp, country,
     language: language || undefined,
     age: Number.isFinite(age) && age > 0 ? age : undefined,
     preferences, interests,
+    marketingOptIn,
+    marketingOptInAt: marketingOptIn ? new Date().toISOString() : null,
   };
-  const { error: insertErr } = await supabase.from("turistas").insert(newTurista);
+  const { error: insertErr } = await writeSkippingMissingColumns(newTurista, row => supabase.from("turistas").insert(row));
   if (insertErr) {
     // Don't leave a bare auth account behind with no profile row — it would
     // pass requireTourist's role check but have nothing for a review to use.
@@ -188,7 +193,7 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #0B1412;">Bem-vindo(a) à Ipantanal! 🌿</h2>
           <p>Olá, ${escapeHtml(name)}! Falta só um passo: confirme seu email pra ativar seu perfil de turista e fazer suas reservas.</p>
-          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Confirmar meu email</a></p>
+          <p><a href="${linkData.properties.action_link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:999px;">Confirmar meu email</a></p>
           <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${linkData.properties.action_link}</p>
         </div>
       `,
@@ -201,8 +206,9 @@ app.post("/api/turista/signup", publicFormLimiter, async (req, res) => {
   res.status(201).json({ success: true, emailConfirmationSent: false });
 });
 
-// Recuperação de senha de parceiro/colaborador pelo Resend. Resposta
-// sempre igual pra não revelar quais emails têm conta.
+// Recuperação de senha (parceiro, colaborador e turista) pelo Resend.
+// Resposta sempre igual pra não revelar quais emails têm conta. O link
+// volta para a tela de login de cada um, que pede a senha nova.
 app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
   const generic = { success: true };
   const email = String(req.body.email || "").trim().toLowerCase();
@@ -210,11 +216,12 @@ app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
   const { data } = await supabaseAdminAuth.auth.admin.listUsers({ perPage: 1000 });
   const user = (data?.users || []).find((u: any) => u.email?.toLowerCase() === email);
   const role = user?.app_metadata?.role;
-  if (!user || (role !== "partner" && role !== "colaborador")) return res.json(generic);
+  const isPortalUser = role === "partner" || role === "colaborador";
+  if (!user || (!isPortalUser && !isTouristUser(user))) return res.json(generic);
   const { data: linkData, error } = await supabaseAdminAuth.auth.admin.generateLink({
     type: "recovery",
     email,
-    options: { redirectTo: `${SITE_URL}/parceiro` },
+    options: { redirectTo: `${SITE_URL}${isPortalUser ? "/parceiro" : "/turista"}` },
   });
   const link = linkData?.properties?.action_link;
   if (error || !link) {
@@ -227,8 +234,8 @@ app.post("/api/auth/forgot-password", publicFormLimiter, async (req, res) => {
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #0B1412;">Redefinir senha</h2>
-        <p>Recebemos um pedido para redefinir a senha do seu acesso ao portal Ipantanal.</p>
-        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Criar nova senha</a></p>
+        <p>Recebemos um pedido para redefinir a senha da sua conta Ipantanal.</p>
+        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:999px;">Criar nova senha</a></p>
         <p style="color: #888; font-size: 12px;">Se você não pediu isso, ignore este email — sua senha continua a mesma.</p>
       </div>
     `,
@@ -438,7 +445,7 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
           <p><strong>${escapeHtml(newBooking.customerName)}</strong> reservou de <strong>${checkIn}</strong> a <strong>${checkOut}</strong> (${adults} adulto(s), ${children} criança(s))${roomType ? ` — ${escapeHtml(roomType)}` : ""}.</p>
           ${detailsSummary ? `<p style="color:#555">${escapeHtml(detailsSummary)}</p>` : ""}
           <p>A reserva aparece na sua Agenda de Reservas. Ela fica como "pendente de pagamento" até o hóspede pagar.</p>
-          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Abrir minha agenda</a></p>
+          <p><a href="${SITE_URL}/parceiro" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:999px;">Abrir minha agenda</a></p>
         </div>
       `,
     });
@@ -489,11 +496,46 @@ app.post("/api/turista/bookings/:id/pagar", checkoutLimiter, requireTourist, asy
 });
 
 app.get("/api/turista/me", requireTourist, async (req, res) => {
-  const userId = (res.locals.touristUser as { id: string }).id;
+  const user = res.locals.touristUser as { id: string; email?: string; email_confirmed_at?: string };
+  const userId = user.id;
   const { data, error } = await supabase.from("turistas").select("*").eq("id", userId).maybeSingle();
   if (error || !data) return res.status(404).json({ error: "Perfil de turista não encontrado." });
+
+  // Boas-vindas: uma vez, na primeira visita depois do e-mail confirmado.
+  // Só quando a coluna existe ("welcomeSentAt" in data) — sem a migração,
+  // mandaria a cada abertura do perfil.
+  if ("welcomeSentAt" in data && !data.welcomeSentAt && user.email_confirmed_at && user.email) {
+    const sent = await sendWelcomeEmail(user.email, String(data.name || ""));
+    if (sent) {
+      const at = new Date().toISOString();
+      await supabase.from("turistas").update({ welcomeSentAt: at }).eq("id", userId);
+      (data as any).welcomeSentAt = at;
+    }
+  }
   res.json(data as Turista);
 });
+
+async function sendWelcomeEmail(email: string, name: string): Promise<boolean> {
+  const first = escapeHtml(name.split(" ")[0] || "");
+  const r = await sendEmail({
+    to: email,
+    subject: "Bem-vindo(a) ao Ipantanal 🌿",
+    preheader: "Seu perfil está ativo. Veja o que dá para fazer agora.",
+    html: `
+      <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;color:#0B1412">Bem-vindo(a)${first ? `, ${first}` : ""}!</h1>
+      <p style="margin:0 0 16px">Seu perfil de turista está ativo. A partir de agora você pode:</p>
+      <ul style="margin:0 0 16px;padding-left:20px">
+        <li style="margin-bottom:6px"><strong>Reservar online</strong> nas pousadas parceiras, com confirmação na hora;</li>
+        <li style="margin-bottom:6px"><strong>Planejar a viagem</strong> pelo calendário de melhor época de cada espécie e pelo mapa de avistamentos;</li>
+        <li style="margin-bottom:6px"><strong>Juntar Jaguars</strong> e trocar por benefícios nas pousadas;</li>
+        <li><strong>Avaliar</strong> as pousadas onde se hospedou (selo de hóspede verificado).</li>
+      </ul>
+      <p style="margin:24px 0"><a href="${SITE_URL}/#catalogo" style="display:inline-block;background:#0B1412;color:#FFFFFF;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Explorar pousadas</a></p>
+      <p style="margin:0;font-size:13px;color:#4F5D58">Dúvidas? É só responder este e-mail.</p>
+    `,
+  });
+  return r.ok;
+}
 
 // Edição do próprio perfil — nunca mexe em email/coins aqui: email é a
 // identidade de login (mudar exigiria reautenticação), coins só espelham o
@@ -542,6 +584,8 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
   const coverPosition = typeof req.body.coverPosition === "string" && /^\d{1,3}(\.\d+)?% \d{1,3}(\.\d+)?%$/.test(req.body.coverPosition.trim())
     ? req.body.coverPosition.trim()
     : undefined;
+  // Aceite das novidades por e-mail (só muda quando vem na requisição).
+  const marketingOptIn = typeof req.body.marketingOptIn === "boolean" ? req.body.marketingOptIn : undefined;
 
   const { data, error } = await writeSkippingMissingColumns(
     {
@@ -549,6 +593,7 @@ app.put("/api/turista/me", requireTourist, async (req, res) => {
       ...(photoUrl !== undefined ? { photoUrl } : {}),
       ...(coverPhotoUrl !== undefined ? { coverPhotoUrl } : {}),
       ...(coverPosition !== undefined ? { coverPosition } : {}),
+      ...(marketingOptIn !== undefined ? { marketingOptIn, marketingOptInAt: marketingOptIn ? new Date().toISOString() : null } : {}),
     },
     row => supabase.from("turistas").update(row).eq("id", userId).select().maybeSingle()
   );

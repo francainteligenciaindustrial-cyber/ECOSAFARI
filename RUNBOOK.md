@@ -31,9 +31,32 @@ que é a fonte da verdade) — é só "o site caiu, e agora?".
 
 ## 3. "Emails de confirmação não estão chegando"
 
-1. Confira `resend.com` → **Logs** — mostra todo envio recente e o motivo de falha, se houver.
-2. Sem `RESEND_API_KEY` configurada, o site nunca tenta mandar email — o fluxo cai pra confirmação só via WhatsApp/painel, que continua funcionando normalmente.
-3. Emails saem de `onboarding@resend.dev` (domínio de teste do Resend) — se isso for uma pendência (ex: quer sair da caixa de spam com mais frequência), configurar um domínio próprio verificado no Resend é o próximo passo, não uma correção de bug.
+1. Abra `https://www.ipantanal.com.br/api/resend/status`: mostra o remetente em uso (`from`) e o último erro do Resend (`lastFailure`).
+2. Confira `resend.com` → **Logs** — mostra todo envio recente e o motivo de falha, se houver.
+3. Sem `RESEND_API_KEY` configurada, o site nunca tenta mandar email. Se o Resend recusa o envio da confirmação de cadastro, a conta do turista é confirmada automaticamente (para não ficar presa) — então "cadastrou e não recebeu nada" quase sempre é chave ou remetente errado.
+4. `EMAIL_FROM` precisa ser de um domínio **verificado** no Resend (`ipantanal.com.br`), e a `RESEND_API_KEY` precisa ser da **mesma conta** do Resend onde o domínio foi verificado.
+
+### Quais e-mails o sistema manda
+
+| E-mail | Quem envia | Quando |
+|---|---|---|
+| Confirmação de cadastro do turista | site → Resend | ao criar o perfil (link `signup`) |
+| Boas-vindas | site → Resend | primeira visita depois de confirmar o email (uma vez) |
+| Recuperação de senha (turista, parceiro, colaborador) | site → Resend | "Esqueci minha senha" |
+| Alerta "sua senha foi alterada" | site → Resend | depois de criar uma senha nova |
+| Convite de parceiro / admin | site → Resend | aprovação de candidatura, acesso de parceiro |
+| Reserva confirmada (com voucher PDF), lembrete, pedido de avaliação | site → Resend | fluxo de reservas e cron diário |
+| Comunicados (novidades e notícias) | Gestão → Comunicados | manual; turistas só com aceite, sempre com "Descadastrar" |
+| E-mails do próprio Supabase (troca de e-mail, convites pelo painel do Supabase) | Supabase → SMTP do Resend | quando acionados pelo painel do Supabase |
+
+Todos saem com a mesma moldura da marca (`server/emailLayout.ts`).
+
+### Supabase usando o Resend (SMTP)
+
+Supabase → **Project Settings → Authentication → SMTP Settings → Enable Custom SMTP**:
+host `smtp.resend.com`, porta `465`, usuário `resend`, senha = a `RESEND_API_KEY`,
+remetente `nao-responda@ipantanal.com.br`, nome `Ipantanal`. Sem isso o Supabase
+usa o servidor de testes dele (2 e-mails por hora e cai no spam).
 
 ## 4. "Um admin perdeu acesso à própria conta" (senha, 2FA)
 

@@ -52,7 +52,7 @@ const emailBox = (title: string, body: string, cta?: { href: string; label: stri
   <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
     <h2 style="color: #0B1412;">${title}</h2>
     ${body}
-    ${cta ? `<p><a href="${cta.href}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">${cta.label}</a></p>` : ""}
+    ${cta ? `<p><a href="${cta.href}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:999px;">${cta.label}</a></p>` : ""}
   </div>`;
 
 // Pedido aberto (ou mais recente) da pousada, com as versões da logo.

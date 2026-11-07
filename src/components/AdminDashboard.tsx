@@ -64,6 +64,8 @@ import CoordinatesInput from "./CoordinatesInput";
 import RemetenteEmailStatus from "./RemetenteEmailStatus";
 import CuponsPanel from "./CuponsPanel";
 import PedidosSitePanel from "./PedidosSitePanel";
+import AdminComunicadosPanel from "./AdminComunicadosPanel";
+import { Megaphone } from "lucide-react";
 import AppLodgeSelect from "./AppLodgeSelect";
 import { usePagination } from "../lib/usePagination";
 import AdminReservasTab from "./AdminReservasTab";
@@ -78,7 +80,7 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira" | "pacotes" | "cupons" | "pedidos-site";
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira" | "pacotes" | "cupons" | "pedidos-site" | "comunicados";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
 // hand-written <button> per tab. Grouped into sections (rather than one flat
@@ -98,6 +100,7 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "candidaturas", icon: Handshake, label: "Candidaturas", group: "Parceiros" },
   { id: "species", icon: PawPrint, label: "Espécies", group: "Conteúdo" },
   { id: "turismo", icon: MapIcon, label: "Turistas & Roteiros", group: "Conteúdo" },
+  { id: "comunicados", icon: Megaphone, label: "Comunicados (email)", group: "Conteúdo" },
   { id: "admins", icon: Lock, label: "Administradores", group: "Sistema" },
   { id: "auditlog", icon: ScrollText, label: "Log de Auditoria", group: "Sistema" },
   { id: "lixeira", icon: Trash2, label: "Lixeira", group: "Sistema" },
@@ -889,6 +892,7 @@ export default function AdminDashboard({
         {activeTab === "pacotes" && <PacotesPanel pousadas={pousadas} guides={guides} />}
         {activeTab === "cupons" && <CuponsPanel pousadas={pousadas} />}
         {activeTab === "pedidos-site" && <PedidosSitePanel />}
+        {activeTab === "comunicados" && <AdminComunicadosPanel />}
 
         {/* TAB 1: RESERVAS & CONFIRMAÇÕES */}
         {activeTab === "bookings" && <AdminReservasTab pousadas={pousadas} onRefreshData={onRefreshData} fetchBookings={fetchBookings} guides={guides} bookings={bookings} />}

@@ -107,6 +107,21 @@ export default function TuristaProfileView() {
     });
   }, []);
 
+  const [savingOptIn, setSavingOptIn] = useState(false);
+  const handleToggleMarketing = async (on: boolean) => {
+    setSavingOptIn(true);
+    try {
+      const res = await adminFetch("/api/turista/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marketingOptIn: on }),
+      });
+      if (res.ok) setLocalProfile(await res.json());
+    } finally {
+      setSavingOptIn(false);
+    }
+  };
+
   const saveProfile = async (overrides?: Partial<{ photoUrl: string; coverPhotoUrl: string; coverPosition: string }>): Promise<Turista | null> => {
     const body = {
       name: form.name,
@@ -588,6 +603,22 @@ export default function TuristaProfileView() {
             <h2 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary flex items-center gap-2 mb-4">
               <ShieldAlert className="h-4 w-4" /> Privacidade e dados
             </h2>
+            <div className="flex items-start justify-between gap-4 pb-4 mb-4 border-b border-editorial-border">
+              <div>
+                <p className="text-editorial-text text-sm font-semibold">Novidades por email</p>
+                <p className="text-editorial-muted text-xs">Roteiros, épocas de avistamento e notícias do Ipantanal. Emails de reserva e de segurança chegam sempre.</p>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-editorial-text cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={!!localProfile.marketingOptIn}
+                  disabled={savingOptIn}
+                  onChange={e => handleToggleMarketing(e.target.checked)}
+                  className="accent-editorial-primary h-4 w-4"
+                />
+                {localProfile.marketingOptIn ? "Recebendo" : "Desligado"}
+              </label>
+            </div>
             <div className="flex flex-col gap-3 pb-4 mb-4 border-b border-editorial-border">
               <div>
                 <p className="text-editorial-text text-sm font-semibold">Baixar meus dados</p>

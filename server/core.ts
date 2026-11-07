@@ -23,6 +23,8 @@ import { buildPousadaSender, pickReplyTo, EMAIL_ADDRESS, parseFromHeader } from 
 import { lodgingTotal, normalizePrecosPorMes } from "../src/lib/pricing.js";
 import { splitBooking } from "../src/lib/finance.js";
 import { sendWhatsAppTemplate } from "./whatsapp.js";
+import { wrapEmail, htmlToText } from "./emailLayout.js";
+import { unsubscribeUrl } from "./emailTokens.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 
@@ -720,6 +722,8 @@ if (RESEND_API_KEY && RESEND_API_KEY !== "MY_RESEND_API_KEY") {
 // onboarding@resend.dev só entrega pro email do dono da conta Resend, e pra
 // qualquer outro destinatário a API responde com erro (sem lançar exceção).
 export const EMAIL_FROM = process.env.EMAIL_FROM || "Ipantanal <onboarding@resend.dev>";
+// CNPJ/endereço no rodapé dos e-mails (mesmas variáveis do rodapé do site).
+const COMPANY_LINE = [process.env.VITE_COMPANY_CNPJ && `CNPJ ${process.env.VITE_COMPANY_CNPJ}`, process.env.VITE_COMPANY_ADDRESS].filter(Boolean).join(" · ");
 if (resend && !process.env.EMAIL_FROM) {
   log.warn("EMAIL_FROM não definido — usando onboarding@resend.dev, que só entrega para o email dono da conta Resend. Verifique um domínio no Resend e defina EMAIL_FROM.");
 }
@@ -737,18 +741,58 @@ const recordEmailFailure = (from: string, message: string) => {
   lastEmailFailure = { at: new Date().toISOString(), from: parseFromHeader(from).address, message: String(message).slice(0, 300) };
 };
 
-export async function sendEmail(msg: { to: string; subject: string; html: string; attachments?: { filename: string; content: string }[]; from?: string; replyTo?: string }): Promise<{ ok: boolean; error?: string }> {
+// Para onde vão as respostas dos e-mails da plataforma (as de reserva vão
+// para a pousada). Sem isso, a resposta iria para o remetente "não responda".
+export const EMAIL_REPLY_TO = process.env.EMAIL_REPLY_TO || "";
+// Segredo dos links de descadastro (ver server/emailTokens.ts).
+export const EMAIL_TOKEN_SECRET = process.env.EMAIL_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+export type EmailCategory = "transacional" | "novidades";
+
+// Todo e-mail sai com a moldura da marca (server/emailLayout.ts) e uma
+// versão em texto. Os de "novidades" levam o link de descadastro no rodapé
+// e os cabeçalhos List-Unsubscribe (botão "Cancelar inscrição" do Gmail).
+export interface OutgoingEmail {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: { filename: string; content: string }[];
+  from?: string;
+  replyTo?: string;
+  preheader?: string;
+  category?: EmailCategory;
+}
+
+// Monta o envio do Resend (moldura, texto, descadastro) — usado por
+// sendEmail e pelos comunicados em lote (server/routes/emails.ts).
+export function buildEmailPayload(msg: OutgoingEmail, sender: string = msg.from || EMAIL_FROM) {
+  const { from: _from, replyTo, preheader, category = "transacional", html, ...rest } = msg;
+  const unsubscribe = category === "novidades" && EMAIL_TOKEN_SECRET ? unsubscribeUrl(SITE_URL, msg.to, EMAIL_TOKEN_SECRET) : undefined;
+  const framed = wrapEmail(html, { preheader, unsubscribeUrl: unsubscribe, siteUrl: SITE_URL, companyLine: COMPANY_LINE || undefined });
+  const reply = replyTo || EMAIL_REPLY_TO || undefined;
+  return {
+    ...rest,
+    html: framed,
+    text: htmlToText(framed),
+    from: sender,
+    ...(reply ? { replyTo: reply } : {}),
+    ...(unsubscribe ? { headers: { "List-Unsubscribe": `<${unsubscribe}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } } : {}),
+  };
+}
+
+export async function sendEmail(msg: OutgoingEmail): Promise<{ ok: boolean; error?: string }> {
   if (!resend) return { ok: false, error: "Resend não configurado" };
-  const { from, replyTo, ...rest } = msg;
-  const attempt = async (sender: string, reply?: string) => {
-    const { error } = await resend!.emails.send({ ...rest, from: sender, ...(reply ? { replyTo: reply } : {}) });
+  const { from } = msg;
+  const attempt = async (sender: string, _reply?: string) => {
+    const { error } = await resend!.emails.send(buildEmailPayload(msg, sender));
     return error;
   };
+  const reply = undefined;
   try {
-    let error = await attempt(from || EMAIL_FROM, replyTo);
+    let error = await attempt(from || EMAIL_FROM, reply);
     if (error && from && from !== EMAIL_FROM) {
       log.warn(`Resend recusou o remetente ${from} (${error.message}) — reenviando por ${EMAIL_FROM}.`);
-      error = await attempt(EMAIL_FROM, replyTo);
+      error = await attempt(EMAIL_FROM, reply);
     }
     if (error) {
       log.warn(`Resend recusou o envio para ${msg.to}: ${error.message}`);
@@ -2010,7 +2054,7 @@ export async function enviarPedidoAvaliacao(booking: Booking): Promise<boolean> 
         <h2 style="color: #0B1412;">Obrigado por viajar com a gente, ${primeiroNome}! 🌿</h2>
         <p>Esperamos que a estadia na <strong>${escapeHtml(booking.pousadaName)}</strong> tenha sido inesquecível.</p>
         <p>Leva um minuto: sua avaliação ajuda outros viajantes a escolher e ajuda a pousada a melhorar.</p>
-        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:12px 22px; text-decoration:none; border-radius:4px;">Avaliar minha estadia</a></p>
+        <p><a href="${link}" style="display:inline-block; background:#0B1412; color:#fff; padding:12px 22px; text-decoration:none; border-radius:999px;">Avaliar minha estadia</a></p>
         <p style="color:#888; font-size:12px;">Thank you for traveling with Ipantanal! Tap the button above to rate your stay.</p>
       </div>
     `,
@@ -2563,7 +2607,7 @@ export async function provisionPartnerLogin(
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
             <h2 style="color: #0B1412;">Bem-vindo(a) à Ipantanal! 🌿</h2>
             <p>Seu acesso ao portal do parceiro foi criado. Clique no link abaixo para definir sua senha e acessar seu perfil:</p>
-            <p><a href="${actionLink}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px;">Definir senha e acessar</a></p>
+            <p><a href="${actionLink}" style="display:inline-block; background:#0B1412; color:#fff; padding:10px 20px; text-decoration:none; border-radius:999px;">Definir senha e acessar</a></p>
             <p style="color: #888; font-size: 12px;">Se o botão não funcionar, copie e cole este link no navegador:<br/>${actionLink}</p>
           </div>
         `,
@@ -2684,9 +2728,15 @@ export function escapeHtml(str: string): string {
 export function injectPousadaMeta(html: string, pousada: Pousada): string {
   const title = `${pousada.name} — Ipantanal`;
   const description = (pousada.description || "Conheça esta pousada parceira da Ipantanal.").slice(0, 200);
-  const image = (pousada.images && pousada.images[0]) || "/species/onca-pintada.png";
+  const own = pousada.images && pousada.images[0];
+  // WhatsApp/Facebook só buscam imagem com endereço completo (https://…):
+  // um caminho relativo (/pousadas/x.png) faz a prévia sair sem foto.
+  const image = own ? (/^https?:\/\//.test(own) ? own : `${SITE_URL}${own.startsWith("/") ? "" : "/"}${own}`) : `${SITE_URL}/og-ipantanal.png`;
 
   return html
+    // Largura/altura/alt declaradas no index.html são da imagem padrão (logo);
+    // com a foto da pousada, deixa o leitor da prévia medir sozinho.
+    .replace(own ? /\s*<meta property="og:image:(width|height|alt)" content=".*?"\s*\/>/g : /$^/, "")
     .replace(/<title>.*?<\/title>/s, `<title>${escapeHtml(title)}</title>`)
     .replace(/<meta name="description" content=".*?"\s*\/>/, `<meta name="description" content="${escapeHtml(description)}" />`)
     .replace(/<meta property="og:title" content=".*?"\s*\/>/, `<meta property="og:title" content="${escapeHtml(title)}" />`)

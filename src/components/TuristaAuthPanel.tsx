@@ -44,6 +44,17 @@ export default function TuristaAuthPanel() {
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
   const [loginResend, setLoginResend] = useState<"idle" | "sending" | "sent">("idle");
   const [loggingIn, setLoggingIn] = useState(false);
+  // "Esqueci minha senha": manda o link; ao voltar pelo link (evento
+  // PASSWORD_RECOVERY do Supabase) a tela pede a senha nova.
+  const [forgotState, setForgotState] = useState<"idle" | "sending" | "sent">("idle");
+  const [recovering, setRecovering] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [recoverError, setRecoverError] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  // Novidades por e-mail: só com aceite explícito (desmarcado por padrão).
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
 
   // Signup — every field is required, matching the "campos obrigatórios no
   // cadastro" requirement: a tourist profile only counts as one if it's
@@ -71,9 +82,10 @@ export default function TuristaAuthPanel() {
         setIsTourist(isTouristUser(data.session?.user));
         setCheckingSession(false);
       });
-      const { data } = client.auth.onAuthStateChange((_event, session) => {
+      const { data } = client.auth.onAuthStateChange((event, session) => {
         setCurrentUser(session?.user || null);
         setIsTourist(isTouristUser(session?.user));
+        if (event === "PASSWORD_RECOVERY") setRecovering(true);
       });
       subscription = data.subscription;
     });
@@ -185,7 +197,7 @@ export default function TuristaAuthPanel() {
       const res = await fetch("/api/turista/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language: LANGUAGE_NAMES[lang] }),
+        body: JSON.stringify({ name, email, password, confirmPassword, whatsapp, country, language: LANGUAGE_NAMES[lang], marketingOptIn }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -211,6 +223,43 @@ export default function TuristaAuthPanel() {
       setIsTourist(true);
     } finally {
       setSigningUp(false);
+    }
+  };
+
+  const handleForgot = async () => {
+    const target = loginEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+      setLoginError("Digite seu email no campo acima para receber o link.");
+      return;
+    }
+    setLoginError("");
+    setForgotState("sending");
+    await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: target }),
+    }).catch(() => {});
+    setForgotState("sent");
+  };
+
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || savingPassword) return;
+    setRecoverError("");
+    if (newPassword.length < 8) return setRecoverError("A senha precisa ter pelo menos 8 caracteres.");
+    if (newPassword !== newPasswordConfirm) return setRecoverError("As senhas não coincidem.");
+    setSavingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return setRecoverError(error.message || "Erro ao salvar a senha nova.");
+      // Alerta de segurança por e-mail ("sua senha foi alterada").
+      adminFetch("/api/auth/password-changed", { method: "POST" }).catch(() => {});
+      setPasswordSaved(true);
+      setRecovering(false);
+      setNewPassword("");
+      setNewPasswordConfirm("");
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -247,6 +296,27 @@ export default function TuristaAuthPanel() {
         >
           {resendState === "sending" ? "Reenviando..." : resendState === "sent" ? "Link reenviado — confira seu email" : "Reenviar email de confirmação"}
         </button>
+      </div>
+    );
+  }
+
+  if (recovering) {
+    return (
+      <div className="max-w-sm w-full mx-auto bg-white border border-editorial-border rounded-2xl p-8 shadow-sm">
+        <h1 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary mb-2">Criar senha nova</h1>
+        <p className="text-editorial-muted text-xs mb-5">Escolha a senha nova da sua conta Ipantanal.</p>
+        <form onSubmit={handleSaveNewPassword} className="flex flex-col gap-3">
+          <label className="sr-only" htmlFor="nova-senha">Senha nova</label>
+          <input id="nova-senha" type="password" required minLength={8} autoComplete="new-password" placeholder="Senha nova (mínimo 8 caracteres)" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+            className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+          <label className="sr-only" htmlFor="nova-senha-2">Confirme a senha nova</label>
+          <input id="nova-senha-2" type="password" required minLength={8} autoComplete="new-password" placeholder="Confirme a senha nova" value={newPasswordConfirm} onChange={e => setNewPasswordConfirm(e.target.value)}
+            className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+          {recoverError && <p role="alert" className="text-red-600 text-xs font-medium">{recoverError}</p>}
+          <button type="submit" disabled={savingPassword} className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-full flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer">
+            {savingPassword ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "Salvar senha nova"}
+          </button>
+        </form>
       </div>
     );
   }
@@ -299,6 +369,7 @@ export default function TuristaAuthPanel() {
             <LogOut className="h-3.5 w-3.5" /> Sair
           </button>
         </div>
+        {passwordSaved && <p role="status" className="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl px-3 py-2">Senha nova salva. Enviamos um aviso para o seu email.</p>}
         {loadingProfile ? (
           <div className="flex justify-center py-8"><LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" /></div>
         ) : profile ? (
@@ -379,6 +450,19 @@ export default function TuristaAuthPanel() {
             </button>
           )}
           <button
+            type="button"
+            onClick={handleForgot}
+            disabled={forgotState === "sending"}
+            className="self-start text-[11px] font-semibold text-editorial-muted hover:text-editorial-primary hover:underline disabled:opacity-60 cursor-pointer"
+          >
+            {forgotState === "sending" ? "Enviando link..." : "Esqueci minha senha"}
+          </button>
+          {forgotState === "sent" && (
+            <p role="status" className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+              Se houver uma conta com esse email, enviamos um link para criar a senha nova. Confira também o spam.
+            </p>
+          )}
+          <button
             type="submit" disabled={loggingIn}
             className="mt-2 bg-editorial-primary text-white text-xs uppercase tracking-widest font-semibold py-2.5 rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition disabled:opacity-60 cursor-pointer"
           >
@@ -408,6 +492,10 @@ export default function TuristaAuthPanel() {
             className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary"
           />
           <CountrySelect required placeholder="País" value={country} onChange={setCountry} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+          <label className="flex items-start gap-2 text-[11px] text-editorial-muted leading-snug cursor-pointer">
+            <input type="checkbox" checked={marketingOptIn} onChange={e => setMarketingOptIn(e.target.checked)} className="mt-0.5 accent-editorial-primary h-4 w-4 flex-shrink-0" />
+            Quero receber novidades, roteiros e notícias do Ipantanal por email. Dá para cancelar quando quiser.
+          </label>
           {signupError && <p className="text-red-600 text-xs font-medium">{signupError}</p>}
           <button
             type="submit" disabled={signingUp}

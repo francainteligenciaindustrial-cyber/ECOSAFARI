@@ -36,6 +36,7 @@ const MobileSimulator = lazy(() => import("./components/MobileSimulator"));
 // is no reason to ship all seven in the main bundle up front.
 const PartnerSignupPage = lazy(() => import("./components/PartnerSignupPage"));
 const AboutPage = lazy(() => import("./components/AboutPage"));
+const UnsubscribePage = lazy(() => import("./components/UnsubscribePage"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("./components/TermsPage"));
 const FaqPage = lazy(() => import("./components/FaqPage"));
@@ -67,6 +68,7 @@ const COMPANY_ADDRESS = (import.meta.env.VITE_COMPANY_ADDRESS as string | undefi
 const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   "/seja-parceiro": PartnerSignupPage,
   "/sobre": AboutPage,
+  "/descadastrar": UnsubscribePage,
   "/privacidade": PrivacyPolicyPage,
   "/termos": TermsPage,
   "/faq": FaqPage,

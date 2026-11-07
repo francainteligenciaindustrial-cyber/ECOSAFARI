@@ -419,6 +419,8 @@ export interface Turista {
   // alimenta nenhuma lógica de negócio como interests.
   coverPhotoUrl?: string;
   coverPosition?: string; // enquadramento da capa ("50% 30%"), escolhido arrastando a foto
+  marketingOptIn?: boolean; // aceitou receber novidades por email (LGPD: só com aceite)
+  welcomeSentAt?: string | null;
 }
 
 // Pousada que um turista logado marcou como "gostei" — alimenta o widget de

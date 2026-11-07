@@ -170,6 +170,8 @@ export default function PartnerPortalPage() {
       setNeedsNewPassword(false);
       setNewPassword("");
       setNewPasswordConfirm("");
+      // Alerta de segurança por e-mail ("sua senha foi alterada").
+      adminFetch("/api/auth/password-changed", { method: "POST" }).catch(() => {});
     } finally {
       setSettingPassword(false);
     }
