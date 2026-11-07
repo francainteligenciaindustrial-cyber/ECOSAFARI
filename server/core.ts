@@ -2700,4 +2700,4 @@ export function injectPousadaMeta(html: string, pousada: Pousada): string {
 // SITE_URL: base URL used to build absolute links in the sitemap. Falls back
 // to a placeholder — set this env var once the real domain (item 14) is live
 // so the sitemap doesn't need a code change.
-export const SITE_URL = (process.env.SITE_URL || "https://ipantanal.com.br").replace(/\/$/, "");
+export const SITE_URL = (process.env.SITE_URL || "https://www.ipantanal.com.br").replace(/\/$/, "");
