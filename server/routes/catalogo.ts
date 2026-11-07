@@ -6,6 +6,7 @@ import { slugify, resolveSlug } from "../../src/lib/slug.js";
 import { normalizeHost, isValidCustomDomain } from "../../src/lib/customDomain.js";
 import { isGoogleMapsUrl, cleanGoogleMapsUrl } from "../../src/lib/mapsLinks.js";
 import { normalizePrecosPorMes } from "../../src/lib/pricing.js";
+import { verificarListaEspera } from "./listaEspera.js";
 import path from "path";
 import fs from "fs";
 import {
@@ -265,6 +266,10 @@ app.put("/api/pousadas/:id", requirePartnerAccess("pousada"), async (req, res) =
     updates.appLodgeId = id || null as any;
   }
   const { data, error, skipped } = await writeSkippingMissingColumns(updates, row => supabase.from("pousadas").update(row).eq("id", id).select().single());
+  // Pousada liberou datas ou aumentou quartos: avisa quem estava esperando.
+  if (!error && ("unavailableDates" in updates || "rooms" in updates || "capacity" in updates)) {
+    await verificarListaEspera(id).catch(() => {});
+  }
   if (error && error.code !== "PGRST116") {
     log.error("[PUT /api/pousadas/:id]", error.message);
     return res.status(500).json({ error: "Erro ao salvar a pousada. Tente novamente ou fale com o suporte.", requestId: res.getHeader("X-Request-Id") });

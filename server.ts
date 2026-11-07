@@ -31,6 +31,7 @@ import { registerMensagensRoutes } from "./server/routes/mensagens.js";
 import { registerListasRoutes } from "./server/routes/listas.js";
 import { registerCarrinhoRoutes } from "./server/routes/carrinho.js";
 import { registerOportunidadesRoutes } from "./server/routes/oportunidades.js";
+import { registerListaEsperaRoutes } from "./server/routes/listaEspera.js";
 
 registerCatalogoRoutes(app);
 registerReservasRoutes(app);
@@ -50,6 +51,7 @@ registerMensagensRoutes(app);
 registerListasRoutes(app);
 registerCarrinhoRoutes(app);
 registerOportunidadesRoutes(app);
+registerListaEsperaRoutes(app);
 
 
 // Catches errors passed to next(err) by any route above (routes that handle

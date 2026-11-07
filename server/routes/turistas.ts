@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import {
   addNotification,
   bookingFinance,
+  CART_HOLD_MINUTES,
   checkoutLimiter,
   checkPousadaAvailability,
   clip,
@@ -299,7 +300,10 @@ app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, r
   if (!profile) return res.status(403).json({ error: "Complete seu perfil de turista antes de reservar." });
   const prep = await prepareTouristBooking(req.body);
   if ("body" in prep) return res.status(prep.status).json(prep.body);
-  const inserted = await insertTouristBooking(prep, profile, { afiliadoCode: req.body.afiliadoCode });
+  // Com a Stripe ligada, a vaga fica segurada pelo mesmo prazo do checkout
+  // (~30 min); sem a Stripe, a equipe manda o link e a reserva não expira.
+  const holdUntil = stripe ? new Date(Date.now() + CART_HOLD_MINUTES * 60000).toISOString() : undefined;
+  const inserted = await insertTouristBooking(prep, profile, { afiliadoCode: req.body.afiliadoCode, holdUntil });
   if ("body" in inserted) return res.status(inserted.status).json(inserted.body);
   const newBooking = inserted.booking;
   const { pousada, detailsSummary } = prep;
@@ -360,6 +364,19 @@ app.post("/api/turista/bookings/:id/pagar", checkoutLimiter, requireTourist, asy
   const { data: booking } = await supabase.from("bookings").select("*").eq("id", req.params.id).maybeSingle();
   if (!booking || !user.email || booking.customerEmail !== user.email) return res.status(404).json({ error: "Reserva não encontrada." });
   if (booking.status !== "pendente_pagamento") return res.status(409).json({ error: "Esta reserva não está aguardando pagamento." });
+  // Retomar o pagamento renova o prazo — se a vaga ainda estiver livre.
+  if (booking.holdUntil && Date.parse(booking.holdUntil) < Date.now()) {
+    const { data: pRow } = await supabase.from("pousadas").select("*").eq("id", booking.pousadaId).maybeSingle();
+    const avail = pRow ? await checkPousadaAvailability(mapPousadaRow(pRow), booking.checkIn, booking.checkOut, (booking.adults || 0) + (booking.children || 0), booking.roomType || undefined, booking.id) : { ok: false };
+    if (!avail.ok) {
+      await supabase.from("bookings").update({ status: "cancelado" }).eq("id", booking.id);
+      return res.status(409).json({ error: "O prazo para pagar venceu e essas datas foram reservadas por outra pessoa. Faça uma nova reserva com outras datas." });
+    }
+  }
+  if ("holdUntil" in booking) {
+    booking.holdUntil = new Date(Date.now() + CART_HOLD_MINUTES * 60000).toISOString();
+    await supabase.from("bookings").update({ holdUntil: booking.holdUntil }).eq("id", booking.id);
+  }
   try {
     res.json({ url: await createBookingCheckoutSession(booking as Booking) });
   } catch (err: any) {

@@ -27,6 +27,7 @@ import { wrapEmail, htmlToText } from "./emailLayout.js";
 import { unsubscribeUrl } from "./emailTokens.js";
 import { directionsUrl, directionsQueryUrl } from "../src/lib/mapsLinks.js";
 import { isExpiredHold } from "../src/lib/cartHold.js";
+import { datasLivresMaisProximas, shiftISO } from "../src/lib/disponibilidade.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 
@@ -1334,12 +1335,31 @@ export const shiftDays = (date: string, days: number) => new Date(Date.parse(dat
 // manual do admin quanto pela reserva online do turista. Estadias que só
 // se encostam (check-out de uma = check-in da outra) não conflitam.
 // excludeBookingId permite revalidar depois de gravar a própria reserva.
+// Datas livres mais próximas (mesmo nº de noites) — uma consulta só, numa
+// janela de ±90 dias, e a conta em memória (src/lib/disponibilidade.ts).
+export async function nearestAvailableDates(pousada: Pousada, checkIn: string, checkOut: string, guests: number, roomType?: string) {
+  const JANELA = 90;
+  const { data, error } = await supabase.from("bookings").select("*").eq("pousadaId", pousada.id).neq("status", "cancelado")
+    .lt("checkIn", shiftISO(checkOut, JANELA + 60)).gt("checkOut", shiftISO(checkIn, -JANELA));
+  if (error) return null;
+  const amanha = shiftISO(new Date().toISOString().slice(0, 10), 1);
+  return datasLivresMaisProximas(pousada, (data || []) as any[], checkIn, checkOut, guests, roomType, { primeiroDia: amanha, maxDias: JANELA });
+}
+
 export async function checkPousadaAvailability(pousada: Pousada, checkIn: string, checkOut: string, newGuests: number, roomType?: string, excludeBookingId?: string): Promise<AvailabilityResult> {
-  const suggestions = [{ checkIn: shiftDays(checkIn, 7), checkOut: shiftDays(checkOut, 7), note: "Uma semana mais tarde" }];
+  // Quando não cabe: sugere as datas livres mais próximas (a revalidação
+  // logo depois de gravar, com excludeBookingId, não precisa de sugestão).
+  const sugerir = async () => {
+    if (excludeBookingId) return { nearest: null, suggestions: [] as any[] };
+    const n = await nearestAvailableDates(pousada, checkIn, checkOut, newGuests, roomType).catch(() => null);
+    return n
+      ? { nearest: n, suggestions: [{ checkIn: n.checkIn, checkOut: n.checkOut, note: "Datas livres mais próximas" }] }
+      : { nearest: null, suggestions: [] as any[] };
+  };
 
   const blocked = (pousada.unavailableDates || []).filter(d => d >= checkIn && d < checkOut);
   if (blocked.length > 0) {
-    return { ok: false, status: 400, body: { error: `A pousada não recebe hóspedes em: ${blocked.slice(0, 5).join(", ")}.`, available: false, suggestions } };
+    return { ok: false, status: 400, body: { error: `A pousada não recebe hóspedes em: ${blocked.slice(0, 5).map(d => d.split("-").reverse().join("/")).join(", ")}.`, available: false, ...(await sugerir()) } };
   }
 
   // select("*"): inclui holdUntil quando a migração do carrinho já rodou,
@@ -1365,14 +1385,14 @@ export async function checkPousadaAvailability(pousada: Pousada, checkIn: string
     }
     const sameRoom = overlappingBookings.filter(b => b.roomType === roomType).length;
     if (sameRoom >= room.quantity) {
-      return { ok: false, status: 400, body: { error: `Sem unidades disponíveis do quarto "${roomType}" para estas datas (${room.quantity} no total).`, available: false, suggestions } };
+      return { ok: false, status: 400, body: { error: `O quarto "${roomType}" já está reservado nestas datas.`, available: false, ...(await sugerir()) } };
     }
     return { ok: true };
   }
 
   const guestsAlready = overlappingBookings.reduce((acc, b) => acc + (b.adults || 0) + (b.children || 0), 0);
   if (guestsAlready + newGuests > pousada.capacity) {
-    return { ok: false, status: 400, body: { error: "Indisponível para estas datas por atingir capacidade máxima.", available: false, suggestions } };
+    return { ok: false, status: 400, body: { error: "A pousada já está lotada nestas datas.", available: false, ...(await sugerir()) } };
   }
   return { ok: true };
 }
@@ -2193,6 +2213,9 @@ export async function createBookingCheckoutSession(booking: Booking): Promise<st
     });
     discounts = [{ coupon: coupon.id }];
   }
+  // Reserva com prazo (site, Stripe ligada): o checkout expira junto, no
+  // mínimo 30 min depois de aberto (exigência do Stripe).
+  const expiresAt = booking.holdUntil ? Math.max(Math.floor(Date.parse(booking.holdUntil) / 1000), Math.floor(Date.now() / 1000) + 31 * 60) : undefined;
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: lineItems,
@@ -2200,10 +2223,14 @@ export async function createBookingCheckoutSession(booking: Booking): Promise<st
     customer_email: booking.customerEmail || undefined,
     metadata: { bookingId: booking.id },
     payment_intent_data: { metadata: { bookingId: booking.id } },
+    ...(expiresAt ? { expires_at: expiresAt } : {}),
     success_url: `${SITE_URL}/pagamento-confirmado?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${SITE_URL}/turista?pagamento=cancelado`,
   });
   if (!session.url) throw new Error("Stripe não devolveu a URL do checkout");
+  // Guarda qual checkout é o atual: um checkout antigo que expira não
+  // cancela a reserva que está sendo paga num checkout novo.
+  await writeSkippingMissingColumns({ stripeSessionId: session.id }, row => supabase.from("bookings").update(row).eq("id", booking.id)).catch(() => {});
   return session.url;
 }
 
@@ -2356,6 +2383,14 @@ export async function handleStripeWebhook(req: express.Request, res: express.Res
     const session = event.data.object as Stripe.Checkout.Session;
     const ids = String(session.metadata?.bookingIds || "").split(",").filter(Boolean);
     await releasePedidoHold(ids).catch(err => log.warn("Erro ao liberar vagas do carrinho:", err.message));
+    // Reserva avulsa: libera só se este era o checkout atual dela.
+    const single = session.metadata?.bookingId;
+    if (single) {
+      const { data: b } = await supabase.from("bookings").select("*").eq("id", single).maybeSingle();
+      if (b && b.status === "pendente_pagamento" && b.holdUntil && (!b.stripeSessionId || b.stripeSessionId === session.id)) {
+        await supabase.from("bookings").update({ status: "cancelado" }).eq("id", single).eq("status", "pendente_pagamento");
+      }
+    }
   }
 
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {

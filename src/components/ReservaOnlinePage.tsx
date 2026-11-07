@@ -88,6 +88,16 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
   const [suggestions, setSuggestions] = useState<{ checkIn: string; checkOut: string; note: string }[]>([]);
   const [done, setDone] = useState<{ id: string; totalPrice: number } | null>(null);
 
+  // Disponibilidade das datas escolhidas, conferida assim que o turista
+  // escolhe (sem esperar o formulário inteiro). Ocupadas: sugere as datas
+  // livres mais próximas; recusou: lista de espera com aviso por e-mail.
+  type Disp = { state: "idle" | "checking" | "ok" | "busy"; error?: string; nearest?: { checkIn: string; checkOut: string } | null };
+  const [disp, setDisp] = useState<Disp>({ state: "idle" });
+  const [espera, setEspera] = useState<"idle" | "saving" | "saved">("idle");
+  const [esperaErro, setEsperaErro] = useState("");
+  const [datasAtualizadas, setDatasAtualizadas] = useState(false);
+  const dispRef = React.useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetch(`/api/pousadas/${encodeURIComponent(pousadaId)}`)
       .then(async res => {
@@ -181,6 +191,58 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subtotal]);
 
+  useEffect(() => {
+    if (!pousada || nightsBetween(checkIn, checkOut) < 1) return;
+    setEspera("idle");
+    setEsperaErro("");
+    let vivo = true;
+    const timer = setTimeout(() => {
+      setDisp({ state: "checking" });
+      fetch(`/api/pousadas/${encodeURIComponent(pousadaId)}/disponibilidade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checkIn, checkOut, adults, children, roomType: roomType || undefined }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then(body => {
+          if (!vivo || !body) return setDisp({ state: "idle" });
+          setDisp(body.available ? { state: "ok" } : { state: "busy", error: body.error, nearest: body.nearest });
+        })
+        .catch(() => vivo && setDisp({ state: "idle" }));
+    }, 500);
+    return () => { vivo = false; clearTimeout(timer); };
+  }, [pousada, pousadaId, checkIn, checkOut, adults, children, roomType]);
+
+  const usarDatasSugeridas = () => {
+    if (!disp.nearest) return;
+    setCheckIn(disp.nearest.checkIn);
+    setCheckOut(disp.nearest.checkOut);
+    setDatasAtualizadas(true);
+  };
+  useEffect(() => {
+    if (!datasAtualizadas) return;
+    const t = setTimeout(() => setDatasAtualizadas(false), 6000);
+    return () => clearTimeout(t);
+  }, [datasAtualizadas]);
+
+  const entrarNaListaDeEspera = async () => {
+    setEspera("saving");
+    setEsperaErro("");
+    try {
+      const r = await adminFetch("/api/turista/lista-espera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pousadaId, checkIn, checkOut, adults, children, roomType: roomType || undefined, pacoteId: pacote?.id, sugestaoRecusada: disp.nearest || null }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) { setEspera("idle"); setEsperaErro(body.error || t("booking.err.generic")); return; }
+      setEspera("saved");
+    } catch {
+      setEspera("idle");
+      setEsperaErro(t("booking.err.network"));
+    }
+  };
+
   const joinChoices = (list: string[], other: string) => [...list, other.trim()].filter(Boolean).join(", ");
 
   // Carrinho: guarda esta estadia (com tudo que foi preenchido) para pagar
@@ -224,6 +286,10 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
     if (selectedRoom && guests > selectedRoom.capacity) {
       return setError(t("booking.err.capacity", { room: selectedRoom.type, n: selectedRoom.capacity }));
     }
+    if (disp.state === "busy") {
+      dispRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (!acceptedTerms) return setError(t("booking.err.terms"));
 
     setSubmitting(true);
@@ -244,6 +310,12 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Datas ocupadas: mostra o aviso com as datas livres mais próximas.
+        if (body.available === false && "nearest" in body) {
+          setDisp({ state: "busy", error: body.error, nearest: body.nearest });
+          setTimeout(() => dispRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+          return;
+        }
         // Mensagens do servidor são em português: para turista estrangeiro,
         // mostra a versão traduzida e deixa o detalhe original embaixo.
         if (lang === "pt") setError(body.error || t("booking.err.generic"));
@@ -382,6 +454,42 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
                     <input id="childAges" type="text" maxLength={200} placeholder={t("booking.childAgesPh")} value={childAges} onChange={e => setChildAges(e.target.value)} className={inputClass} />
                   </div>
                 )}
+                <div ref={dispRef} aria-live="polite">
+                  {disp.state === "checking" && <p className="text-xs text-editorial-muted flex items-center gap-1.5"><LoaderCircle className="h-3.5 w-3.5 animate-spin" /> {t("booking.avail.checking")}</p>}
+                  {disp.state === "ok" && <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> {datasAtualizadas ? t("booking.avail.updated") : t("booking.avail.ok")}</p>}
+                  {disp.state === "busy" && (
+                    <div role="alert" className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                      <div>
+                        <p className="font-semibold text-sm text-amber-950">{t("booking.avail.busy")}</p>
+                        {lang === "pt" && disp.error && <p className="text-xs text-amber-900 mt-0.5">{disp.error}</p>}
+                      </div>
+                      {espera === "saved" ? (
+                        <p className="bg-white border border-emerald-200 text-emerald-900 text-sm rounded-lg px-3 py-2.5 flex items-start gap-2">
+                          <Check className="h-4 w-4 flex-shrink-0 mt-0.5" /> {t("booking.avail.thanks", { from: formatDate(checkIn), to: formatDate(checkOut) })}
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-sm text-amber-950">
+                            {disp.nearest
+                              ? t("booking.avail.nearest", { from: formatDate(disp.nearest.checkIn), to: formatDate(disp.nearest.checkOut), n: nightsBetween(disp.nearest.checkIn, disp.nearest.checkOut) })
+                              : t("booking.avail.none")}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {disp.nearest && (
+                              <button type="button" onClick={usarDatasSugeridas} className="bg-editorial-primary text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2.5 rounded-full cursor-pointer">
+                                {t("booking.avail.yes")}
+                              </button>
+                            )}
+                            <button type="button" onClick={entrarNaListaDeEspera} disabled={espera === "saving"} className="border border-editorial-border bg-white text-editorial-text text-[11px] uppercase tracking-widest font-bold px-4 py-2.5 rounded-full cursor-pointer disabled:opacity-60">
+                              {espera === "saving" ? t("booking.avail.saving") : disp.nearest ? t("booking.avail.no") : t("booking.avail.notify")}
+                            </button>
+                          </div>
+                          {esperaErro && <p className="text-xs text-red-700">{esperaErro}</p>}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </section>
 
               {!pacote && (pousada.experiences || []).length > 0 && (
