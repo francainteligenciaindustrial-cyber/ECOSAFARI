@@ -95,7 +95,13 @@ export default function TouristProfileWidget() {
         <div className="absolute right-0 top-full mt-3 w-80 max-h-[75vh] overflow-y-auto bg-white border border-editorial-border rounded-xl shadow-xl z-40 animate-fadeIn">
           {/* Header */}
           <div className="p-5 border-b border-editorial-border">
-            <div className="flex items-center gap-3">
+            {/* Foto + nome: abre o perfil completo. */}
+            <button
+              type="button"
+              onClick={() => { setOpen(false); navigate("/turista"); }}
+              aria-label="Abrir meu perfil"
+              className="w-full flex items-center gap-3 text-left rounded-xl -m-2 p-2 hover:bg-editorial-secondary transition cursor-pointer group"
+            >
               <span className="w-11 h-11 rounded-full bg-editorial-primary text-white text-sm font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {profile?.photoUrl ? (
                   <img src={profile.photoUrl} alt={profile.name} className="w-full h-full object-cover" />
@@ -103,11 +109,12 @@ export default function TouristProfileWidget() {
                   initials(profile.name)
                 ) : null}
               </span>
-              <div className="min-w-0">
-                <p className="font-bold text-sm text-editorial-text truncate">{profile?.name}</p>
-                <p className="text-editorial-muted text-[11px] truncate">{profile?.email}</p>
-              </div>
-            </div>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-sm text-editorial-text truncate group-hover:underline">{profile?.name}</span>
+                <span className="block text-editorial-muted text-[11px] truncate">{profile?.email}</span>
+                <span className="block text-editorial-accent text-[11px] font-semibold mt-0.5">Ver meu perfil →</span>
+              </span>
+            </button>
 
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-editorial-muted">
               {profile?.country && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {profile.country}</span>}
@@ -196,7 +203,7 @@ export default function TouristProfileWidget() {
 
           <div className="p-4 flex items-center justify-between">
             <button
-              onClick={() => { setOpen(false); navigate("/turista"); }}
+              onClick={() => { setOpen(false); navigate("/turista?editar=1"); }}
               className="text-editorial-primary text-[11px] uppercase tracking-widest font-bold hover:opacity-80 transition cursor-pointer"
             >
               Editar perfil

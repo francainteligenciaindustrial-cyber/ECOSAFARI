@@ -46,6 +46,22 @@ export default function TuristaProfileView() {
   const [localProfile, setLocalProfile] = useState<Turista | null>(null);
 
   const [editing, setEditing] = useState(false);
+  // "Editar perfil" no menu da conta abre /turista?editar=1: já entra com o
+  // formulário aberto (também quando o perfil já estava na tela).
+  useEffect(() => {
+    const openFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("editar") !== "1") return;
+      setEditing(true);
+      params.delete("editar");
+      const rest = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      setTimeout(() => document.getElementById("meus-dados")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    };
+    openFromUrl();
+    window.addEventListener("app-navigate", openFromUrl);
+    return () => window.removeEventListener("app-navigate", openFromUrl);
+  }, []);
   const [form, setForm] = useState({ name: "", whatsapp: "", country: "", language: "", age: "", preferences: "" });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -488,7 +504,7 @@ export default function TuristaProfileView() {
       <div className="px-6 mt-6 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* Coluna esquerda — dados + privacidade */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white border border-editorial-border rounded-lg p-6">
+          <div id="meus-dados" className="bg-white border border-editorial-border rounded-2xl p-6 scroll-mt-24">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary flex items-center gap-2">
                 <User className="h-4 w-4" /> Meus dados
