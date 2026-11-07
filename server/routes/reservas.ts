@@ -16,6 +16,7 @@ import {
   enviarLembreteCancelamento,
   enviarPedidosDeAvaliacao,
   generateVoucherPdfBuffer,
+  bookingContacts,
   getAuthorizedBooking,
   isOverbookingError,
   log,
@@ -310,7 +311,8 @@ app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {
   if (!booking) return; // getAuthorizedBooking já respondeu o erro
 
   try {
-    const buffer = await generateVoucherPdfBuffer(booking);
+    const pago = ["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"].includes(booking.status);
+    const buffer = await generateVoucherPdfBuffer(booking, pago ? await bookingContacts(booking).catch(() => ({})) : {});
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="voucher-${booking.id}.pdf"`);
     res.send(buffer);

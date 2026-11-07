@@ -25,6 +25,7 @@ import { splitBooking } from "../src/lib/finance.js";
 import { sendWhatsAppTemplate } from "./whatsapp.js";
 import { wrapEmail, htmlToText } from "./emailLayout.js";
 import { unsubscribeUrl } from "./emailTokens.js";
+import { directionsUrl, directionsQueryUrl } from "../src/lib/mapsLinks.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 
@@ -1016,7 +1017,7 @@ export function pickFields<T extends object>(body: any, allowedKeys: readonly (k
 // "viewCount" are deliberately excluded from POUSADA_* — they're computed by
 // the system (average of reviews / view counter), never set directly by a
 // client payload.
-export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl", "menu", "cuisineTypes", "transportOptions", "entertainmentOptions", "serviceNotes", "hasParking", "hasWifi", "facebookUrl", "tiktokUrl", "youtubeUrl", "logoUrl", "themeColorPrimary", "themeColorAccent", "latitude", "longitude", "emailContato", "precosPorMes", "googleMapsUrl"] as const;
+export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", "location", "pricePerNight", "images", "features", "activities", "experiences", "capacity", "videoUrl", "officialSiteUrl", "teamPhotoUrl", "teamSectionTitle", "teamSectionText", "officialSiteImages", "rooms", "unavailableDates", "hasOwnWebsite", "ownWebsiteUrl", "menu", "cuisineTypes", "transportOptions", "entertainmentOptions", "serviceNotes", "hasParking", "hasWifi", "facebookUrl", "tiktokUrl", "youtubeUrl", "logoUrl", "themeColorPrimary", "themeColorAccent", "latitude", "longitude", "emailContato", "precosPorMes", "googleMapsUrl", "whatsappContato"] as const;
 // googleCalendarId fica de fora de POUSADA_CREATE_FIELDS de propósito — é
 // um detalhe de organização interna da agência (qual calendário Google essa
 // pousada usa), não algo que o parceiro deveria poder mexer autoeditando o
@@ -1101,6 +1102,7 @@ export function mapPousadaRow(p: any): Pousada {
     longitude: toNumberOrUndefined(p.longitude),
     googleMapsUrl: p.googleMapsUrl || undefined,
     emailContato: p.emailContato || "",
+    whatsappContato: p.whatsappContato || "",
     emailRemetente: p.emailRemetente || "",
     emailRemetenteNome: p.emailRemetenteNome || "",
     customDomain: p.customDomain || "",
@@ -1651,9 +1653,16 @@ export async function applyBookingStatusUpdate(id: string, body: Partial<Booking
   const { data: savedBooking, error } = await supabase.from("bookings").update(updated).eq("id", id).select().single();
   if (error) log.warn("Erro ao atualizar reserva no Supabase:", error.message);
 
+  // Guia definido depois do pagamento: o hóspede recebe o contato dele.
+  const paidStatuses = ["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"];
+  if (updated.guideId && updated.guideId !== oldBooking.guideId && paidStatuses.includes(oldBooking.status)) {
+    await sendGuideAssignedEmail(updated).catch(err => log.warn("Erro ao enviar contato do guia:", err.message));
+  }
+
   // Email confirmation with PDF voucher (only sends if RESEND_API_KEY is configured)
   if (status === "pago" && oldBooking.status !== "pago") {
-    sendBookingConfirmationEmail(updated).catch(err => log.warn("Erro ao enviar email de confirmação:", err.message));
+    // await: na Vercel a função pode ser congelada logo depois da resposta.
+    await sendBookingConfirmationEmail(updated).catch(err => log.warn("Erro ao enviar email de confirmação:", err.message));
     // Mesmo aviso pelo WhatsApp (modelo "reserva_confirmada", ver RUNBOOK).
     sendWhatsAppTemplate(updated.customerPhone, "reserva_confirmada", [
       (updated.customerName || "").split(" ")[0] || "viajante",
@@ -2206,7 +2215,7 @@ export async function handleStripeWebhook(req: express.Request, res: express.Res
 // VOUCHER EM PDF & EMAIL DE CONFIRMAÇÃO (RESEND)
 // ----------------------------------------------------
 
-export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
+export function generateVoucherPdfBuffer(booking: Booking, contatos: { pousada?: { whatsapp?: string | null; email?: string | null } | null; guia?: { telefone?: string | null } | null } = {}): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     const chunks: Buffer[] = [];
@@ -2229,6 +2238,7 @@ export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
       doc.moveDown(0.3);
     };
 
+    row("Nº da reserva:", bookingRef(booking.id));
     row("Hóspede:", booking.customerName);
     row("Email:", booking.customerEmail);
     row("Pousada:", booking.pousadaName);
@@ -2238,6 +2248,9 @@ export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
     row("Experiência:", booking.experienceType);
     if (booking.guideName) row("Guia designado:", booking.guideName);
     row("Status:", "Pagamento confirmado");
+    if (contatos.pousada?.whatsapp) row("WhatsApp da pousada:", contatos.pousada.whatsapp);
+    if (contatos.pousada?.email) row("Email da pousada:", contatos.pousada.email);
+    if (contatos.guia?.telefone) row("Telefone do guia:", contatos.guia.telefone);
 
     doc.moveDown(1);
     doc.strokeColor("#0B1412").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
@@ -2255,29 +2268,119 @@ export function generateVoucherPdfBuffer(booking: Booking): Promise<Buffer> {
   });
 }
 
+// Número curto e fácil de ditar por telefone (o id completo continua no voucher).
+export const bookingRef = (id: string) => String(id || "").replace(/^b_/, "").slice(0, 8).toUpperCase();
+
+const AGENCY_WHATSAPP_DISPLAY = "+55 65 99986-8334";
+const AGENCY_WHATSAPP_LINK = "https://wa.me/5565999868334";
+const waLinkFrom = (phone?: string) => {
+  const d = String(phone || "").replace(/\D/g, "");
+  return d ? `https://wa.me/${d.length <= 11 ? `55${d}` : d}` : null;
+};
+const formatBR = (iso: string) => String(iso || "").slice(0, 10).split("-").reverse().join("/");
+
+// Contatos liberados depois do pagamento: recepção da pousada e guia.
+export async function bookingContacts(booking: Booking) {
+  const [{ data: pRow }, { data: gRow }] = await Promise.all([
+    supabase.from("pousadas").select("*").eq("id", booking.pousadaId).maybeSingle(),
+    booking.guideId ? supabase.from("guides").select("*").eq("id", booking.guideId).maybeSingle() : Promise.resolve({ data: null as any }),
+  ]);
+  const p = pRow ? mapPousadaRow(pRow) : null;
+  const g = gRow ? mapGuideRow(gRow) : null;
+  const hasCoords = p && typeof p.latitude === "number" && typeof p.longitude === "number";
+  return {
+    pousada: p
+      ? {
+          nome: p.name,
+          local: p.location,
+          whatsapp: p.whatsappContato || null,
+          whatsappLink: waLinkFrom(p.whatsappContato),
+          email: p.emailContato || null,
+          rotaUrl: hasCoords ? directionsUrl(p.latitude as number, p.longitude as number) : directionsQueryUrl(`${p.name}, ${p.location}`),
+        }
+      : null,
+    guia: g ? { nome: g.name, telefone: g.phone || null, whatsappLink: waLinkFrom(g.phone) } : null,
+  };
+}
+
+const contactCard = (title: string, lines: string[]) =>
+  `<div style="margin:0 0 12px;padding:14px 16px;border:1px solid #D6E0DC;border-radius:14px"><p style="margin:0 0 6px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4F5D58;font-weight:700">${title}</p>${lines.filter(Boolean).join("")}</div>`;
+
 export async function sendBookingConfirmationEmail(booking: Booking) {
   if (!resend || !booking.customerEmail) return;
 
-  const pdfBuffer = await generateVoucherPdfBuffer(booking);
+  const contatos = await bookingContacts(booking);
+  const pdfBuffer = await generateVoucherPdfBuffer(booking, contatos);
+  const ref = bookingRef(booking.id);
+  const first = escapeHtml((booking.customerName || "").split(" ")[0] || "viajante");
+  const hospedes = `${booking.adults} adulto(s)${booking.children ? ` e ${booking.children} criança(s)` : ""}`;
+  const p = contatos.pousada;
+  const g = contatos.guia;
+
+  const pousadaCard = contactCard("Pousada", [
+    `<p style="margin:0 0 4px;font-weight:600">${escapeHtml(booking.pousadaName)}</p>`,
+    p?.local ? `<p style="margin:0 0 8px;font-size:13px;color:#4F5D58">${escapeHtml(p.local)}</p>` : "",
+    p?.whatsappLink ? `<p style="margin:0 0 4px;font-size:14px">WhatsApp da recepção: <a href="${p.whatsappLink}" style="color:#087A55;font-weight:600">${escapeHtml(p.whatsapp || "")}</a></p>` : "",
+    p?.email ? `<p style="margin:0 0 4px;font-size:14px">Email: <a href="mailto:${escapeHtml(p.email)}" style="color:#087A55">${escapeHtml(p.email)}</a></p>` : "",
+    p?.rotaUrl ? `<p style="margin:8px 0 0"><a href="${p.rotaUrl}" style="color:#087A55;font-weight:600">Como chegar (Google Maps) →</a></p>` : "",
+  ]);
+  const guiaCard = g
+    ? contactCard("Seu guia", [
+        `<p style="margin:0 0 4px;font-weight:600">${escapeHtml(g.nome)}</p>`,
+        g.whatsappLink ? `<p style="margin:0;font-size:14px">WhatsApp: <a href="${g.whatsappLink}" style="color:#087A55;font-weight:600">${escapeHtml(g.telefone || "")}</a></p>` : "",
+      ])
+    : "";
 
   await sendEmail({
     ...(await remetenteDaPousada(booking.pousadaId)),
     to: booking.customerEmail,
-    subject: `Reserva confirmada — ${booking.pousadaName} (#${booking.id})`,
+    subject: `Reserva confirmada! ${booking.pousadaName} · Nº ${ref}`,
+    preheader: `Pagamento aprovado. Check-in em ${formatBR(booking.checkIn)} — voucher e contatos neste email.`,
     html: `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #0B1412;">Pagamento confirmado! 🌿</h2>
-        <p>Olá, ${escapeHtml(booking.customerName)}! Sua reserva na <strong>${escapeHtml(booking.pousadaName)}</strong> está confirmada.</p>
-        <p><strong>Check-in:</strong> ${booking.checkIn}<br/>
-        <strong>Check-out:</strong> ${booking.checkOut}<br/>
-        <strong>Total pago:</strong> R$ ${booking.totalPrice.toLocaleString('pt-BR')}</p>
-        <p>O voucher da reserva está em anexo neste email.</p>
-        <p style="color: #888; font-size: 12px;">Dúvidas? Fale conosco pelo WhatsApp +55 65 99986-8334.</p>
+      <h1 style="margin:0 0 8px;font-size:24px;line-height:1.25;color:#0B1412">Parabéns, ${first}! Sua viagem está confirmada 🌿</h1>
+      <p style="margin:0 0 18px">O pagamento foi aprovado e a sua reserva na <strong>${escapeHtml(booking.pousadaName)}</strong> está garantida.</p>
+      <div style="margin:0 0 18px;padding:16px;background:#F4F6F5;border-radius:14px">
+        <p style="margin:0 0 4px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4F5D58;font-weight:700">Nº da reserva</p>
+        <p style="margin:0 0 12px;font-size:22px;font-weight:700;letter-spacing:2px;color:#0B1412">${ref}</p>
+        <p style="margin:0;font-size:14px;line-height:1.7">
+          <strong>Check-in:</strong> ${formatBR(booking.checkIn)}<br/>
+          <strong>Check-out:</strong> ${formatBR(booking.checkOut)}<br/>
+          <strong>Hóspedes:</strong> ${hospedes}<br/>
+          ${booking.roomType ? `<strong>Acomodação:</strong> ${escapeHtml(booking.roomType)}<br/>` : ""}
+          ${booking.experienceType && !/^(Padrão|Hospedagem)$/i.test(booking.experienceType) ? `<strong>Inclui:</strong> ${escapeHtml(booking.experienceType)}<br/>` : ""}
+          <strong>Total pago:</strong> R$ ${Number(booking.totalPrice).toLocaleString("pt-BR")}
+        </p>
       </div>
+      <p style="margin:0 0 10px;font-weight:600">Contatos para a sua viagem</p>
+      ${pousadaCard}
+      ${guiaCard}
+      ${!g ? `<p style="margin:0 0 12px;font-size:13px;color:#4F5D58">Se a sua viagem incluir guia, mandamos o contato dele assim que ele for confirmado.</p>` : ""}
+      <p style="margin:0 0 6px;font-size:14px">📎 O <strong>voucher</strong> está anexado — apresente no check-in (impresso ou no celular). Ele também fica em <a href="${SITE_URL}/turista" style="color:#087A55">Minhas reservas</a>, inclusive sem internet.</p>
+      <p style="margin:24px 0"><a href="${SITE_URL}/turista" style="display:inline-block;background:#0B1412;color:#FFFFFF;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Ver minha reserva</a></p>
+      <p style="margin:0;font-size:12px;color:#4F5D58">Cancelamento: veja a <a href="${SITE_URL}/termos" style="color:#4F5D58">política de cancelamento</a>. Precisa de ajuda? Equipe Ipantanal no WhatsApp <a href="${AGENCY_WHATSAPP_LINK}" style="color:#4F5D58">${AGENCY_WHATSAPP_DISPLAY}</a>.</p>
     `,
     attachments: [
-      { filename: `voucher-${booking.id}.pdf`, content: pdfBuffer.toString("base64") }
+      { filename: `voucher-${ref}.pdf`, content: pdfBuffer.toString("base64") }
     ],
+  });
+}
+
+// Guia confirmado DEPOIS do pagamento: manda o contato dele ao hóspede.
+export async function sendGuideAssignedEmail(booking: Booking) {
+  if (!resend || !booking.customerEmail || !booking.guideId) return;
+  const { guia } = await bookingContacts(booking);
+  if (!guia) return;
+  const ref = bookingRef(booking.id);
+  await sendEmail({
+    to: booking.customerEmail,
+    subject: `Seu guia está confirmado: ${guia.nome} · Reserva ${ref}`,
+    preheader: "Agora você pode falar direto com o guia pelo WhatsApp.",
+    html: `
+      <h1 style="margin:0 0 12px;font-size:22px;color:#0B1412">Seu guia está confirmado</h1>
+      <p style="margin:0 0 16px"><strong>${escapeHtml(guia.nome)}</strong> vai acompanhar a sua expedição (reserva <strong>${ref}</strong>, ${escapeHtml(booking.pousadaName)}, de ${formatBR(booking.checkIn)} a ${formatBR(booking.checkOut)}).</p>
+      ${guia.whatsappLink ? `<p style="margin:24px 0"><a href="${guia.whatsappLink}" style="display:inline-block;background:#0B9467;color:#FFFFFF;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Falar com ${escapeHtml(guia.nome.split(" ")[0])} no WhatsApp</a></p><p style="margin:0 0 14px;font-size:14px">Telefone: ${escapeHtml(guia.telefone || "")}</p>` : ""}
+      <p style="margin:0;font-size:13px;color:#4F5D58">Combine horário de saída, ponto de encontro e o que levar. As mensagens pelo Ipantanal também continuam disponíveis.</p>
+    `,
   });
 }
 

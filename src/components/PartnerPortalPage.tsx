@@ -256,6 +256,7 @@ export default function PartnerPortalPage() {
             longitude: data.pousada.longitude ?? null,
             googleMapsUrl: data.pousada.googleMapsUrl || "",
             emailContato: data.pousada.emailContato || "",
+            whatsappContato: data.pousada.whatsappContato || "",
           });
         } else if (data.partnerType === "atracao" && data.atracao) {
           setForm({
@@ -409,6 +410,7 @@ export default function PartnerPortalPage() {
           googleMapsUrl: form.googleMapsUrl.trim(),
           // String vazia de propósito: limpar volta ao e-mail de login do gestor.
           emailContato: form.emailContato.trim().toLowerCase(),
+          whatsappContato: (form.whatsappContato || "").trim(),
         };
       } else if (profile.partnerType === "atracao") {
         endpoint = `/api/atracoes/${profile.partnerId}`;
@@ -721,6 +723,11 @@ export default function PartnerPortalPage() {
                       <label htmlFor="email-contato" className="block text-editorial-text font-semibold mb-1.5">E-mail para respostas dos hóspedes</label>
                       <input id="email-contato" type="email" placeholder="contato@suapousada.com.br" value={form.emailContato} onChange={e => setForm((p: any) => ({ ...p, emailContato: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
                       <p className="text-editorial-muted text-[11px] mt-1">A confirmação de reserva e o pedido de avaliação saem do Ipantanal com o nome da sua pousada; quando o hóspede responde, a mensagem chega neste e-mail.</p>
+                    </div>
+                    <div className="text-xs">
+                      <label htmlFor="whatsapp-contato" className="block text-editorial-text font-semibold mb-1.5">WhatsApp da recepção</label>
+                      <input id="whatsapp-contato" type="tel" inputMode="tel" placeholder="(65) 99999-9999" value={form.whatsappContato || ""} onChange={e => setForm((p: any) => ({ ...p, whatsappContato: e.target.value }))} className="w-full border border-editorial-border rounded-md p-2.5 focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                      <p className="text-editorial-muted text-[11px] mt-1">Só aparece para o hóspede depois do pagamento: no e-mail de confirmação e no voucher.</p>
                     </div>
                     <RemetenteEmailStatus pousadaId={profile.partnerId} reloadKey={saved} />
                   </FormSection>

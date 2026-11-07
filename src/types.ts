@@ -102,6 +102,9 @@ export interface Pousada {
   // Para onde vão as respostas dos hóspedes aos e-mails de reserva — a
   // própria pousada edita no portal.
   emailContato?: string;
+  // WhatsApp da recepção — só vai ao hóspede depois do pagamento
+  // (e-mail de confirmação e voucher).
+  whatsappContato?: string;
   // Domínio próprio que abre o site oficial da pousada (ex.:
   // pousadavagalume.com). Só o admin define — ver /api/sites/by-host.
   customDomain?: string;
