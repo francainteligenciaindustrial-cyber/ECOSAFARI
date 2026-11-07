@@ -47,6 +47,29 @@ export default function PousadaOfficialSite({ slug, previewPousada, mainUrl }: P
     return () => { document.title = previous; };
   }, [pousada?.name, previewPousada, mainUrl]);
 
+  // Ícone da aba = logo da pousada (o site oficial é dela, não da
+  // plataforma). Sem logo cadastrada, fica o ícone padrão. Restaura ao sair.
+  useEffect(() => {
+    const logo = pousada?.logoUrl;
+    if (!logo || previewPousada) return;
+    const links = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"]'));
+    const saved = links.map(l => ({ l, href: l.href, type: l.type }));
+    for (const l of links) {
+      l.href = logo;
+      l.removeAttribute("type");
+    }
+    const theme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const savedTheme = theme?.content;
+    if (theme && pousada?.themeColorPrimary) theme.content = pousada.themeColorPrimary;
+    return () => {
+      for (const { l, href, type } of saved) {
+        l.href = href;
+        if (type) l.type = type;
+      }
+      if (theme && savedTheme) theme.content = savedTheme;
+    };
+  }, [pousada?.logoUrl, pousada?.themeColorPrimary, previewPousada]);
+
   // Link para o catálogo/reserva: navegação interna no domínio do Ipantanal,
   // link absoluto quando o site está no domínio próprio da pousada.
   const platformLink = (target: string) => ({
