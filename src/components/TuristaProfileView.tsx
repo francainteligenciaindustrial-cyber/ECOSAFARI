@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   User, MapPin, Languages, Coins, Heart, Ticket, Check, Copy, LoaderCircle,
   Pencil, X, Compass, Download, Trash2, ShieldAlert, Camera, ImagePlus, Send,
+  Settings, KeyRound, Bell, LogOut,
 } from "lucide-react";
 import { useTouristSession } from "../lib/useTouristSession";
 import { adminFetch } from "../lib/adminFetch";
@@ -339,6 +340,50 @@ export default function TuristaProfileView() {
     navigate("/");
   };
 
+  // Configurações (engrenagem).
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"seguranca" | "notificacoes" | "privacidade">("seguranca");
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSettingsOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [settingsOpen]);
+
+  // Trocar senha pede a atual antes (alguém com o celular destravado na
+  // mão não consegue trocar sem saber a senha). Depois avisa por email.
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || pwSaving || !localProfile?.email) return;
+    setPwMessage(null);
+    if (pwNew.length < 8) return setPwMessage({ ok: false, text: "A senha nova precisa ter pelo menos 8 caracteres." });
+    if (pwNew !== pwConfirm) return setPwMessage({ ok: false, text: "As senhas novas não coincidem." });
+    if (pwNew === pwCurrent) return setPwMessage({ ok: false, text: "A senha nova precisa ser diferente da atual." });
+    setPwSaving(true);
+    try {
+      const { error: checkErr } = await supabase.auth.signInWithPassword({ email: localProfile.email, password: pwCurrent });
+      if (checkErr) return setPwMessage({ ok: false, text: "A senha atual está incorreta." });
+      const { error } = await supabase.auth.updateUser({ password: pwNew });
+      if (error) return setPwMessage({ ok: false, text: error.message || "Não foi possível salvar a senha nova." });
+      adminFetch("/api/auth/password-changed", { method: "POST" }).catch(() => {});
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+      setPwMessage({ ok: true, text: "Senha alterada. Enviamos um aviso para o seu email." });
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  const handleLogoutEverywhere = async () => {
+    if (supabase) await supabase.auth.signOut({ scope: "global" });
+    navigate("/");
+  };
+
   // Direito de acesso/portabilidade (LGPD) — baixa tudo que está vinculado
   // a esta conta num arquivo só, sem precisar pedir pra equipe.
   const handleExportData = async () => {
@@ -465,6 +510,15 @@ export default function TuristaProfileView() {
               <span className="flex items-center gap-1.5 bg-editorial-primary/5 border border-editorial-primary/15 text-editorial-primary font-bold text-sm px-3 py-1.5 rounded-full">
                 <Coins className="h-4 w-4" /> {localProfile.coins ?? 0} Jaguars
               </span>
+              <button
+                type="button"
+                onClick={() => { setSettingsTab("seguranca"); setSettingsOpen(true); }}
+                aria-label="Configurações (segurança, notificações e privacidade)"
+                title="Configurações"
+                className="w-9 h-9 rounded-full border border-editorial-border bg-white text-editorial-text hover:bg-editorial-secondary flex items-center justify-center transition cursor-pointer"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
               <button
                 onClick={handleLogout}
                 className="text-editorial-muted hover:text-red-600 text-[10px] uppercase tracking-widest font-bold transition cursor-pointer"
@@ -612,90 +666,177 @@ export default function TuristaProfileView() {
             )}
           </div>
 
-          {/* Privacidade e dados — direitos de acesso/portabilidade e
-              eliminação da LGPD, disponíveis pra pessoa exercer sozinha em
-              vez de precisar pedir pra equipe. */}
-          <div className="bg-white border border-editorial-border rounded-lg p-6">
-            <h2 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary flex items-center gap-2 mb-4">
-              <ShieldAlert className="h-4 w-4" /> Privacidade e dados
-            </h2>
-            <div className="flex items-start justify-between gap-4 pb-4 mb-4 border-b border-editorial-border">
-              <div>
-                <p className="text-editorial-text text-sm font-semibold">Novidades por email</p>
-                <p className="text-editorial-muted text-xs">Roteiros, épocas de avistamento e notícias do Ipantanal. Emails de reserva e de segurança chegam sempre.</p>
-              </div>
-              <label className="flex items-center gap-2 text-xs font-semibold text-editorial-text cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={!!localProfile.marketingOptIn}
-                  disabled={savingOptIn}
-                  onChange={e => handleToggleMarketing(e.target.checked)}
-                  className="accent-editorial-primary h-4 w-4"
-                />
-                {localProfile.marketingOptIn ? "Recebendo" : "Desligado"}
-              </label>
-            </div>
-            <div className="flex flex-col gap-3 pb-4 mb-4 border-b border-editorial-border">
-              <div>
-                <p className="text-editorial-text text-sm font-semibold">Baixar meus dados</p>
-                <p className="text-editorial-muted text-xs">Perfil, favoritos, avaliações, resgates e reservas num arquivo só.</p>
-              </div>
-              <button
-                onClick={handleExportData}
-                disabled={exporting}
-                className="flex items-center justify-center gap-1.5 border border-editorial-border text-editorial-text text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md hover:bg-editorial-secondary transition cursor-pointer disabled:opacity-60"
+          {/* Configurações (engrenagem): segurança, notificações e privacidade
+              — inclui os direitos da LGPD (baixar dados, excluir conta) que a
+              pessoa exerce sozinha, sem pedir para a equipe. */}
+          {settingsOpen && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => setSettingsOpen(false)}>
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="config-titulo"
+                onClick={e => e.stopPropagation()}
+                className="bg-white w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl"
               >
-                {exporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                Exportar
-              </button>
-            </div>
+                <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-editorial-border sticky top-0 bg-white z-10">
+                  <h2 id="config-titulo" className="font-serif text-xl font-semibold text-editorial-text flex items-center gap-2"><Settings className="h-5 w-5" /> Configurações</h2>
+                  <button type="button" onClick={() => setSettingsOpen(false)} aria-label="Fechar configurações" className="w-9 h-9 rounded-full hover:bg-editorial-secondary flex items-center justify-center cursor-pointer"><X className="h-4 w-4" /></button>
+                </div>
+                <div className="flex flex-col sm:flex-row">
+                  <nav aria-label="Seções das configurações" className="sm:w-48 flex sm:flex-col gap-1 p-3 sm:border-r border-b sm:border-b-0 border-editorial-border overflow-x-auto">
+                    {([
+                      { id: "seguranca" as const, label: "Segurança", Icon: KeyRound },
+                      { id: "notificacoes" as const, label: "Notificações", Icon: Bell },
+                      { id: "privacidade" as const, label: "Privacidade e dados", Icon: ShieldAlert },
+                    ]).map(({ id, label, Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        aria-current={settingsTab === id ? "page" : undefined}
+                        onClick={() => setSettingsTab(id)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm whitespace-nowrap text-left transition cursor-pointer ${settingsTab === id ? "bg-editorial-secondary text-editorial-text font-semibold" : "text-editorial-muted hover:bg-editorial-secondary/60"}`}
+                      >
+                        <Icon className="h-4 w-4 flex-shrink-0" /> {label}
+                      </button>
+                    ))}
+                  </nav>
 
-            <div className="flex flex-col gap-3">
-              <div>
-                <p className="text-editorial-text text-sm font-semibold">Excluir minha conta</p>
-                <p className="text-editorial-muted text-xs">Remove seu perfil e login permanentemente.</p>
-              </div>
-              {!showDeleteConfirm ? (
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md hover:bg-red-50 transition cursor-pointer"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Excluir conta
-                </button>
-              ) : null}
-            </div>
+                  <div className="flex-1 p-6 space-y-6">
+                    {settingsTab === "seguranca" && (
+                      <>
+                        <div>
+                          <p className="text-editorial-text text-sm font-semibold">Email da conta</p>
+                          <p className="text-editorial-muted text-sm">{localProfile.email}</p>
+                        </div>
+                        <form onSubmit={handleChangePassword} className="space-y-3 border-t border-editorial-border pt-5">
+                          <p className="text-editorial-text text-sm font-semibold">Trocar senha</p>
+                          <div>
+                            <label htmlFor="senha-atual" className="block text-xs text-editorial-muted mb-1">Senha atual</label>
+                            <input id="senha-atual" type="password" required autoComplete="current-password" value={pwCurrent} onChange={e => setPwCurrent(e.target.value)} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label htmlFor="senha-nova" className="block text-xs text-editorial-muted mb-1">Senha nova</label>
+                              <input id="senha-nova" type="password" required minLength={8} autoComplete="new-password" value={pwNew} onChange={e => setPwNew(e.target.value)} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                            </div>
+                            <div>
+                              <label htmlFor="senha-nova-2" className="block text-xs text-editorial-muted mb-1">Confirme a senha nova</label>
+                              <input id="senha-nova-2" type="password" required minLength={8} autoComplete="new-password" value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} className="w-full border border-editorial-border bg-white px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-editorial-primary" />
+                            </div>
+                          </div>
+                          {pwMessage && <p role="status" className={`text-xs rounded-xl px-3 py-2 ${pwMessage.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>{pwMessage.text}</p>}
+                          <button type="submit" disabled={pwSaving} className="inline-flex items-center gap-2 bg-editorial-primary text-white text-[11px] uppercase tracking-widest font-bold px-5 py-2.5 rounded-full hover:opacity-90 disabled:opacity-60 cursor-pointer">
+                            {pwSaving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} Salvar senha nova
+                          </button>
+                        </form>
+                        <div className="border-t border-editorial-border pt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="text-editorial-text text-sm font-semibold">Sair de todos os aparelhos</p>
+                            <p className="text-editorial-muted text-xs">Encerra o acesso no celular, computador e qualquer outro lugar onde você entrou. Use se perdeu um aparelho ou desconfia de acesso.</p>
+                          </div>
+                          <button type="button" onClick={handleLogoutEverywhere} className="flex-shrink-0 inline-flex items-center justify-center gap-1.5 border border-editorial-border text-editorial-text text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-full hover:bg-editorial-secondary transition cursor-pointer">
+                            <LogOut className="h-3.5 w-3.5" /> Sair de todos
+                          </button>
+                        </div>
+                      </>
+                    )}
 
-            {showDeleteConfirm && (
-              <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-red-800 text-xs font-semibold mb-1">Essa ação não pode ser desfeita.</p>
-                <p className="text-red-700 text-xs mb-3">Digite <span className="font-mono font-bold">EXCLUIR</span> abaixo para confirmar.</p>
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    value={deleteConfirmText}
-                    onChange={e => setDeleteConfirmText(e.target.value)}
-                    placeholder="EXCLUIR"
-                    className="flex-1 border border-red-300 bg-white px-3 py-2 text-sm rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleDeleteAccount}
-                      disabled={deleteConfirmText.trim().toUpperCase() !== "EXCLUIR" || deletingAccount}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    >
-                      {deletingAccount ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : "Confirmar exclusão"}
-                    </button>
-                    <button
-                      onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
-                      className="text-editorial-muted hover:text-editorial-text text-[11px] uppercase tracking-widest font-bold px-2 transition cursor-pointer"
-                    >
-                      Cancelar
-                    </button>
+                    {settingsTab === "notificacoes" && (
+                      <>
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-editorial-text text-sm font-semibold">Novidades por email</p>
+                            <p className="text-editorial-muted text-xs">Roteiros, épocas de avistamento e notícias do Ipantanal.</p>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs font-semibold text-editorial-text cursor-pointer flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={!!localProfile.marketingOptIn}
+                              disabled={savingOptIn}
+                              onChange={e => handleToggleMarketing(e.target.checked)}
+                              className="accent-editorial-primary h-4 w-4"
+                            />
+                            {localProfile.marketingOptIn ? "Recebendo" : "Desligado"}
+                          </label>
+                        </div>
+                        <div className="border-t border-editorial-border pt-5">
+                          <p className="text-editorial-text text-sm font-semibold">Emails da sua conta</p>
+                          <p className="text-editorial-muted text-xs">Confirmação de reservas, lembretes de viagem, pedidos de avaliação e alertas de segurança chegam sempre — são parte do serviço, não propaganda.</p>
+                        </div>
+                      </>
+                    )}
+
+                    {settingsTab === "privacidade" && (
+                      <>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="text-editorial-text text-sm font-semibold">Baixar meus dados</p>
+                            <p className="text-editorial-muted text-xs">Perfil, favoritos, avaliações, resgates e reservas num arquivo só.</p>
+                          </div>
+                          <button
+                            onClick={handleExportData}
+                            disabled={exporting}
+                            className="flex-shrink-0 flex items-center justify-center gap-1.5 border border-editorial-border text-editorial-text text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-full hover:bg-editorial-secondary transition cursor-pointer disabled:opacity-60"
+                          >
+                            {exporting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                            Exportar
+                          </button>
+                        </div>
+                        <p className="text-editorial-muted text-xs border-t border-editorial-border pt-5">
+                          Veja como usamos seus dados na <a href="/privacidade" onClick={e => { e.preventDefault(); setSettingsOpen(false); navigate("/privacidade"); }} className="text-editorial-accent font-semibold underline">Política de Privacidade</a>.
+                        </p>
+                        <div className="border-t border-editorial-border pt-5 flex flex-col gap-3">
+                          <div>
+                            <p className="text-editorial-text text-sm font-semibold">Excluir minha conta</p>
+                            <p className="text-editorial-muted text-xs">Remove seu perfil e login permanentemente.</p>
+                          </div>
+                          {!showDeleteConfirm ? (
+                            <button
+                              onClick={() => setShowDeleteConfirm(true)}
+                              className="self-start flex items-center justify-center gap-1.5 border border-red-200 text-red-600 text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-full hover:bg-red-50 transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> Excluir conta
+                            </button>
+                          ) : (
+                            <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                              <p className="text-red-800 text-xs font-semibold mb-1">Essa ação não pode ser desfeita.</p>
+                              <p className="text-red-700 text-xs mb-3">Digite <span className="font-mono font-bold">EXCLUIR</span> abaixo para confirmar.</p>
+                              <div className="flex flex-col gap-2">
+                                <label htmlFor="confirmar-exclusao" className="sr-only">Digite EXCLUIR para confirmar</label>
+                                <input
+                                  id="confirmar-exclusao"
+                                  type="text"
+                                  value={deleteConfirmText}
+                                  onChange={e => setDeleteConfirmText(e.target.value)}
+                                  placeholder="EXCLUIR"
+                                  className="flex-1 border border-red-300 bg-white px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={handleDeleteAccount}
+                                    disabled={deleteConfirmText.trim().toUpperCase() !== "EXCLUIR" || deletingAccount}
+                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-full transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                  >
+                                    {deletingAccount ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : "Confirmar exclusão"}
+                                  </button>
+                                  <button
+                                    onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+                                    className="text-editorial-muted hover:text-editorial-text text-[11px] uppercase tracking-widest font-bold px-2 transition cursor-pointer"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Coluna direita — posts + favoritos */}
