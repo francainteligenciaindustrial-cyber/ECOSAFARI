@@ -1112,6 +1112,8 @@ export function mapPousadaRow(p: any): Pousada {
     sitePublicado: p.sitePublicado === true,
     appLodgeId: p.appLodgeId || "",
     commissionPct: toNumberOrUndefined(p.commissionPct) ?? null,
+    publicacao: p.publicacao || null,
+    publicacaoNota: p.publicacaoNota || "",
     contratoId: p.contratoId || null,
     contratoAceitoEm: p.contratoAceitoEm || null,
     comissaoLancamentoAte: p.comissaoLancamentoAte || null,
@@ -1618,6 +1620,52 @@ export async function runBookingHooks(kind: keyof typeof bookingHooks, booking: 
 // cartão no módulo de repasses).
 export const stripeHooks: ((event: Stripe.Event) => Promise<void>)[] = [];
 
+// ---------------- Publicação: quem aparece no site ----------------
+// Só pousada "publicada" E com contrato assinado. As checagens usam a linha
+// crua do banco: coluna inexistente (migração pendente) não esconde nada.
+export const EXIGIR_CONTRATO = process.env.EXIGIR_CONTRATO !== "false";
+export function isPousadaPublica(row: any): boolean {
+  if (!row) return false;
+  if ("publicacao" in row && row.publicacao && row.publicacao !== "publicada") return false;
+  if (EXIGIR_CONTRATO && "contratoId" in row && !row.contratoId) return false;
+  return true;
+}
+
+// Quais colunas existem (para filtrar direto na consulta paginada).
+let colunasPub: { at: number; publicacao: boolean; contrato: boolean } | null = null;
+export async function colunasDePublicacao() {
+  if (colunasPub && Date.now() - colunasPub.at < 5 * 60000) return colunasPub;
+  const [a, b] = await Promise.all([
+    supabase.from("pousadas").select("publicacao").limit(1),
+    supabase.from("pousadas").select("contratoId").limit(1),
+  ]);
+  colunasPub = { at: Date.now(), publicacao: !a.error, contrato: !b.error };
+  return colunasPub;
+}
+// Síncrono de propósito: a consulta do Supabase é "thenable", e devolvê-la
+// de uma função async a executaria antes da hora.
+export function filtroPublico<Q>(q: Q, c: { publicacao: boolean; contrato: boolean }): Q {
+  let out: any = q;
+  if (c.publicacao) out = out.eq("publicacao", "publicada");
+  if (EXIGIR_CONTRATO && c.contrato) out = out.not("contratoId", "is", null);
+  return out;
+}
+
+// Quem chama é admin? (a Gestão vê todas as pousadas, publicadas ou não)
+export async function isAdminRequest(req: express.Request): Promise<boolean> {
+  const auth = req.headers.authorization || "";
+  if (!auth.startsWith("Bearer ")) return false;
+  const { data } = await supabase.auth.getUser(auth.slice(7)).catch(() => ({ data: { user: null } } as any));
+  return !!data?.user && isAdminUser(data.user);
+}
+
+// Dados da pousada para o público: sem o que é interno ou só liberado
+// depois do pagamento (WhatsApp da recepção vai no e-mail/voucher).
+export function toPublicPousada(p: Pousada) {
+  const { whatsappContato, comissaoLancamentoAte, repasseBloqueado, publicacaoNota, ...resto } = p as any;
+  return resto as Pousada;
+}
+
 // Pousada avisada assim que o hóspede paga (reserva avulsa ou carrinho).
 export async function sendPousadaPaidEmail(b: Booking) {
   for (const gestorEmail of await getPousadaGestorEmails(b.pousadaId).catch(() => [] as string[])) {
@@ -1993,7 +2041,7 @@ export async function toPacotePublico(pacotes: Pacote[]): Promise<PacotePublico[
   const guideIds = [...new Set(pacotes.map(p => p.guideId).filter(Boolean))] as string[];
   const atracaoIds = [...new Set(pacotes.flatMap(p => p.atracaoIds))];
   const [pousadasRes, guidesRes, atracoesRes] = await Promise.all([
-    pousadaIds.length ? supabase.from("pousadas").select("id,name").in("id", pousadaIds) : Promise.resolve({ data: [] as any[] }),
+    pousadaIds.length ? supabase.from("pousadas").select("*").in("id", pousadaIds).then(r => ({ ...r, data: (r.data || []).filter(isPousadaPublica) })) : Promise.resolve({ data: [] as any[] }),
     guideIds.length ? supabase.from("guides").select("id,name").in("id", guideIds) : Promise.resolve({ data: [] as any[] }),
     atracaoIds.length ? supabase.from("atracoes").select("id,name").in("id", atracaoIds) : Promise.resolve({ data: [] as any[] }),
   ]);
@@ -3087,7 +3135,7 @@ export const KNOWN_FAKE_IDS: Record<string, string[]> = {
 // Formats listings dynamically for the LLM to read
 export async function getPousadasContext() {
   const { data } = await supabase.from("pousadas").select("*");
-  return (data || []).map(mapPousadaRow).map(p => {
+  return (data || []).filter(isPousadaPublica).map(mapPousadaRow).map(p => {
     return `- ID: "${p.id}", Nome: "${p.name}", Localização: "${p.location}", Preço/noite: R$ ${p.pricePerNight}, Capacidade: ${p.capacity} hóspedes. Experiências: [${p.experiences.map(e => `${e.title}: R$ ${e.price}`).join(", ")}]. Características: [${p.features.join(", ")}].`;
   }).join("\n");
 }

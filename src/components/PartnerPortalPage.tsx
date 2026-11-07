@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { TrendingUp, Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe, Receipt, UserRoundCheck, Wallet, FileSignature } from "lucide-react";
 import PousadaContratoPanel from "./PousadaContratoPanel";
+import PousadaPublicacaoCard from "./PousadaPublicacaoCard";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
@@ -693,9 +694,12 @@ export default function PartnerPortalPage() {
 
         {isPousadaGestor && pousadaTab === "agenda" && profile?.partnerType === "pousada" && form && (
           <div className="mb-6">
+            <ErrorBoundary variant="section" sectionLabel="a publicação">
+              <PousadaPublicacaoCard pousadaId={profile.partnerId} onIrPara={aba => setPousadaTab(aba as PousadaTab)} reloadKey={saved} />
+            </ErrorBoundary>
             {profile.pousada && "contratoId" in profile.pousada && !profile.pousada.contratoId && (
               <button type="button" onClick={() => setPousadaTab("contrato")} className="w-full mb-4 text-left bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-xl px-4 py-3 flex items-center gap-2 cursor-pointer">
-                <FileSignature className="h-4 w-4 flex-shrink-0" /> <span><strong>Assine o contrato de parceria</strong> para receber reservas e pagamentos online pelo Ipantanal. Leva 2 minutos →</span>
+                <FileSignature className="h-4 w-4 flex-shrink-0" /> <span><strong>Assine o contrato de parceria</strong> para aparecer no site e receber reservas e pagamentos online. Leva 2 minutos →</span>
               </button>
             )}
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">

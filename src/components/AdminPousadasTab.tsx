@@ -8,6 +8,7 @@ import ExperienceListEditor, { ExperienceDraft } from "./ExperienceListEditor";
 import RoomsEditor, { RoomDraft } from "./RoomsEditor";
 import Pagination from "./Pagination";
 import { usePagination } from "../lib/usePagination";
+import { ROTULO_PUBLICACAO } from "../lib/publicacao";
 
 
 // Aba "Pousadas (cadastro e lista)" do painel de Gestão — extraída do AdminDashboard.tsx.
@@ -20,6 +21,22 @@ interface AdminPousadasTabProps {
 }
 
 export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingPousadaAccess, setEditingPousadaId, setEditPousadaForm }: AdminPousadasTabProps) {
+  // Ciclo de publicação: publicar, devolver com comentário ou pausar.
+  const handlePublicacao = async (p: Pousada, acao: "publicar" | "devolver" | "pausar") => {
+    let nota = "";
+    if (acao === "devolver") {
+      nota = window.prompt(`O que a ${p.name} precisa ajustar antes de publicar? (vai por e-mail para a pousada)`) || "";
+      if (!nota.trim()) return;
+    } else if (acao === "pausar") {
+      const n = window.prompt(`Motivo da pausa da ${p.name} (opcional, vai por e-mail):`);
+      if (n === null) return;
+      nota = n;
+    } else if (!window.confirm(`Publicar ${p.name}? Ela passa a aparecer no site${p.contratoId ? "" : " assim que assinar o contrato"}.`)) return;
+    const r = await adminFetch(`/api/admin/pousadas/${p.id}/publicacao`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao, nota }) });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) window.alert(b.error || "Não foi possível concluir.");
+    onRefreshData();
+  };
   const [showAddPousada, setShowAddPousada] = useState(false);
 
   // Forms States
@@ -312,7 +329,25 @@ export default function AdminPousadasTab({ pousadas, onRefreshData, setManagingP
                             <BadgeCheck className="h-3 w-3" /> Verificada
                           </span>
                         )}
+                        {p.publicacao && (
+                          <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${p.publicacao === "publicada" ? (p.contratoId ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-800 border-amber-200") : p.publicacao === "em_revisao" ? "bg-sky-50 text-sky-800 border-sky-200 animate-pulse" : "bg-zinc-100 text-zinc-600 border-zinc-200"}`}>
+                            {ROTULO_PUBLICACAO[p.publicacao]}{p.publicacao === "publicada" && !p.contratoId ? " · sem contrato (oculta)" : ""}
+                          </span>
+                        )}
                       </div>
+                      {p.publicacao && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {p.publicacao !== "publicada" && (
+                            <button type="button" onClick={() => handlePublicacao(p, "publicar")} className="text-[10px] font-bold px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer">Publicar</button>
+                          )}
+                          {p.publicacao === "em_revisao" && (
+                            <button type="button" onClick={() => handlePublicacao(p, "devolver")} className="text-[10px] font-bold px-2 py-1 rounded border border-amber-300 text-amber-800 hover:bg-amber-50 cursor-pointer">Devolver com comentário</button>
+                          )}
+                          {p.publicacao === "publicada" && (
+                            <button type="button" onClick={() => handlePublicacao(p, "pausar")} className="text-[10px] font-bold px-2 py-1 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50 cursor-pointer">Pausar</button>
+                          )}
+                        </div>
+                      )}
                       <p className="text-[11px] text-zinc-500 mt-0.5">{p.location}</p>
                       <p className="text-zinc-600 text-xs mt-1.5 line-clamp-2">{p.description}</p>
                       <span className="flex items-center gap-1 text-[10px] text-zinc-400 mt-1.5">

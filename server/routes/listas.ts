@@ -17,6 +17,7 @@ import {
   ai,
   GEMINI_MODEL,
   mapPousadaRow,
+  isPousadaPublica,
   mapGuideRow,
   toPublicGuide,
   mapAtracaoRow,
@@ -56,7 +57,7 @@ async function resolveItems(items: { id: string; tipo: Tipo; refId: string }[]):
     ids("pacote").length ? supabase.from("pacotes").select("*").in("id", ids("pacote")) : Promise.resolve({ data: [] as any[] }),
   ]);
   const map = new Map<string, Omit<ItemResumo, "id" | "tipo" | "refId">>();
-  for (const row of (pq.data || []) as any[]) {
+  for (const row of ((pq.data || []) as any[]).filter(isPousadaPublica)) {
     const p = mapPousadaRow(row);
     map.set(`pousada:${p.id}`, { nome: p.name, imagem: p.images?.[0], local: p.location, preco: p.pricePerNight ? `${brl(p.pricePerNight)}/noite` : undefined, url: `/pousadas/${p.id}` });
   }
@@ -263,7 +264,7 @@ export async function enviarAlertasListas(): Promise<{ vagas: number; epocas: nu
     const { data: itens } = await supabase.from("lista_itens").select("*").eq("listaId", lista.id).eq("tipo", "pousada");
     if (!itens?.length) continue;
     const { data: pousadasRows } = await supabase.from("pousadas").select("*").in("id", itens.map((i: any) => i.refId));
-    const pousadas = (pousadasRows || []).map(mapPousadaRow);
+    const pousadas = (pousadasRows || []).filter(isPousadaPublica).map(mapPousadaRow);
     const { data: t } = await supabase.from("turistas").select("email, name").eq("id", lista.turistaId).maybeSingle();
     if (!t?.email) continue;
 

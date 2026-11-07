@@ -44,6 +44,11 @@ import {
   viteDevServer,
   writeSkippingMissingColumns,
   SUPABASE_URL,
+  isPousadaPublica,
+  isAdminRequest,
+  filtroPublico,
+  colunasDePublicacao,
+  toPublicPousada,
 } from "../core.js";
 
 // Reserva concluída (paga/confirmada, check-out no passado) do turista nesta
@@ -75,8 +80,8 @@ app.get("/api/turista/pousadas-avaliaveis", requireTourist, async (req, res) => 
 app.get("/api/sites/by-host", async (req, res) => {
   const host = normalizeHost(String(req.query.host || ""));
   if (!host) return res.status(400).json({ error: "Informe o host." });
-  const { data, error } = await supabase.from("pousadas").select("id, name, customDomain").ilike("customDomain", host).maybeSingle();
-  if (error || !data) return res.status(404).json({ error: "Domínio não vinculado a nenhuma pousada." });
+  const { data, error } = await supabase.from("pousadas").select("*").ilike("customDomain", host).maybeSingle();
+  if (error || !data || !isPousadaPublica(data)) return res.status(404).json({ error: "Domínio não vinculado a nenhuma pousada." });
   res.setHeader("Cache-Control", "public, max-age=300");
   res.json({ pousadaId: data.id, slug: slugify(data.name), mainUrl: SITE_URL });
 });
@@ -106,12 +111,16 @@ app.get("/api/sites/by-host", async (req, res) => {
 // capacidade) já cobrem o caso real que isCompletePousadaProfile existe pra
 // evitar (cadastro vazio recém-criado).
 app.get("/api/pousadas", async (req, res) => {
-  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=300");
+  // A Gestão vê todas (com o status de publicação); o público só as
+  // publicadas com contrato (isPousadaPublica).
+  const admin = await isAdminRequest(req);
+  res.setHeader("Cache-Control", admin ? "private, no-store" : "public, max-age=30, stale-while-revalidate=300");
 
   if (!req.query.page) {
     const { data, error } = await supabase.from("pousadas").select("*");
     if (error) return res.status(500).json({ error: "Erro ao buscar pousadas" });
-    return res.json((data || []).map(mapPousadaRow));
+    if (admin) return res.json((data || []).map(mapPousadaRow));
+    return res.json((data || []).filter(isPousadaPublica).map(mapPousadaRow).map(toPublicPousada));
   }
 
   const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
@@ -142,6 +151,7 @@ app.get("/api/pousadas", async (req, res) => {
   if (sortBy === "price-asc") query = query.order("pricePerNight", { ascending: true });
   else if (sortBy === "price-desc") query = query.order("pricePerNight", { ascending: false });
   else if (sortBy === "rating-desc") query = query.order("rating", { ascending: false });
+  query = filtroPublico(query, await colunasDePublicacao());
   // Tiebreaker sempre presente — sem uma ordem determinística, .range() em
   // páginas sucessivas pode repetir ou pular linhas se o Postgres escolher
   // uma ordem física diferente entre uma requisição e outra.
@@ -153,7 +163,7 @@ app.get("/api/pousadas", async (req, res) => {
   if (error) return res.status(500).json({ error: "Erro ao buscar pousadas" });
 
   res.json({
-    items: (data || []).map(mapPousadaRow),
+    items: (data || []).map(mapPousadaRow).map(toPublicPousada),
     total: count || 0,
     page,
     pageSize,
@@ -163,7 +173,9 @@ app.get("/api/pousadas", async (req, res) => {
 app.get("/api/pousadas/:id", async (req, res) => {
   const { data, error } = await supabase.from("pousadas").select("*").eq("id", req.params.id).maybeSingle();
   if (error || !data) return res.status(404).json({ error: "Pousada não encontrada" });
-  res.json(mapPousadaRow(data));
+  const admin = await isAdminRequest(req);
+  if (!admin && !isPousadaPublica(data)) return res.status(404).json({ error: "Pousada não encontrada" });
+  res.json(admin ? mapPousadaRow(data) : toPublicPousada(mapPousadaRow(data)));
 });
 
 app.post("/api/pousadas/:id/view", viewLimiter, async (req, res) => {
@@ -639,10 +651,10 @@ app.delete("/api/species/:id", requireAdmin, async (req, res) => {
 
 app.get("/sitemap.xml", async (req, res) => {
   const staticPaths = ["/", "/sobre", "/faq", "/privacidade", "/termos", "/seja-parceiro"];
-  const { data: pousadaRows } = await supabase.from("pousadas").select("id,name");
+  const { data: pousadaRows } = await supabase.from("pousadas").select("*");
   const urls = [
     ...staticPaths.map(p => `${SITE_URL}${p}`),
-    ...(pousadaRows || []).flatMap(p => [`${SITE_URL}/pousadas/${p.id}`, `${SITE_URL}/site/${slugify(p.name)}`]),
+    ...(pousadaRows || []).filter(isPousadaPublica).flatMap(p => [`${SITE_URL}/pousadas/${p.id}`, `${SITE_URL}/site/${slugify(p.name)}`]),
   ];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
     .map(u => `  <url><loc>${u}</loc></url>`)
@@ -661,7 +673,7 @@ app.get("/sitemap.xml", async (req, res) => {
 app.get('/pousadas/:id', async (req, res, next) => {
   try {
     const { data: pousadaRow } = await supabase.from("pousadas").select("*").eq("id", req.params.id).maybeSingle();
-    if (!pousadaRow) return next();
+    if (!pousadaRow || !isPousadaPublica(pousadaRow)) return next();
     const pousada = mapPousadaRow(pousadaRow);
     const indexPath = isProd ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'index.html');
     let html = fs.readFileSync(indexPath, 'utf-8');
@@ -680,7 +692,7 @@ app.get('/pousadas/:id', async (req, res, next) => {
 app.get('/site/:slug', async (req, res, next) => {
   try {
     const { data: allPousadas } = await supabase.from("pousadas").select("*");
-    const pousadaRow = (allPousadas || []).find(p => slugify(p.name) === resolveSlug(req.params.slug));
+    const pousadaRow = (allPousadas || []).filter(isPousadaPublica).find(p => slugify(p.name) === resolveSlug(req.params.slug));
     if (!pousadaRow) return next();
     const pousada = mapPousadaRow(pousadaRow);
     const indexPath = isProd ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'index.html');

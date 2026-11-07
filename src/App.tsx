@@ -13,6 +13,7 @@ import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import TouristProfileWidget from "./components/TouristProfileWidget";
 import CartButton from "./components/CartButton";
+import { adminFetch } from "./lib/adminFetch";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { isAdminUser, isTouristUser, isPartnerUser } from "./lib/authRoles";
@@ -193,7 +194,9 @@ export default function App() {
   const fetchData = async () => {
     try {
       const [pRes, bRes, sRes, rRes, spRes] = await Promise.all([
-        fetch("/api/pousadas"),
+        // Com sessão de admin, vem a lista completa (inclusive não
+        // publicadas) para a Gestão; para o público, só as publicadas.
+        adminFetch("/api/pousadas"),
         fetch("/api/bookings/public-confirmed"),
         fetch("/api/sightings"),
         fetch("/api/reviews"),

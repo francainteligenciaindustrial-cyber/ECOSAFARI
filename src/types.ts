@@ -127,6 +127,10 @@ export interface Pousada {
   featured?: boolean;
   // Contrato de parceria (ver server/routes/repasses.ts): sem ele, a
   // pousada não recebe reservas online. Comissão de lançamento até a data.
+  // Ciclo de publicação (src/lib/publicacao.ts) e comentário da Gestão
+  // quando devolve para ajustes.
+  publicacao?: "em_preparacao" | "em_revisao" | "publicada" | "pausada" | null;
+  publicacaoNota?: string;
   contratoId?: string | null;
   contratoAceitoEm?: string | null;
   comissaoLancamentoAte?: string | null;

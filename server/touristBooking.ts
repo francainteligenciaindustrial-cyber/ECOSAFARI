@@ -68,6 +68,7 @@ export async function prepareTouristBooking(body: any): Promise<Prepared | Fail>
 
   const { data: pousadaRow } = await supabase.from("pousadas").select("*").eq("id", pousadaId).maybeSingle();
   if (!pousadaRow) return fail(404, "Pousada não encontrada.");
+  if ("publicacao" in pousadaRow && pousadaRow.publicacao && pousadaRow.publicacao !== "publicada") return fail(404, "Esta pousada não está disponível para reservas no momento.");
   const pousada = mapPousadaRow(pousadaRow);
   // Reserva online só com o contrato de parceria assinado (comissão e
   // repasse definidos). Antes da migração (coluna inexistente), não bloqueia.
