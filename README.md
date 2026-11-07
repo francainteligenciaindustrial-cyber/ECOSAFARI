@@ -71,6 +71,7 @@ mais de uma vez. As mais recentes:
 11. `scripts/add-google-maps-pousada.sql` — link da ficha no Google Maps (seção "Localização e como chegar")
 12. `scripts/add-prestadores-varias-pousadas.sql` — atrações de interesse no cadastro de prestadores de serviço
 13. `scripts/add-emails-preferencias.sql` — aceite de novidades por email (LGPD) e controle do email de boas-vindas
+14. `scripts/add-avaliacao-turistas.sql` — avaliação dos turistas pelos prestadores (só prestadores veem)
 
 **No Supabase do app** (projeto separado): `scripts/app-ecosafari-go/estatisticas-publicas.sql`
 — funções somente leitura com números agregados de avistamentos aprovados, que

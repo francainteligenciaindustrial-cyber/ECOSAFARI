@@ -16,6 +16,7 @@ import LanguageFlag from "./LanguageFlag";
 import PousadaRecompensasManager from "./PousadaRecompensasManager";
 import PousadaProdutosManager from "./PousadaProdutosManager";
 import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
+import GuestRatingsPanel from "./GuestRating";
 import PousadaReservasAgenda from "./PousadaReservasAgenda";
 import GestorPousadaPanel from "./GestorPousadaPanel";
 import PousadaGestoresManager from "./PousadaGestoresManager";
@@ -668,6 +669,11 @@ export default function PartnerPortalPage() {
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PousadaReservasAgenda pousadaId={profile.partnerId} unavailableDates={form.unavailableDates} />
             </ErrorBoundary>
+            <div className="mt-6">
+              <ErrorBoundary variant="section" sectionLabel="a avaliação de hóspedes">
+                <GuestRatingsPanel />
+              </ErrorBoundary>
+            </div>
           </div>
         )}
 
@@ -1162,9 +1168,12 @@ export default function PartnerPortalPage() {
         )}
 
         {profile?.partnerType === "guia" && (
-          <div className="mt-8">
+          <div className="mt-8 space-y-6">
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
+            </ErrorBoundary>
+            <ErrorBoundary variant="section" sectionLabel="a avaliação de hóspedes">
+              <GuestRatingsPanel />
             </ErrorBoundary>
           </div>
         )}

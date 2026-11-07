@@ -5,6 +5,7 @@ import { adminFetch } from "../lib/adminFetch";
 import { useToast } from "../lib/ToastProvider";
 import PousadaConsumoManager from "./PousadaConsumoManager";
 import ErrorBoundary from "./ErrorBoundary";
+import { GuestRatingSummary } from "./GuestRating";
 
 interface Props {
   pousadaId: string;
@@ -316,6 +317,12 @@ export default function PousadaReservasAgenda({ pousadaId, unavailableDates = []
                 <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-amber-600" />
                 Cancelar uma reserva já confirmada com menos de 45 dias de antecedência gera penalidade.
               </p>
+
+              <div className="border-t border-editorial-border pt-5">
+                <ErrorBoundary variant="section" sectionLabel="a avaliação do hóspede">
+                  <GuestRatingSummary key={selected.id} bookingId={selected.id} guestName={selected.customerName} />
+                </ErrorBoundary>
+              </div>
 
               <div className="border-t border-editorial-border pt-5">
                 <ErrorBoundary variant="section" sectionLabel="o consumo do hóspede">

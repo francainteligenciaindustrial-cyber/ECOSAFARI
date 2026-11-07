@@ -16,6 +16,7 @@ export default function PrivacyPolicyPage() {
         <li><strong>Dados de cadastro de parceiros (guias e pousadas):</strong> nome, email, telefone, idade, idiomas, disponibilidade, localidade e demais informações fornecidas no formulário "Seja um Parceiro".</li>
         <li><strong>Dados de navegação:</strong> páginas visitadas e interações no site, usados apenas para melhorar a experiência (ex: contadores de visualização).</li>
         <li><strong>Conversas com nossa assistente virtual:</strong> o conteúdo trocado durante o atendimento via chatbot para fins de orçamento e reserva.</li>
+        <li><strong>Avaliação do hóspede pelos prestadores:</strong> depois de uma estadia ou passeio concluído, a pousada, o guia e a equipe que atenderam podem dar uma nota de 1 a 5 (comunicação, respeito às regras e cuidado com o local) e um comentário. Essas notas são vistas somente por prestadores de serviço que recebem reservas suas, servem para a segurança e a qualidade do atendimento, não são publicadas no site e podem ser solicitadas por você a qualquer momento pelos nossos canais de contato.</li>
       </ul>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">2. Por que coletamos (finalidade e base legal)</h3>

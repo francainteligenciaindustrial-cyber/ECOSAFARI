@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { LoaderCircle, Clock, BadgeCheck, XCircle } from "lucide-react";
 import { adminFetch } from "../lib/adminFetch";
+import GuestRatingsPanel from "./GuestRating";
 
 interface Me {
   name: string;
@@ -55,6 +56,7 @@ export default function ColaboradorPanel() {
         {me.specialties.length > 0 && <p><span className="text-editorial-muted text-xs block">Especialidades</span>{me.specialties.join(", ")}</p>}
         <p><span className="text-editorial-muted text-xs block">Contato</span>{me.email} · {me.phone}</p>
       </div>
+      {me.status === "aprovado" && <GuestRatingsPanel />}
     </div>
   );
 }
