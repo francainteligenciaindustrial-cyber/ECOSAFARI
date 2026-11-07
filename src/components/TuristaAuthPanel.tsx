@@ -120,6 +120,14 @@ export default function TuristaAuthPanel() {
     setProfile(null);
   };
 
+  // Entrou por /entrar ou /turista: vai direto para o site (catálogo), ou para
+  // onde estava indo (ex.: a reserva começada antes do login). Embutido na
+  // reserva ou no carrinho, fica onde está.
+  const irParaOSite = () => {
+    if (!["/turista", "/turista/", "/entrar", "/entrar/"].includes(window.location.pathname)) return;
+    navigate(consumeReturnTo() || "/");
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || loggingIn) return;
@@ -147,6 +155,7 @@ export default function TuristaAuthPanel() {
     }
     setIsTourist(true);
     setLoggingIn(false);
+    irParaOSite();
   };
 
   // Ativa o perfil de turista numa conta que já está logada (admin,
@@ -221,6 +230,7 @@ export default function TuristaAuthPanel() {
         return;
       }
       setIsTourist(true);
+      irParaOSite();
     } finally {
       setSigningUp(false);
     }
