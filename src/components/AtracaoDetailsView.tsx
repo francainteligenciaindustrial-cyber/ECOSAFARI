@@ -5,6 +5,7 @@ import { navigate } from "../lib/router";
 import ReviewsSection from "./ReviewsSection";
 import TopReviewQuote from "./TopReviewQuote";
 import BrandLogo from "./BrandLogo";
+import SaveToListButton from "./SaveToListButton";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 const TYPE_LABELS: Record<Atracao["type"], string> = { parada_legal: "Parada Legal", restaurante: "Restaurante" };
@@ -51,9 +52,12 @@ export default function AtracaoDetailsView({ id }: { id: string }) {
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2 cursor-pointer">
           <BrandLogo />
         </a>
-        <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="hidden sm:flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition">
-          <MessageSquare className="h-3.5 w-3.5" /> Fale Conosco
-        </a>
+        <div className="flex items-center gap-2">
+          <SaveToListButton tipo="atracao" refId={id} />
+          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="hidden sm:flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-full transition">
+            <MessageSquare className="h-3.5 w-3.5" /> Fale Conosco
+          </a>
+        </div>
       </header>
 
       <section className="relative h-[360px] md:h-[420px] flex items-end bg-zinc-200">

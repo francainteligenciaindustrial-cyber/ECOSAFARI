@@ -1,5 +1,6 @@
 // Reservas: criação, status, agenda, confiabilidade e o cron diário.
 import type { Express } from "express";
+import { enviarAlertasListas } from "./listas.js";
 import { Booking } from "../../src/types.js";
 import { randomUUID } from "crypto";
 import { safeEqual } from "../../src/lib/safeEqual.js";
@@ -295,7 +296,13 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
   // E-mail de avaliação no dia seguinte ao check-out (Resend + este cron).
   const reviewRequestsSent = await enviarPedidosDeAvaliacao();
 
-  res.json({ success: true, remindersSent: sent, reviewRequestsSent });
+  // Alertas da lista de desejos (vaga nas datas, começo da época de avistamento).
+  const wishlist = await enviarAlertasListas().catch(err => {
+    log.warn("Falha nos alertas da lista de desejos:", err?.message);
+    return { vagas: 0, epocas: 0 };
+  });
+
+  res.json({ success: true, remindersSent: sent, reviewRequestsSent, wishlistAlerts: wishlist });
 });
 
 app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {

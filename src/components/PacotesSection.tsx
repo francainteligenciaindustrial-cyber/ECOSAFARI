@@ -3,6 +3,7 @@ import { Package, Check, Moon } from "lucide-react";
 import { useI18n } from "../i18n/I18nProvider";
 import { navigate } from "../lib/router";
 import PictureImg from "./PictureImg";
+import SaveToListButton from "./SaveToListButton";
 import type { PacotePublico } from "../types";
 
 // Pacotes combinados (pousada + guia + atração) montados pelo admin em
@@ -41,6 +42,7 @@ export default function PacotesSection() {
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-editorial-muted"><Package className="h-8 w-8" /></div>
                 )}
+                <span className="absolute top-3 right-3"><SaveToListButton tipo="pacote" refId={p.id} compact /></span>
                 <span className="absolute top-3 left-3 bg-white/95 text-editorial-primary text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
                   <Moon className="h-3 w-3" /> {t("pkg.nights", { n: p.nights })}
                 </span>

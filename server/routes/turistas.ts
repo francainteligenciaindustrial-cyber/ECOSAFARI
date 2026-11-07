@@ -473,7 +473,7 @@ app.get("/api/turista/bookings", requireTourist, async (req, res) => {
   if (!user.email) return res.json([]);
   const { data, error } = await supabase
     .from("bookings")
-    .select("id, pousadaId, pousadaName, checkIn, checkOut, adults, children, roomType, experienceType, totalPrice, status, dateCreated")
+    .select("id, pousadaId, pousadaName, guideId, guideName, checkIn, checkOut, adults, children, roomType, experienceType, totalPrice, status, dateCreated")
     .eq("customerEmail", user.email)
     .order("checkIn", { ascending: false });
   if (error) return res.status(500).json({ error: "Erro ao buscar suas reservas." });

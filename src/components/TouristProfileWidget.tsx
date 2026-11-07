@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Coins, MapPin, Languages, Heart, Ticket, LogOut, ChevronDown, LoaderCircle, Check, Copy } from "lucide-react";
+import { Coins, MapPin, Languages, Heart, Ticket, LogOut, ChevronDown, LoaderCircle, Check, Copy, MessageSquare } from "lucide-react";
 import { useTouristSession } from "../lib/useTouristSession";
 import { adminFetch } from "../lib/adminFetch";
 import { navigate } from "../lib/router";
@@ -134,27 +134,14 @@ export default function TouristProfileWidget() {
             <div className="flex justify-center py-8"><LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" /></div>
           ) : (
             <>
-              {/* Favoritos */}
-              <div className="p-4 border-b border-editorial-border">
-                <h4 className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-editorial-muted mb-2">
-                  <Heart className="h-3.5 w-3.5" /> Pousadas favoritas
-                </h4>
-                {favoritos && favoritos.length > 0 ? (
-                  <ul className="space-y-1.5">
-                    {favoritos.map(p => (
-                      <li key={p.id}>
-                        <button
-                          onClick={() => { setOpen(false); navigate(`/pousadas/${p.id}`); }}
-                          className="text-left text-xs text-editorial-text hover:text-editorial-primary transition cursor-pointer truncate block w-full"
-                        >
-                          {p.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-editorial-muted text-xs">Nenhuma pousada favoritada ainda.</p>
-                )}
+              {/* Atalhos: lista de desejos e mensagens com guias */}
+              <div className="p-2 border-b border-editorial-border">
+                <button type="button" onClick={() => { setOpen(false); navigate("/turista/listas"); }} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-editorial-text hover:bg-editorial-secondary cursor-pointer">
+                  <Heart className="h-4 w-4 text-red-500" /> Lista de desejos
+                </button>
+                <button type="button" onClick={() => { setOpen(false); navigate("/turista/mensagens"); }} className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-editorial-text hover:bg-editorial-secondary cursor-pointer">
+                  <MessageSquare className="h-4 w-4 text-editorial-accent" /> Mensagens com guias
+                </button>
               </div>
 
               {/* Visitados */}

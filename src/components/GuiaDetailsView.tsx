@@ -7,6 +7,8 @@ import TopReviewQuote from "./TopReviewQuote";
 import LanguageFlag from "./LanguageFlag";
 import { LEVEL_LABELS } from "./LanguagesEditor";
 import BrandLogo from "./BrandLogo";
+import AskGuideButton from "./AskGuideButton";
+import SaveToListButton from "./SaveToListButton";
 
 const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 
@@ -54,9 +56,10 @@ export default function GuiaDetailsView({ id }: { id: string }) {
         <a href="/" onClick={e => { e.preventDefault(); navigate("/"); }} className="flex items-center gap-2 cursor-pointer">
           <BrandLogo />
         </a>
-        <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="hidden sm:flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] uppercase tracking-widest font-bold px-4 py-2 rounded-md transition">
-          <MessageSquare className="h-3.5 w-3.5" /> Fale Conosco
-        </a>
+        <div className="flex items-center gap-2">
+          <SaveToListButton tipo="guia" refId={guia.id} />
+          <AskGuideButton guideId={guia.id} guideName={guia.name} className="hidden sm:inline-flex !px-4 !py-2" />
+        </div>
       </header>
 
       {/* Profile header — social-profile style: big circular photo, name, status */}
@@ -163,9 +166,13 @@ export default function GuiaDetailsView({ id }: { id: string }) {
 
       <section className="bg-editorial-primary text-white py-14 text-center px-6">
         <h2 className="text-2xl font-serif font-bold mb-3">Quer explorar com {guia.name.split(" ")[0]}?</h2>
-        <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-white text-editorial-primary hover:bg-white/90 font-bold px-8 py-3.5 text-xs uppercase tracking-widest transition">
-          <MessageSquare className="h-4 w-4" /> Fale Conosco no WhatsApp
-        </a>
+        <p className="text-sm text-white/70 mb-6 max-w-md mx-auto">Tire suas dúvidas direto com o guia pelo Ipantanal. O contato dele é liberado depois da reserva paga.</p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <AskGuideButton guideId={guia.id} guideName={guia.name} variant="light" />
+          <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 border border-white/40 text-white hover:bg-white/10 font-bold px-6 py-3 rounded-full text-xs uppercase tracking-widest transition">
+            <MessageSquare className="h-4 w-4" /> Falar com a equipe
+          </a>
+        </div>
       </section>
 
       <footer className="py-8 text-center text-editorial-muted text-[10px] uppercase tracking-widest font-bold">

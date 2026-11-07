@@ -17,6 +17,7 @@ import PousadaRecompensasManager from "./PousadaRecompensasManager";
 import PousadaProdutosManager from "./PousadaProdutosManager";
 import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
 import GuestRatingsPanel from "./GuestRating";
+import GuideMessagesPanel from "./GuideMessagesPanel";
 import PousadaReservasAgenda from "./PousadaReservasAgenda";
 import GestorPousadaPanel from "./GestorPousadaPanel";
 import PousadaGestoresManager from "./PousadaGestoresManager";
@@ -1171,6 +1172,9 @@ export default function PartnerPortalPage() {
           <div className="mt-8 space-y-6">
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
+            </ErrorBoundary>
+            <ErrorBoundary variant="section" sectionLabel="as mensagens dos turistas">
+              <GuideMessagesPanel guideId={profile.partnerId} />
             </ErrorBoundary>
             <ErrorBoundary variant="section" sectionLabel="a avaliação de hóspedes">
               <GuestRatingsPanel />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { LoaderCircle, CalendarDays, CreditCard, FileDown, WifiOff, Map as MapIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { LoaderCircle, CalendarDays, CreditCard, FileDown, WifiOff, Map as MapIcon, ChevronDown, ChevronUp, Phone } from "lucide-react";
 import { adminFetch } from "../lib/adminFetch";
 
 interface MinhaReserva {
@@ -14,6 +14,8 @@ interface MinhaReserva {
   experienceType?: string;
   totalPrice: number;
   status: string;
+  guideId?: string;
+  guideName?: string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -99,6 +101,18 @@ export default function MinhasReservas() {
   const [openRoteiro, setOpenRoteiro] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [voucherId, setVoucherId] = useState<string | null>(null);
+  const [guideContact, setGuideContact] = useState<string | null>(null);
+  const abrirWhatsGuia = async (guideId: string) => {
+    setGuideContact(guideId);
+    try {
+      const res = await adminFetch(`/api/turista/guias/${encodeURIComponent(guideId)}/contato`);
+      const body = await res.json().catch(() => ({}));
+      if (res.ok && body.whatsapp) window.open(body.whatsapp, "_blank", "noopener");
+      else setError(body.error || "Não foi possível abrir o contato do guia.");
+    } finally {
+      setGuideContact(null);
+    }
+  };
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -222,6 +236,12 @@ export default function MinhasReservas() {
                   <button type="button" aria-expanded={openRoteiro === r.id} onClick={() => setOpenRoteiro(openRoteiro === r.id ? null : r.id)} className="flex items-center gap-1.5 border border-editorial-border text-editorial-text text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-md cursor-pointer">
                     <MapIcon className="h-3.5 w-3.5" /> Roteiro {openRoteiro === r.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                   </button>
+                  {/* Contato direto do guia: liberado só com a reserva paga. */}
+                  {r.guideId && hasVoucher(r.status) && (
+                    <button type="button" onClick={() => abrirWhatsGuia(r.guideId!)} disabled={guideContact === r.guideId} className="flex items-center gap-1.5 bg-emerald-600 text-white text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-md disabled:opacity-60 cursor-pointer">
+                      {guideContact === r.guideId ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Phone className="h-3.5 w-3.5" />} WhatsApp {r.guideName ? `de ${r.guideName.split(" ")[0]}` : "do guia"}
+                    </button>
+                  )}
                 </div>
               )}
               {openRoteiro === r.id && <Roteiro r={r} />}

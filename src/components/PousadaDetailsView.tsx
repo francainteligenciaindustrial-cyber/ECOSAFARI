@@ -6,7 +6,7 @@ import { slugify } from "../lib/slug";
 import PictureImg from "./PictureImg";
 import PousadaHighlights, { hasPousadaHighlights } from "./PousadaHighlights";
 import TopReviewQuote from "./TopReviewQuote";
-import FavoriteButton from "./FavoriteButton";
+import SaveToListButton from "./SaveToListButton";
 import PousadaRecompensas from "./PousadaRecompensas";
 import { useStructuredData } from "../lib/structuredData";
 import { useI18n } from "../i18n/I18nProvider";
@@ -162,7 +162,7 @@ export default function PousadaDetailsView({ pousada, onBack, onOpenBot }: Pousa
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4 md:mt-0">
-            <FavoriteButton pousadaId={pousada.id} />
+            <SaveToListButton tipo="pousada" refId={pousada.id} />
             {pousada.rating > 0 ? (
               <>
                 <div className="flex items-center gap-1 text-editorial-primary bg-editorial-secondary border border-editorial-border px-3 py-1.5 rounded-full font-serif text-sm font-bold">

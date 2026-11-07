@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   User, MapPin, Languages, Coins, Heart, Ticket, Check, Copy, LoaderCircle,
   Pencil, X, Compass, Download, Trash2, ShieldAlert, Camera, ImagePlus, Send,
-  Settings, KeyRound, Bell, LogOut,
+  Settings, KeyRound, Bell, LogOut, MessageSquare,
 } from "lucide-react";
 import { useTouristSession } from "../lib/useTouristSession";
 import { adminFetch } from "../lib/adminFetch";
@@ -956,42 +956,18 @@ export default function TuristaProfileView() {
             </div>
           )}
 
-          {/* Favoritos */}
-          <div className="bg-white border border-editorial-border rounded-lg p-6">
-            <h2 className="text-xs uppercase tracking-[0.2em] font-bold text-editorial-primary flex items-center gap-2 mb-4">
-              <Heart className="h-4 w-4" /> Pousadas favoritas
-            </h2>
-            {favoritos === null ? (
-              <div className="flex justify-center py-6"><LoaderCircle className="h-5 w-5 text-editorial-primary animate-spin" /></div>
-            ) : favoritos.length === 0 ? (
-              <p className="text-editorial-muted text-xs">Nenhuma pousada favoritada ainda — explore o catálogo e clique no coração de quem você mais curtiu.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {favoritos.map(p => (
-                  <div key={p.id} className="flex items-center gap-3 border border-editorial-border rounded-md p-2.5 group">
-                    <button
-                      onClick={() => navigate(`/pousadas/${p.id}`)}
-                      className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
-                    >
-                      <span className="w-12 h-12 rounded bg-editorial-secondary flex-shrink-0 overflow-hidden">
-                        {p.images?.[0] && <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-editorial-text truncate group-hover:text-editorial-primary transition">{p.name}</span>
-                        <span className="block text-[11px] text-editorial-muted truncate">{p.location}</span>
-                      </span>
-                    </button>
-                    <button aria-label="Remover dos favoritos"
-                      onClick={() => handleRemoveFavorite(p.id)}
-                      title="Remover dos favoritos"
-                      className="text-editorial-muted hover:text-red-600 transition cursor-pointer flex-shrink-0 p-1"
-                    >
-                      <Heart className="h-4 w-4 fill-red-500 text-red-500" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Lista de desejos e mensagens com guias */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <a href="/turista/listas" onClick={e => { e.preventDefault(); navigate("/turista/listas"); }} className="bg-white border border-editorial-border rounded-2xl p-5 hover:border-editorial-primary transition block">
+              <Heart className="h-5 w-5 text-red-500 mb-2" />
+              <p className="font-serif text-lg font-semibold text-editorial-text">Lista de desejos</p>
+              <p className="text-xs text-editorial-muted mt-1">Pousadas, guias, atrações e pacotes que você salvou — com datas, alertas e roteiro pela IA.</p>
+            </a>
+            <a href="/turista/mensagens" onClick={e => { e.preventDefault(); navigate("/turista/mensagens"); }} className="bg-white border border-editorial-border rounded-2xl p-5 hover:border-editorial-primary transition block">
+              <MessageSquare className="h-5 w-5 text-editorial-accent mb-2" />
+              <p className="font-serif text-lg font-semibold text-editorial-text">Mensagens com guias</p>
+              <p className="text-xs text-editorial-muted mt-1">Tire dúvidas antes de reservar. O contato direto do guia é liberado depois da reserva paga.</p>
+            </a>
           </div>
         </div>
       </div>

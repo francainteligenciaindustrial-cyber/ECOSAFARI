@@ -37,6 +37,9 @@ const MobileSimulator = lazy(() => import("./components/MobileSimulator"));
 const PartnerSignupPage = lazy(() => import("./components/PartnerSignupPage"));
 const AboutPage = lazy(() => import("./components/AboutPage"));
 const UnsubscribePage = lazy(() => import("./components/UnsubscribePage"));
+const TuristaListasPage = lazy(() => import("./components/TuristaListasPage"));
+const TuristaMensagensPage = lazy(() => import("./components/TuristaMensagensPage"));
+const SharedListPage = lazy(() => import("./components/SharedListPage"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("./components/TermsPage"));
 const FaqPage = lazy(() => import("./components/FaqPage"));
@@ -69,6 +72,8 @@ const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   "/seja-parceiro": PartnerSignupPage,
   "/sobre": AboutPage,
   "/descadastrar": UnsubscribePage,
+  "/turista/listas": TuristaListasPage,
+  "/turista/mensagens": TuristaMensagensPage,
   "/privacidade": PrivacyPolicyPage,
   "/termos": TermsPage,
   "/faq": FaqPage,
@@ -98,6 +103,7 @@ export default function App() {
   const atracaoRouteMatch = path.match(/^\/atracoes\/(.+)$/);
   const guiaRouteMatch = path.match(/^\/guias\/(.+)$/);
   const reservaRouteMatch = path.match(/^\/reservar\/([^/]+)$/);
+  const sharedListMatch = path.match(/^\/lista\/([^/]+)$/);
 
   // Supabase Auth: the "Gestão" tab is only shown to authenticated users whose
   // account has app_metadata.isAdmin === true (concedido via a votação dos 3
@@ -208,7 +214,7 @@ export default function App() {
 
   useEffect(() => {
     // Standalone info/partner pages are self-contained and don't need the portal's data.
-    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch || reservaRouteMatch) return;
+    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch || reservaRouteMatch || sharedListMatch) return;
     fetchData();
     // Refreshes the public catalog periodically so new pousadas/reviews/
     // sightings show up without a manual reload. This runs in every visitor's
@@ -297,6 +303,14 @@ export default function App() {
 
   if (guiaRouteMatch) {
     return <GuiaDetailsView id={guiaRouteMatch[1]} />;
+  }
+
+  if (sharedListMatch) {
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <SharedListPage token={decodeURIComponent(sharedListMatch[1])} />
+      </Suspense>
+    );
   }
 
   if (reservaRouteMatch) {

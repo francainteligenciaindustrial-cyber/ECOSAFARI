@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from "rea
 import { Star, MapPin, Compass, PlayCircle, Eye, ChevronRight, MessageCircle, ChevronLeft, X, Smartphone, BadgeCheck, UtensilsCrossed, User, Lock, LoaderCircle, Search } from "lucide-react";
 import { Pousada, Review, Species, Sighting, PublicBookingSummary, Atracao, Guide } from "../types";
 import PictureImg from "./PictureImg";
+import SaveToListButton from "./SaveToListButton";
 import { navigate } from "../lib/router";
 import LanguageFlag from "./LanguageFlag";
 import { adminFetch } from "../lib/adminFetch";
@@ -525,6 +526,7 @@ export default function PousadaCatalog({
                     <span className="text-editorial-muted text-[10px] sm:text-xs">{t("common.perNight")}</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <SaveToListButton tipo="pousada" refId={pousada.id} compact className="hidden sm:inline-block" />
                     <button aria-label={t("catalog.videoCta")}
                       onClick={(e) => { e.stopPropagation(); onSelectVideo(pousada); }}
                       className="hidden sm:flex bg-editorial-beige hover:bg-editorial-border/60 text-editorial-primary p-2.5 rounded-full border border-editorial-border transition items-center gap-1 cursor-pointer"
