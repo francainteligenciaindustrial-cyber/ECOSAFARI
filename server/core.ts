@@ -28,6 +28,7 @@ import { unsubscribeUrl } from "./emailTokens.js";
 import { directionsUrl, directionsQueryUrl } from "../src/lib/mapsLinks.js";
 import { isExpiredHold } from "../src/lib/cartHold.js";
 import { datasLivresMaisProximas, shiftISO } from "../src/lib/disponibilidade.js";
+import { comissaoVigente, COMISSAO_PADRAO_PCT as POLITICA_COMISSAO_PADRAO, RESUMO_CANCELAMENTO } from "../src/lib/politica.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 
@@ -1111,6 +1112,10 @@ export function mapPousadaRow(p: any): Pousada {
     sitePublicado: p.sitePublicado === true,
     appLodgeId: p.appLodgeId || "",
     commissionPct: toNumberOrUndefined(p.commissionPct) ?? null,
+    contratoId: p.contratoId || null,
+    contratoAceitoEm: p.contratoAceitoEm || null,
+    comissaoLancamentoAte: p.comissaoLancamentoAte || null,
+    repasseBloqueado: p.repasseBloqueado === true,
     plano: p.plano === "basico" ? "basico" : "gestao",
     precosPorMes: normalizePrecosPorMes(parseJSONSafe(p.precosPorMes) ?? p.precosPorMes),
     conservationPct: toNumberOrUndefined(p.conservationPct) ?? null,
@@ -1410,13 +1415,13 @@ export function computeBookingTotal(pousada: Pousada, checkIn: string, checkOut:
   return lodgingTotal(pousada, checkIn, checkOut) + extras;
 }
 
-// Percentuais padrão da plataforma (Vercel). Sem eles, 0 — o painel
-// Financeiro avisa para configurar.
-export const COMISSAO_PADRAO_PCT = Number(process.env.COMISSAO_PADRAO_PCT) || 0;
+// Comissão padrão do Ipantanal: 15% (ou COMISSAO_PADRAO_PCT na Vercel);
+// 10% nos 6 primeiros meses de contrato (src/lib/politica.ts).
+export const COMISSAO_PADRAO_PCT = Number(process.env.COMISSAO_PADRAO_PCT) || POLITICA_COMISSAO_PADRAO;
 export const CONSERVACAO_PADRAO_PCT = Number(process.env.CONSERVACAO_PADRAO_PCT) || 0;
 export const PLANO_GESTAO_VALOR = Number(process.env.PLANO_GESTAO_VALOR) || null;
 
-export const commissionPctOf = (p: Pousada) => (typeof p.commissionPct === "number" ? p.commissionPct : COMISSAO_PADRAO_PCT);
+export const commissionPctOf = (p: Pousada) => comissaoVigente(p, new Date().toISOString().slice(0, 10), COMISSAO_PADRAO_PCT);
 export const conservationPctOf = (p: Pousada) => (typeof p.conservationPct === "number" ? p.conservationPct : CONSERVACAO_PADRAO_PCT);
 
 // Afiliado ativo pelo código do link (?ref=).
@@ -1608,6 +1613,10 @@ export async function runBookingHooks(kind: keyof typeof bookingHooks, booking: 
     await fn(booking, req, extra).catch(err => log.warn(`Gancho de reserva (${kind}) falhou:`, err?.message));
   }
 }
+
+// Outros módulos que reagem a eventos do Stripe (ex.: contestação de
+// cartão no módulo de repasses).
+export const stripeHooks: ((event: Stripe.Event) => Promise<void>)[] = [];
 
 // Pousada avisada assim que o hóspede paga (reserva avulsa ou carrinho).
 export async function sendPousadaPaidEmail(b: Booking) {
@@ -2379,6 +2388,8 @@ export async function handleStripeWebhook(req: express.Request, res: express.Res
     return res.status(400).send("Webhook Error: assinatura inválida");
   }
 
+  for (const fn of stripeHooks) await fn(event).catch(err => log.warn("Gancho Stripe falhou:", err?.message));
+
   if (event.type === "checkout.session.expired") {
     const session = event.data.object as Stripe.Checkout.Session;
     const ids = String(session.metadata?.bookingIds || "").split(",").filter(Boolean);
@@ -2561,7 +2572,8 @@ export async function sendBookingConfirmationEmail(booking: Booking) {
       ${!g ? `<p style="margin:0 0 12px;font-size:13px;color:#4F5D58">Se a sua viagem incluir guia, mandamos o contato dele assim que ele for confirmado.</p>` : ""}
       <p style="margin:0 0 6px;font-size:14px">📎 O <strong>voucher</strong> está anexado — apresente no check-in (impresso ou no celular). Ele também fica em <a href="${SITE_URL}/turista" style="color:#087A55">Minhas reservas</a>, inclusive sem internet.</p>
       <p style="margin:24px 0"><a href="${SITE_URL}/turista" style="display:inline-block;background:#0B1412;color:#FFFFFF;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Ver minha reserva</a></p>
-      <p style="margin:0;font-size:12px;color:#4F5D58">Cancelamento: veja a <a href="${SITE_URL}/termos" style="color:#4F5D58">política de cancelamento</a>. Precisa de ajuda? Equipe Ipantanal no WhatsApp <a href="${AGENCY_WHATSAPP_LINK}" style="color:#4F5D58">${AGENCY_WHATSAPP_DISPLAY}</a>.</p>
+      <p style="margin:0 0 8px;font-size:12px;color:#4F5D58">${RESUMO_CANCELAMENTO} Para cancelar, use "Minhas reservas" — o valor do reembolso aparece antes de confirmar. <a href="${SITE_URL}/termos" style="color:#4F5D58">Política completa</a>.</p>
+      <p style="margin:0;font-size:12px;color:#4F5D58">Precisa de ajuda? Equipe Ipantanal no WhatsApp <a href="${AGENCY_WHATSAPP_LINK}" style="color:#4F5D58">${AGENCY_WHATSAPP_DISPLAY}</a>.</p>
     `,
     attachments: [
       { filename: `voucher-${ref}.pdf`, content: pdfBuffer.toString("base64") }

@@ -629,6 +629,7 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
                 <span className="font-serif text-xl font-bold text-editorial-primary">{estimate !== null ? formatMoney(estimate) : "—"}</span>
               </div>
               <p className="text-[10px] text-editorial-muted">{t("booking.finalNote")}</p>
+              <p className="text-[11px] text-editorial-text bg-editorial-secondary border border-editorial-border rounded-md px-3 py-2">{t("booking.cancelPolicy")}</p>
               <label className="flex items-start gap-2 text-xs cursor-pointer">
                 <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} className="accent-editorial-primary h-4 w-4 mt-0.5" />
                 <span>{t("booking.acceptTerms1")} <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-editorial-primary font-semibold underline">{t("booking.acceptTerms2")}</a>.</span>

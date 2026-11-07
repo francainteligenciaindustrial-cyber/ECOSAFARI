@@ -67,6 +67,8 @@ import PedidosSitePanel from "./PedidosSitePanel";
 import AdminComunicadosPanel from "./AdminComunicadosPanel";
 import { Megaphone, MessagesSquare } from "lucide-react";
 import AdminConversasPanel from "./AdminConversasPanel";
+import AdminRepassesPanel from "./AdminRepassesPanel";
+import { Wallet } from "lucide-react";
 import AppLodgeSelect from "./AppLodgeSelect";
 import { usePagination } from "../lib/usePagination";
 import AdminReservasTab from "./AdminReservasTab";
@@ -81,7 +83,7 @@ interface AdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira" | "pacotes" | "cupons" | "pedidos-site" | "comunicados" | "conversas";
+type AdminTab = "bookings" | "pousadas" | "guides" | "atracoes" | "agenda" | "history" | "species" | "turismo" | "candidaturas" | "admins" | "auditlog" | "lixeira" | "pacotes" | "cupons" | "pedidos-site" | "comunicados" | "conversas" | "repasses";
 
 // Drives the vertical sidebar nav — a single source of truth instead of one
 // hand-written <button> per tab. Grouped into sections (rather than one flat
@@ -93,6 +95,7 @@ const ADMIN_TABS: { id: AdminTab; icon: LucideIcon; label: string; group: string
   { id: "agenda", icon: CalendarClock, label: "Agenda Integrada", group: "Operação" },
   { id: "history", icon: HistoryIcon, label: "Histórico de Clientes", group: "Operação" },
   { id: "conversas", icon: MessagesSquare, label: "Mensagens (guias)", group: "Operação" },
+  { id: "repasses", icon: Wallet, label: "Repasses e contratos", group: "Vendas" },
   { id: "pacotes", icon: Package, label: "Pacotes", group: "Vendas" },
   { id: "cupons", icon: Tag, label: "Cupons", group: "Vendas" },
   { id: "pedidos-site", icon: Globe, label: "Pedidos de site", group: "Vendas" },
@@ -896,6 +899,7 @@ export default function AdminDashboard({
         {activeTab === "pedidos-site" && <PedidosSitePanel />}
         {activeTab === "comunicados" && <AdminComunicadosPanel />}
         {activeTab === "conversas" && <AdminConversasPanel />}
+        {activeTab === "repasses" && <AdminRepassesPanel />}
 
         {/* TAB 1: RESERVAS & CONFIRMAÇÕES */}
         {activeTab === "bookings" && <AdminReservasTab pousadas={pousadas} onRefreshData={onRefreshData} fetchBookings={fetchBookings} guides={guides} bookings={bookings} />}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { LoaderCircle, CalendarDays, CreditCard, FileDown, WifiOff, Map as MapIcon, ChevronDown, ChevronUp, Phone } from "lucide-react";
+import { LoaderCircle, CalendarDays, CreditCard, FileDown, WifiOff, Map as MapIcon, ChevronDown, ChevronUp, Phone, XCircle } from "lucide-react";
+import { checkInMomento } from "../lib/politica";
 import { adminFetch } from "../lib/adminFetch";
 
 interface MinhaReserva {
@@ -114,6 +115,47 @@ export default function MinhasReservas() {
     }
   };
   const [error, setError] = useState("");
+
+  // Cancelar: primeiro mostra quanto volta (pela política), depois confirma.
+  type Previa = { id: string; pago: boolean; reembolso: number; retido: number; rotulo: string; total?: number; reembolsoPct?: number };
+  const [previa, setPrevia] = useState<Previa | null>(null);
+  const [carregandoPrevia, setCarregandoPrevia] = useState<string | null>(null);
+  const [cancelando, setCancelando] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState<{ id: string; texto: string } | null>(null);
+  const abrirCancelamento = async (id: string) => {
+    setError("");
+    setCancelMsg(null);
+    setCarregandoPrevia(id);
+    try {
+      const res = await adminFetch(`/api/turista/bookings/${encodeURIComponent(id)}/cancelamento`);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(body.error || "Não foi possível consultar o cancelamento.");
+      setPrevia({ id, ...body });
+    } catch {
+      setError("Sem conexão. Tente de novo.");
+    } finally {
+      setCarregandoPrevia(null);
+    }
+  };
+  const confirmarCancelamento = async () => {
+    if (!previa) return;
+    setCancelando(true);
+    try {
+      const res = await adminFetch(`/api/turista/bookings/${encodeURIComponent(previa.id)}/cancelar`, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(body.error || "Não foi possível cancelar."); return; }
+      setReservas(rs => (rs || []).map(r => (r.id === previa.id ? { ...r, status: "cancelado" } : r)));
+      setCancelMsg({
+        id: previa.id,
+        texto: body.reembolso > 0
+          ? `Reserva cancelada. Reembolso de R$ ${Number(body.reembolso).toLocaleString("pt-BR")} ${body.reembolsoAutomatico ? "já solicitado ao seu cartão/banco (aparece em 5 a 10 dias úteis)" : "será feito pela nossa equipe"}. Enviamos os detalhes por e-mail.`
+          : "Reserva cancelada. Enviamos a confirmação por e-mail.",
+      });
+      setPrevia(null);
+    } finally {
+      setCancelando(false);
+    }
+  };
 
   useEffect(() => {
     adminFetch("/api/turista/bookings")
@@ -244,6 +286,31 @@ export default function MinhasReservas() {
                   )}
                 </div>
               )}
+              {r.status !== "cancelado" && Date.now() < checkInMomento(r.checkIn) && previa?.id !== r.id && (
+                <button type="button" onClick={() => abrirCancelamento(r.id)} disabled={carregandoPrevia === r.id} className="mt-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-editorial-muted hover:text-red-600 cursor-pointer disabled:opacity-60">
+                  {carregandoPrevia === r.id ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />} Cancelar reserva
+                </button>
+              )}
+              {previa?.id === r.id && (
+                <div role="alertdialog" aria-label="Confirmar cancelamento" className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                  {previa.pago ? (
+                    <>
+                      <p className="font-semibold text-red-900">Cancelar esta reserva?</p>
+                      <p className="text-red-900">{previa.rotulo}: reembolso de <strong>{previa.reembolsoPct}%</strong>.</p>
+                      <p className="text-red-900">Você recebe de volta <strong>R$ {previa.reembolso.toLocaleString("pt-BR")}</strong>{previa.retido > 0 ? ` (taxa de cancelamento: R$ ${previa.retido.toLocaleString("pt-BR")})` : ""}.</p>
+                    </>
+                  ) : (
+                    <p className="font-semibold text-red-900">Cancelar esta reserva? Ela ainda não foi paga, então não há cobrança.</p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={confirmarCancelamento} disabled={cancelando} className="bg-red-600 text-white text-[10px] uppercase tracking-widest font-bold px-3 py-2 rounded-md cursor-pointer disabled:opacity-60">
+                      {cancelando ? "Cancelando…" : "Sim, cancelar"}
+                    </button>
+                    <button type="button" onClick={() => setPrevia(null)} className="border border-editorial-border bg-white text-[10px] uppercase tracking-widest font-bold px-3 py-2 rounded-md cursor-pointer">Manter reserva</button>
+                  </div>
+                </div>
+              )}
+              {cancelMsg?.id === r.id && <p role="status" className="mt-2 text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2">{cancelMsg.texto}</p>}
               {openRoteiro === r.id && <Roteiro r={r} />}
             </li>
           ))}

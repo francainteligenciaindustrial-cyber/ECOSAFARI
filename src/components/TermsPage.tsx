@@ -18,13 +18,14 @@ export default function TermsPage() {
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">3. Política de Cancelamento</h3>
       <ul className="list-disc pl-5 space-y-2">
-        <li><strong>Mais de 15 dias antes do check-in:</strong> reembolso de 100% do valor pago.</li>
-        <li><strong>Entre 7 e 15 dias antes do check-in:</strong> reembolso de 50% do valor pago.</li>
-        <li><strong>Menos de 7 dias antes do check-in:</strong> sem reembolso; é possível solicitar remarcação de data, sujeita à disponibilidade da pousada e do guia.</li>
+        <li><strong>Até 7 dias antes do check-in:</strong> reembolso de 90% do valor pago (taxa de cancelamento de 10%).</li>
+        <li><strong>De 7 dias a 48 horas antes do check-in:</strong> reembolso de 70% do valor pago (taxa de cancelamento de 30%).</li>
+        <li><strong>Menos de 48 horas antes do check-in, ou não comparecimento:</strong> sem reembolso; é possível pedir remarcação de data, sujeita à disponibilidade da pousada e do guia.</li>
+        <li><strong>Para que serve a taxa:</strong> compensar a pousada pela vaga que ficou reservada para você (e que deixou de ser vendida) e cobrir as tarifas do meio de pagamento, que não são devolvidas no reembolso. O horário de referência do check-in é 12h (horário de Mato Grosso).</li>
         <li><strong>Cancelamento por parte da pousada/guia:</strong> reembolso integral garantido, com apoio da nossa equipe para realocação em outra unidade parceira, se desejado.</li>
         <li><strong>Casos de força maior</strong> (desastres naturais, emergências de saúde documentadas, restrições oficiais de viagem): avaliados individualmente pela nossa equipe.</li>
       </ul>
-      <p>Solicitações de cancelamento devem ser feitas por escrito, pelo WhatsApp ou email de contato, informando o número da reserva.</p>
+      <p>O cancelamento é feito por você mesmo em <strong>Minhas reservas</strong>, que mostra o valor exato do reembolso antes de confirmar; o reembolso é solicitado automaticamente no mesmo meio de pagamento (o prazo para aparecer depende do banco ou cartão). Se preferir, fale com a nossa equipe pelo WhatsApp ou e-mail informando o número da reserva. Ficam ressalvados os direitos previstos no Código de Defesa do Consumidor.</p>
 
       <h3 className="text-lg font-serif font-bold text-editorial-primary pt-2">4. Responsabilidades do viajante</h3>
       <ul className="list-disc pl-5 space-y-2">

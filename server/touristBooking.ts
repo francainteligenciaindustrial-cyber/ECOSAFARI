@@ -69,6 +69,11 @@ export async function prepareTouristBooking(body: any): Promise<Prepared | Fail>
   const { data: pousadaRow } = await supabase.from("pousadas").select("*").eq("id", pousadaId).maybeSingle();
   if (!pousadaRow) return fail(404, "Pousada não encontrada.");
   const pousada = mapPousadaRow(pousadaRow);
+  // Reserva online só com o contrato de parceria assinado (comissão e
+  // repasse definidos). Antes da migração (coluna inexistente), não bloqueia.
+  if ("contratoId" in pousadaRow && !pousadaRow.contratoId && process.env.EXIGIR_CONTRATO !== "false") {
+    return fail(403, "Esta pousada ainda está ativando as reservas online. Fale com a nossa equipe pelo WhatsApp para reservar.");
+  }
   if ((pousada.rooms || []).length > 0 && !roomType) return fail(400, "Escolha o tipo de quarto.");
   const missingExperience = experienceTitles.find(title => !(pousada.experiences || []).some(e => e.title === title));
   if (missingExperience) return fail(400, `Experiência não encontrada nesta pousada: ${missingExperience}.`);

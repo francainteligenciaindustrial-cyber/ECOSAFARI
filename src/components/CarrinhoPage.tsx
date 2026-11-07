@@ -8,6 +8,7 @@ import { navigate } from "../lib/router";
 import { RETURN_TO_KEY } from "../lib/returnTo";
 import { useCart, writeCart, readCart, updateCartItem, removeFromCart, toBookingRequest, type CartItem } from "../lib/cart";
 import type { Pousada } from "../types";
+import { RESUMO_CANCELAMENTO } from "../lib/politica";
 
 interface Cotacao { ok: boolean; total?: number; error?: string; suggestions?: { checkIn: string; checkOut: string; note: string }[] }
 
@@ -227,6 +228,7 @@ export default function CarrinhoPage() {
               <li className="flex gap-1.5"><Clock className="h-3.5 w-3.5 flex-shrink-0" /> Ao abrir o pagamento, as vagas ficam seguradas por 30 minutos.</li>
               <li className="flex gap-1.5"><ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" /> Cada item vira uma reserva separada, com voucher próprio, e pode ser cancelado sem afetar os outros.</li>
               <li className="flex gap-1.5"><Tag className="h-3.5 w-3.5 flex-shrink-0" /> Tem cupom? Ele vale na reserva individual da pousada.</li>
+              <li className="flex gap-1.5 text-editorial-text"><AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" /> {RESUMO_CANCELAMENTO}</li>
             </ul>
             {pedirLogin && !isTourist && !checking ? (
               <div className="border-t border-editorial-border pt-4">

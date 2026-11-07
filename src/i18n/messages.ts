@@ -380,6 +380,7 @@ const raw = {
   "booking.packageShort": ["Pacote", "Package", "Paquete"],
   "booking.total": ["Total estimado", "Estimated total", "Total estimado"],
   "booking.finalNote": ["O valor final é confirmado pelo sistema no momento do pagamento.", "The final amount is confirmed by the system at payment.", "El valor final se confirma al momento del pago."],
+  "booking.cancelPolicy": ["Cancelamento: até 7 dias antes do check-in, reembolso de 90%; de 7 dias a 48 h antes, 70%; com menos de 48 h, sem reembolso.", "Cancellation: up to 7 days before check-in, 90% refund; 7 days to 48 h before, 70%; less than 48 h, no refund.", "Cancelación: hasta 7 días antes del check-in, reembolso del 90%; de 7 días a 48 h antes, 70%; con menos de 48 h, sin reembolso."],
   "booking.acceptTerms1": ["Li e aceito a", "I have read and accept the", "He leído y acepto la"],
   "booking.acceptTerms2": ["política de cancelamento", "cancellation policy", "política de cancelación"],
   "booking.submit": ["Confirmar e ir para o pagamento", "Confirm and go to payment", "Confirmar e ir al pago"],

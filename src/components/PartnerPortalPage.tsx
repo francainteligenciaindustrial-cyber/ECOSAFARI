@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe, Receipt, UserRoundCheck } from "lucide-react";
+import { TrendingUp, Compass, LogOut, LoaderCircle, Lock, Save, Check, ArrowLeft, ShieldCheck, Trash2, Eye, Share2, Copy, Facebook, UserRound, Info, ConciergeBell, BedDouble, Images, UtensilsCrossed, CalendarDays, Package, Award, Users, Globe, Receipt, UserRoundCheck, Wallet, FileSignature } from "lucide-react";
+import PousadaContratoPanel from "./PousadaContratoPanel";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { adminFetch } from "../lib/adminFetch";
@@ -63,10 +64,11 @@ function menuByCategory(menu: Pousada["menu"] | undefined, category: string): Ex
     .map(m => ({ title: m.item, price: m.price, description: m.description || "" }));
 }
 
-type PousadaTab = "gestor" | "agenda" | "resultados" | "caixa" | "colaboradores" | "sobre" | "servicos" | "acomodacoes" | "galeria" | "redes" | "bar" | "produtos" | "recompensas" | "gestores" | "editar-site";
+type PousadaTab = "gestor" | "agenda" | "resultados" | "caixa" | "colaboradores" | "sobre" | "servicos" | "acomodacoes" | "galeria" | "redes" | "bar" | "produtos" | "recompensas" | "gestores" | "editar-site" | "contrato";
 
 const POUSADA_TABS: { id: PousadaTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "agenda", label: "Agenda de Reservas", icon: CalendarDays },
+  { id: "contrato", label: "Contrato e Repasses", icon: Wallet },
   { id: "resultados", label: "Resultados", icon: TrendingUp },
   { id: "caixa", label: "Caixa", icon: Receipt },
   { id: "sobre", label: "Sobre", icon: Info },
@@ -683,8 +685,19 @@ export default function PartnerPortalPage() {
           />
         )}
 
+        {isPousadaGestor && pousadaTab === "contrato" && profile?.partnerType === "pousada" && (
+          <ErrorBoundary variant="section" sectionLabel="o contrato e os repasses">
+            <PousadaContratoPanel pousadaId={profile.partnerId} />
+          </ErrorBoundary>
+        )}
+
         {isPousadaGestor && pousadaTab === "agenda" && profile?.partnerType === "pousada" && form && (
           <div className="mb-6">
+            {profile.pousada && "contratoId" in profile.pousada && !profile.pousada.contratoId && (
+              <button type="button" onClick={() => setPousadaTab("contrato")} className="w-full mb-4 text-left bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-xl px-4 py-3 flex items-center gap-2 cursor-pointer">
+                <FileSignature className="h-4 w-4 flex-shrink-0" /> <span><strong>Assine o contrato de parceria</strong> para receber reservas e pagamentos online pelo Ipantanal. Leva 2 minutos →</span>
+              </button>
+            )}
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PousadaReservasAgenda pousadaId={profile.partnerId} unavailableDates={form.unavailableDates} />
             </ErrorBoundary>

@@ -125,6 +125,12 @@ export interface Pousada {
   conservationPartner?: string;
   // Em destaque na home (estratégia Pantanal Norte).
   featured?: boolean;
+  // Contrato de parceria (ver server/routes/repasses.ts): sem ele, a
+  // pousada não recebe reservas online. Comissão de lançamento até a data.
+  contratoId?: string | null;
+  contratoAceitoEm?: string | null;
+  comissaoLancamentoAte?: string | null;
+  repasseBloqueado?: boolean;
 }
 
 // Agência ou influenciador com link de indicação (?ref=CODIGO).
@@ -300,6 +306,17 @@ export interface Booking {
   afiliadoCode?: string;
   afiliadoCommission?: number;
   conservationAmount?: number;
+  // Repasse à pousada (custódia → garantido → liberado → em_lote → pago;
+  // ou reembolsado/disputa). repasseValor = o que a pousada recebe.
+  repasseStatus?: string | null;
+  repasseValor?: number | null;
+  repasseLiberadoEm?: string | null;
+  repassePagoEm?: string | null;
+  repasseLoteId?: string | null;
+  cancelamentoTaxa?: number | null;
+  reembolsoValor?: number | null;
+  canceladoPor?: string | null;
+  canceladoEm?: string | null;
   // Deve bater com um Pousada.rooms[].type — quando informado, a
   // disponibilidade é checada por unidade daquele tipo de quarto (não só
   // contra a capacidade agregada da pousada). Opcional pra manter

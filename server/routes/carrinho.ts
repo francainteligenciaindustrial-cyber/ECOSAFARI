@@ -116,7 +116,7 @@ app.post("/api/admin/bookings/:id/reembolso", requireAdmin, async (req, res) => 
     log.error("Erro no reembolso:", err.message);
     return res.status(502).json({ error: `O Stripe recusou o reembolso: ${err.message}` });
   }
-  await writeSkippingMissingColumns({ status: "cancelado", refundedAt: new Date().toISOString(), refundedAmount: amount }, row => supabase.from("bookings").update(row).eq("id", b.id));
+  await writeSkippingMissingColumns({ status: "cancelado", refundedAt: new Date().toISOString(), refundedAmount: amount, reembolsoValor: amount, canceladoPor: "gestao", canceladoEm: new Date().toISOString(), repasseStatus: "reembolsado", repasseValor: 0 }, row => supabase.from("bookings").update(row).eq("id", b.id));
   addNotification("admin", `Reserva ${b.id} (${b.pousadaName}) cancelada e R$ ${amount.toLocaleString("pt-BR")} reembolsados.`, "status_update", b.id);
   res.json({ success: true, amount });
 });

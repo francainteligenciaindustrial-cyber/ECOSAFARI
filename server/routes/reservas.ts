@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { enviarAlertasListas } from "./listas.js";
 import { processarOportunidadesCron } from "./oportunidades.js";
 import { verificarListaEspera } from "./listaEspera.js";
+import { processarRepasses } from "./repasses.js";
 import { Booking } from "../../src/types.js";
 import { randomUUID } from "crypto";
 import { safeEqual } from "../../src/lib/safeEqual.js";
@@ -311,6 +312,12 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
     return null;
   });
 
+  // Repasses: custódia → garantido → liberado e lotes do dia por pousada.
+  const repasses = await processarRepasses().catch(err => {
+    log.warn("Erro nos repasses:", err.message);
+    return null;
+  });
+
   // Lista de espera: avisa quem queria datas que ficaram livres.
   const listaEspera = await verificarListaEspera().catch(err => {
     log.warn("Erro na lista de espera:", err.message);
@@ -326,7 +333,7 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
     return { vagas: 0, epocas: 0 };
   });
 
-  res.json({ success: true, remindersSent: sent, reviewRequestsSent, wishlistAlerts: wishlist, oportunidades, listaEspera });
+  res.json({ success: true, remindersSent: sent, reviewRequestsSent, wishlistAlerts: wishlist, oportunidades, listaEspera, repasses });
 });
 
 app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {
