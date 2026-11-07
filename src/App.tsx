@@ -76,6 +76,9 @@ const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   // Matches the Supabase OAuth Server config exactly: Site URL =
   // .../parceiro, Authorization Path = /oauth/consent.
   "/parceiro/oauth/consent": PartnerOAuthConsentPage,
+  // Mesmo consentimento quando a Site URL do Supabase é a raiz do site
+  // (https://www.ipantanal.com.br + /oauth/consent).
+  "/oauth/consent": PartnerOAuthConsentPage,
   "/turista": TuristaAuthPage,
 };
 
