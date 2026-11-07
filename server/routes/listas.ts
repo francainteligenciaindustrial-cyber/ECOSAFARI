@@ -7,6 +7,7 @@ import {
   supabase,
   requireTourist,
   publicFormLimiter,
+  authLimiter,
   chatLimiter,
   sendEmail,
   escapeHtml,
@@ -198,7 +199,7 @@ app.delete("/api/turista/listas/:id/compartilhar", requireTourist, async (req, r
 });
 
 // Lista compartilhada (só leitura, sem dados pessoais além do primeiro nome).
-app.get("/api/listas/compartilhada/:token", publicFormLimiter, async (req, res) => {
+app.get("/api/listas/compartilhada/:token", authLimiter, async (req, res) => {
   const token = clip(req.params.token, 40);
   const { data: lista, error } = await supabase.from("listas_desejos").select("*").eq("shareToken", token).maybeSingle();
   if (error && isMissing(error)) return res.status(503).json({ error: MIGRATION_MSG });
