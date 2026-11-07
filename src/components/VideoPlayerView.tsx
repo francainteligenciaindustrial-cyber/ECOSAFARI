@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, MessageSquare, Compass, Eye, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, MessageSquare, Compass, Eye, MapPin } from "lucide-react";
 import { Pousada } from "../types";
 import { parseVideoUrl } from "../lib/videoEmbed";
 
@@ -66,10 +66,6 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot, backLabel 
           >
             <ArrowLeft className="h-4 w-4" /> {backLabel}
           </button>
-          
-          <div className="bg-[#F4F6F5]/10 border border-[#F4F6F5]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#F4F6F5] font-bold flex items-center gap-1.5 animate-pulse">
-            <Sparkles className="h-3.5 w-3.5" /> EcoCinema Auto-Executável
-          </div>
         </div>
 
         {/* Layout grid: Cinematic Video vs Chapters Sidebar */}
