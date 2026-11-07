@@ -18,6 +18,8 @@ import PousadaProdutosManager from "./PousadaProdutosManager";
 import PartnerBookingsCalendar from "./PartnerBookingsCalendar";
 import GuestRatingsPanel from "./GuestRating";
 import GuideMessagesPanel from "./GuideMessagesPanel";
+import PrestadorOportunidadesPanel from "./PrestadorOportunidadesPanel";
+import AreaAtuacaoEditor from "./AreaAtuacaoEditor";
 import PousadaReservasAgenda from "./PousadaReservasAgenda";
 import GestorPousadaPanel from "./GestorPousadaPanel";
 import PousadaGestoresManager from "./PousadaGestoresManager";
@@ -284,6 +286,10 @@ export default function PartnerPortalPage() {
             status: data.guia.status,
             images: [...(data.guia.images || [])],
             unavailableDates: [...(data.guia.unavailableDates || [])],
+            baseCidade: data.guia.baseCidade || "",
+            baseLatitude: data.guia.baseLatitude ?? null,
+            baseLongitude: data.guia.baseLongitude ?? null,
+            raioKm: data.guia.raioKm || 150,
           });
         }
       })
@@ -440,6 +446,10 @@ export default function PartnerPortalPage() {
           status: form.status,
           images: form.images.map((i: string) => i.trim()).filter(Boolean),
           unavailableDates: form.unavailableDates,
+          baseCidade: form.baseCidade || "",
+          baseLatitude: form.baseLatitude ?? null,
+          baseLongitude: form.baseLongitude ?? null,
+          raioKm: form.raioKm || 150,
         };
       }
       const res = await adminFetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -563,6 +573,11 @@ export default function PartnerPortalPage() {
         <div className="max-w-2xl mx-auto px-4 md:px-6 py-10">
           <h1 className="text-2xl font-serif font-bold text-editorial-primary mb-6">Área do Colaborador</h1>
           <ColaboradorPanel />
+          <div className="mt-6">
+            <ErrorBoundary variant="section" sectionLabel="as oportunidades de passeios">
+              <PrestadorOportunidadesPanel />
+            </ErrorBoundary>
+          </div>
         </div>
       </div>
     );
@@ -1100,6 +1115,10 @@ export default function PartnerPortalPage() {
                   <p className="text-editorial-muted text-[11px] mb-3">Bloqueie datas específicas (uma viagem já marcada, uma folga) sem precisar desligar a disponibilidade geral acima.</p>
                   <GuideAvailabilityCalendar value={form.unavailableDates} onChange={unavailableDates => setForm((p: any) => ({ ...p, unavailableDates }))} />
                 </div>
+                <AreaAtuacaoEditor
+                  value={{ baseCidade: form.baseCidade, baseLatitude: form.baseLatitude, baseLongitude: form.baseLongitude, raioKm: form.raioKm }}
+                  onChange={v => setForm((p: any) => ({ ...p, ...v }))}
+                />
                 <ImageListEditor label="Galeria de Fotos (expedições, campo)" value={form.images} onChange={images => setForm((p: any) => ({ ...p, images }))} />
               </>
             )}
@@ -1177,6 +1196,9 @@ export default function PartnerPortalPage() {
 
         {profile?.partnerType === "guia" && (
           <div className="mt-8 space-y-6">
+            <ErrorBoundary variant="section" sectionLabel="as oportunidades de passeios">
+              <PrestadorOportunidadesPanel semAreaDeAtuacao={!profile.guia?.baseLatitude} />
+            </ErrorBoundary>
             <ErrorBoundary variant="section" sectionLabel="a agenda de reservas">
               <PartnerBookingsCalendar partnerType="guia" partnerId={profile.partnerId} />
             </ErrorBoundary>

@@ -4,6 +4,7 @@ import { Pousada, Guide, Booking } from "../types";
 import { adminFetch } from "../lib/adminFetch";
 import Pagination from "./Pagination";
 import NewBookingForm from "./NewBookingForm";
+import { PROVIDER_TYPES } from "./ExperienceListEditor";
 import { usePagination } from "../lib/usePagination";
 
 
@@ -76,6 +77,13 @@ export default function AdminReservasTab({ pousadas, onRefreshData, fetchBooking
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleChamarPrestadores = async (b: Booking, servico: string) => {
+    const response = await adminFetch(`/api/admin/bookings/${b.id}/oportunidades`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ servico }) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) window.alert(body.error || "Não foi possível chamar prestadores.");
+    else window.alert(body.convidados > 0 ? `${body.convidados} prestador(es) de "${servico}" avisado(s) por e-mail. O primeiro que aceitar fica com o serviço.` : `Nenhum prestador de "${servico}" encontrado na região — a Gestão foi alertada.`);
   };
 
   // Cancela só esta reserva e devolve o valor dela no mesmo pagamento do
@@ -192,6 +200,21 @@ export default function AdminReservasTab({ pousadas, onRefreshData, fetchBooking
                               >
                                 Aprovar Quarto Pousada
                               </button>
+                            </div>
+                          )}
+
+                          {/* Avisa por e-mail os prestadores da região (o primeiro que aceitar fica). */}
+                          {["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"].includes(b.status) && (
+                            <div className="flex items-center justify-end gap-1.5 mt-1.5">
+                              <span className="text-[10px] text-zinc-500 font-semibold">Chamar prestadores:</span>
+                              <select
+                                defaultValue=""
+                                onChange={e => { const v = e.target.value; e.target.value = ""; if (v) handleChamarPrestadores(b, v); }}
+                                className="bg-zinc-50 border border-zinc-200 rounded p-1 text-[10px]"
+                              >
+                                <option value="" disabled>Serviço...</option>
+                                {PROVIDER_TYPES.filter(s => !(b.guideId && /guia/i.test(s))).map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
                             </div>
                           )}
 

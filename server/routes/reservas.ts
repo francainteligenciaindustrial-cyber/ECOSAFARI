@@ -1,6 +1,7 @@
 // Reservas: criação, status, agenda, confiabilidade e o cron diário.
 import type { Express } from "express";
 import { enviarAlertasListas } from "./listas.js";
+import { processarOportunidadesCron } from "./oportunidades.js";
 import { Booking } from "../../src/types.js";
 import { randomUUID } from "crypto";
 import { safeEqual } from "../../src/lib/safeEqual.js";
@@ -20,6 +21,7 @@ import {
   getAuthorizedBooking,
   isOverbookingError,
   log,
+  runBookingHooks,
   logAdminAction,
   mapAtracaoRow,
   mapGuideRow,
@@ -222,6 +224,8 @@ app.put("/api/guides/:id/bookings/:bookingId/status", requirePartnerAccess("guia
     const revertStatus = booking.status === "confirmado_total" || booking.status === "confirmado_pousada" ? "confirmado_pousada" : "pago";
     const { data: updated, error } = await supabase.from("bookings").update({ status: revertStatus, guideId: null, guideName: null }).eq("id", booking.id).select().single();
     if (error) return res.status(500).json({ error: "Erro ao cancelar participação do guia." });
+    // A vaga reabre e os outros guias da região são avisados.
+    await runBookingHooks("guideLeft", updated as Booking, req, req.params.id);
     await logAdminAction(res.locals.actorUser, "update_status", "booking", booking.id, `Guia cancelou participação — reserva volta pra ${revertStatus}`);
     return res.json(updated);
   }
@@ -299,6 +303,13 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
   await supabase.from("bookings").update({ status: "cancelado" }).eq("status", "pendente_pagamento").lt("holdUntil", new Date(Date.now() - 5 * 60000).toISOString())
     .then(({ error }) => { if (error && !/holdUntil/.test(error.message)) log.warn("Erro ao liberar vagas vencidas do carrinho:", error.message); });
 
+  // Oportunidades de prestadores: expira as vencidas, alerta a Gestão das
+  // que ficaram sem ninguém e lembra na véspera quem aceitou.
+  const oportunidades = await processarOportunidadesCron().catch(err => {
+    log.warn("Erro no cron de oportunidades:", err.message);
+    return null;
+  });
+
   // E-mail de avaliação no dia seguinte ao check-out (Resend + este cron).
   const reviewRequestsSent = await enviarPedidosDeAvaliacao();
 
@@ -308,7 +319,7 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
     return { vagas: 0, epocas: 0 };
   });
 
-  res.json({ success: true, remindersSent: sent, reviewRequestsSent, wishlistAlerts: wishlist });
+  res.json({ success: true, remindersSent: sent, reviewRequestsSent, wishlistAlerts: wishlist, oportunidades });
 });
 
 app.get("/api/bookings/:id/voucher.pdf", async (req, res) => {

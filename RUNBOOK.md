@@ -30,6 +30,7 @@ que é a fonte da verdade) — é só "o site caiu, e agora?".
 4. Pra confirmar manualmente uma reserva que ficou presa em "pendente_pagamento" mas o cliente já pagou (confirmado no dashboard do Stripe): painel de Gestão → Reservas → mude o status manualmente.
 5. **Eventos do webhook**: marque `checkout.session.completed`, `checkout.session.async_payment_succeeded` (Pix/boleto) e `checkout.session.expired` (libera as vagas do carrinho não pago em ~30 min; sem ele, o cron diário faz essa limpeza).
 6. **Carrinho**: cada item é uma reserva própria com o mesmo nº de pedido. Para cancelar só um item pago: Gestão → Reservas → **Cancelar e reembolsar** (reembolso parcial do mesmo pagamento no Stripe). Se a vaga de um item se perder durante o pagamento, ele é reembolsado sozinho e a Gestão recebe um aviso.
+7. **Prestadores (guia, piloteiro, cozinheiro...)**: quando uma reserva paga inclui um passeio marcado "Precisa de prestador" (cadastro da pousada → Serviços), os prestadores certos recebem o e-mail "acabou de aparecer um passeio turístico perto de você" com Aceitar/Recusar — guias com "Onde você atua" cobrindo a pousada (a pousada precisa ter latitude/longitude) e prestadores aprovados pela própria pousada. O primeiro que aceita fica; o contato do hóspede só vai para ele. Sem ninguém em 48 h (ou faltando 3 dias), a Gestão recebe alerta (notificação + e-mail em EMAIL_REPLY_TO). Gestão → Reservas → **Chamar prestadores** dispara manualmente para qualquer serviço. Migração: scripts/add-oportunidades.sql.
 
 ## 3. "Emails de confirmação não estão chegando"
 

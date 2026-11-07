@@ -216,6 +216,11 @@ export interface Guide {
   photoUrl?: string; // foto de perfil — exibida na página pública do guia, tipo um perfil de rede social
   images?: string[]; // galeria de fotos do guia em campo/expedições — separada da foto de perfil
   unavailableDates?: string[]; // datas específicas bloqueadas (YYYY-MM-DD) — além do liga/desliga geral em "status"
+  // Onde o guia atua: recebe por e-mail os passeios em até raioKm da base.
+  baseCidade?: string;
+  baseLatitude?: number;
+  baseLongitude?: number;
+  raioKm?: number;
 }
 
 // Atração: parceiro que não é uma hospedagem — "Parada Legal" (passeio,

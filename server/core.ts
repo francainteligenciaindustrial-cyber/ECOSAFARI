@@ -1027,7 +1027,7 @@ export const POUSADA_CREATE_FIELDS = ["name", "description", "longDescription", 
 // editável aqui à mão se o admin preferir apontar pra um que já existe.
 // emailRemetente/emailRemetenteNome: só admin (ver remetenteDaPousada).
 export const POUSADA_UPDATE_FIELDS = [...POUSADA_CREATE_FIELDS, "verified", "googleCalendarId", "emailRemetente", "emailRemetenteNome", "customDomain", "sitePublicado", "appLodgeId", "commissionPct", "plano", "conservationPct", "conservationPartner", "featured"] as const;
-export const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images", "unavailableDates"] as const;
+export const GUIDE_FIELDS = ["name", "email", "phone", "languages", "specialty", "status", "bio", "age", "birthplace", "interests", "photoUrl", "images", "unavailableDates", "baseCidade", "baseLatitude", "baseLongitude", "raioKm"] as const;
 export const SPECIES_FIELDS = ["name", "scientificName", "category", "description", "details", "sightings", "image", "bestPousadaId", "bestPousadaName"] as const;
 export const TURISTA_FIELDS = ["name", "email", "whatsapp", "country", "language", "age", "preferences"] as const;
 export const ROTEIRO_FIELDS = ["name", "duration", "price", "difficulty", "capacity", "description"] as const;
@@ -1288,7 +1288,9 @@ export function mapGuideRow(g: any): Guide {
 // of service providers" the site is meant to be. The full record (with
 // contact info) stays admin-only via the route below.
 export function toPublicGuide(g: Guide): Omit<Guide, "email" | "phone"> {
-  const { email, phone, ...publicFields } = g;
+  // Coordenadas da base podem ser a casa do guia: nunca vão para o público
+  // (a cidade-base sim).
+  const { email, phone, baseLatitude, baseLongitude, ...publicFields } = g as Guide & { baseLatitude?: number; baseLongitude?: number };
   return publicFields;
 }
 
@@ -1577,9 +1579,37 @@ export async function createCalendarEvent(booking: Booking, req: express.Request
 // Extracted so both the REST endpoint and the Stripe payment-confirmation
 // flow can trigger the same "pago" side effects (notifications, calendar sync).
 
+// Ganchos de reserva: módulos como as oportunidades para prestadores
+// (server/routes/oportunidades.ts) se registram aqui, sem import circular.
+type BookingHook = (booking: Booking, req: express.Request, extra?: any) => Promise<void>;
+export const bookingHooks: { paid: BookingHook[]; cancelled: BookingHook[]; guideLeft: BookingHook[] } = { paid: [], cancelled: [], guideLeft: [] };
+export async function runBookingHooks(kind: keyof typeof bookingHooks, booking: Booking, req: express.Request, extra?: any) {
+  for (const fn of bookingHooks[kind]) {
+    await fn(booking, req, extra).catch(err => log.warn(`Gancho de reserva (${kind}) falhou:`, err?.message));
+  }
+}
+
+// Pousada avisada assim que o hóspede paga (reserva avulsa ou carrinho).
+export async function sendPousadaPaidEmail(b: Booking) {
+  for (const gestorEmail of await getPousadaGestorEmails(b.pousadaId).catch(() => [] as string[])) {
+    await sendEmail({
+      to: gestorEmail,
+      subject: `Nova reserva paga — ${b.pousadaName} (${formatBRDate(b.checkIn)})`,
+      preheader: "Pagamento aprovado. Confirme a reserva na sua agenda em até 24 horas.",
+      html: `
+        <h1 style="margin:0 0 12px;font-size:20px;color:#0B1412">Nova reserva paga pelo site</h1>
+        <p style="margin:0 0 12px"><strong>${escapeHtml(b.customerName)}</strong> reservou de <strong>${formatBRDate(b.checkIn)}</strong> a <strong>${formatBRDate(b.checkOut)}</strong> (${b.adults} adulto(s)${b.children ? `, ${b.children} criança(s)` : ""})${b.roomType ? ` — ${escapeHtml(b.roomType)}` : ""}. Nº ${bookingRef(b.id)}.</p>
+        ${b.experienceType && b.experienceType !== "Hospedagem" ? `<p style="margin:0 0 12px">Inclui: ${escapeHtml(b.experienceType)}</p>` : ""}
+        <p style="margin:0 0 12px">O pagamento já foi aprovado. <strong>Confirme a reserva na sua agenda em até 24 horas.</strong> Se o passeio precisa de guia ou outro prestador, avisamos os profissionais da região automaticamente.</p>
+        <p style="margin:20px 0"><a href="${SITE_URL}/parceiro" style="display:inline-block;background:#0B1412;color:#fff;padding:10px 20px;text-decoration:none;border-radius:999px">Abrir minha agenda</a></p>
+      `,
+    }).catch(() => {});
+  }
+}
+
 // opts.silent: o pedido do carrinho manda UM e-mail com todas as reservas
 // (sendPedidoConfirmationEmail) em vez de um por reserva.
-export async function applyBookingStatusUpdate(id: string, body: Partial<Booking>, req: express.Request, opts: { silent?: boolean } = {}): Promise<Booking | null> {
+export async function applyBookingStatusUpdate(id: string, body: Partial<Booking>, req: express.Request, opts: { silent?: boolean; skipGuideEmail?: boolean } = {}): Promise<Booking | null> {
   const { status, guideId } = body;
   const { data: oldBookingRow, error: fetchErr } = await supabase.from("bookings").select("*").eq("id", id).maybeSingle();
   if (fetchErr || !oldBookingRow) {
@@ -1664,9 +1694,20 @@ export async function applyBookingStatusUpdate(id: string, body: Partial<Booking
   const paidStatuses = ["pago", "confirmado_pousada", "confirmado_guia", "confirmado_total"];
   if (updated.guideId && updated.guideId !== oldBooking.guideId && paidStatuses.includes(oldBooking.status)) {
     await sendGuideAssignedEmail(updated).catch(err => log.warn("Erro ao enviar contato do guia:", err.message));
+    // Guia escalado pela Gestão: avisa o próprio guia (quem aceitou pelo
+    // convite já recebe a confirmação do módulo de oportunidades).
+    if (!opts.skipGuideEmail) await sendGuideScheduledEmail(updated).catch(err => log.warn("Erro ao avisar o guia:", err.message));
   }
 
   // Email confirmation with PDF voucher (only sends if RESEND_API_KEY is configured)
+  if (status === "pago" && oldBooking.status !== "pago") {
+    await sendPousadaPaidEmail(updated);
+    await runBookingHooks("paid", updated, req);
+  }
+  if (status === "cancelado" && oldBooking.status !== "cancelado") {
+    await runBookingHooks("cancelled", updated, req);
+  }
+
   if (status === "pago" && oldBooking.status !== "pago" && !opts.silent) {
     // await: na Vercel a função pode ser congelada logo depois da resposta.
     await sendBookingConfirmationEmail(updated).catch(err => log.warn("Erro ao enviar email de confirmação:", err.message));
@@ -2258,21 +2299,8 @@ export async function applyPedidoPayment(session: Stripe.Checkout.Session, req: 
   }
 
   if (newlyPaid.length > 0 || refunded.length > 0) {
+    // O aviso à pousada sai em applyBookingStatusUpdate (sendPousadaPaidEmail).
     await sendPedidoConfirmationEmail(newlyPaid, refunded, pedidoId).catch(err => log.warn("Erro ao enviar e-mail do pedido:", err.message));
-    for (const b of newlyPaid) {
-      for (const gestorEmail of await getPousadaGestorEmails(b.pousadaId).catch(() => [] as string[])) {
-        await sendEmail({
-          to: gestorEmail,
-          subject: `Nova reserva paga — ${b.pousadaName} (${formatBRDate(b.checkIn)})`,
-          html: `
-            <h1 style="margin:0 0 12px;font-size:20px;color:#0B1412">Nova reserva paga pelo site</h1>
-            <p style="margin:0 0 12px"><strong>${escapeHtml(b.customerName)}</strong> reservou de <strong>${formatBRDate(b.checkIn)}</strong> a <strong>${formatBRDate(b.checkOut)}</strong> (${b.adults} adulto(s)${b.children ? `, ${b.children} criança(s)` : ""})${b.roomType ? ` — ${escapeHtml(b.roomType)}` : ""}. Nº ${bookingRef(b.id)}.</p>
-            <p style="margin:0 0 12px">O pagamento já foi aprovado. Confirme a reserva na sua agenda.</p>
-            <p style="margin:20px 0"><a href="${SITE_URL}/parceiro" style="display:inline-block;background:#0B1412;color:#fff;padding:10px 20px;text-decoration:none;border-radius:999px">Abrir minha agenda</a></p>
-          `,
-        }).catch(() => {});
-      }
-    }
   }
   return { bookings: all.map(b => newlyPaid.find(n => n.id === b.id) || b), newlyPaid, refunded };
 }
@@ -2557,6 +2585,32 @@ export async function sendPedidoConfirmationEmail(paid: Booking[], refunded: Boo
       <p style="margin:0;font-size:12px;color:#4F5D58">Cada reserva pode ser cancelada separadamente, conforme a <a href="${SITE_URL}/termos" style="color:#4F5D58">política de cancelamento</a>. Ajuda: WhatsApp <a href="${AGENCY_WHATSAPP_LINK}" style="color:#4F5D58">${AGENCY_WHATSAPP_DISPLAY}</a>.</p>
     `,
     attachments,
+  });
+}
+
+// Guia escalado: e-mail para o GUIA com a reserva e o contato do hóspede.
+export async function sendGuideScheduledEmail(booking: Booking) {
+  if (!resend || !booking.guideId) return;
+  const { data: g } = await supabase.from("guides").select("name, email").eq("id", booking.guideId).maybeSingle();
+  if (!g?.email) return;
+  const wa = waLinkFrom(booking.customerPhone);
+  await sendEmail({
+    to: g.email,
+    subject: `Você foi escalado: ${booking.pousadaName} · ${formatBR(booking.checkIn)} (reserva ${bookingRef(booking.id)})`,
+    preheader: "Novo compromisso na sua agenda do Ipantanal.",
+    html: `
+      <h1 style="margin:0 0 12px;font-size:22px;color:#0B1412">Olá, ${escapeHtml(String(g.name || "").split(" ")[0])}! Você tem um novo passeio</h1>
+      <div style="margin:0 0 16px;padding:16px;background:#F4F6F5;border-radius:14px;font-size:14px;line-height:1.7">
+        <strong>Pousada:</strong> ${escapeHtml(booking.pousadaName)}<br/>
+        <strong>Datas:</strong> ${formatBR(booking.checkIn)} a ${formatBR(booking.checkOut)}<br/>
+        <strong>Grupo:</strong> ${booking.adults} adulto(s)${booking.children ? ` e ${booking.children} criança(s)` : ""}<br/>
+        <strong>Passeio:</strong> ${escapeHtml(booking.experienceType || "—")}
+      </div>
+      <p style="margin:0 0 6px"><strong>Hóspede:</strong> ${escapeHtml(booking.customerName)}${booking.nationality ? ` (${escapeHtml(booking.nationality)})` : ""}</p>
+      ${wa ? `<p style="margin:0 0 16px">WhatsApp: <a href="${wa}" style="color:#087A55;font-weight:600">${escapeHtml(booking.customerPhone || "")}</a></p>` : ""}
+      <p style="margin:0 0 8px;font-size:14px">Se não puder atender, cancele pelo portal o quanto antes — a vaga é oferecida a outros guias da região.</p>
+      <p style="margin:24px 0"><a href="${SITE_URL}/parceiro" style="display:inline-block;background:#0B1412;color:#FFFFFF;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Abrir minha agenda</a></p>
+    `,
   });
 }
 

@@ -42,6 +42,7 @@ const TuristaListasPage = lazy(() => import("./components/TuristaListasPage"));
 const TuristaMensagensPage = lazy(() => import("./components/TuristaMensagensPage"));
 const SharedListPage = lazy(() => import("./components/SharedListPage"));
 const CarrinhoPage = lazy(() => import("./components/CarrinhoPage"));
+const OportunidadePage = lazy(() => import("./components/OportunidadePage"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("./components/TermsPage"));
 const FaqPage = lazy(() => import("./components/FaqPage"));
@@ -107,6 +108,7 @@ export default function App() {
   const guiaRouteMatch = path.match(/^\/guias\/(.+)$/);
   const reservaRouteMatch = path.match(/^\/reservar\/([^/]+)$/);
   const sharedListMatch = path.match(/^\/lista\/([^/]+)$/);
+  const oportunidadeMatch = path.match(/^\/oportunidade\/([^/]+)$/);
 
   // Supabase Auth: the "Gestão" tab is only shown to authenticated users whose
   // account has app_metadata.isAdmin === true (concedido via a votação dos 3
@@ -220,7 +222,7 @@ export default function App() {
 
   useEffect(() => {
     // Standalone info/partner pages are self-contained and don't need the portal's data.
-    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch || reservaRouteMatch || sharedListMatch) return;
+    if (StandalonePage || officialSiteMatch || atracaoRouteMatch || guiaRouteMatch || reservaRouteMatch || sharedListMatch || oportunidadeMatch) return;
     fetchData();
     // Refreshes the public catalog periodically so new pousadas/reviews/
     // sightings show up without a manual reload. This runs in every visitor's
@@ -322,6 +324,14 @@ export default function App() {
 
   if (guiaRouteMatch) {
     return <GuiaDetailsView id={guiaRouteMatch[1]} />;
+  }
+
+  if (oportunidadeMatch) {
+    return (
+      <Suspense fallback={<LazyFallback />}>
+        <OportunidadePage id={decodeURIComponent(oportunidadeMatch[1])} />
+      </Suspense>
+    );
   }
 
   if (sharedListMatch) {

@@ -338,7 +338,14 @@ app.post("/api/guides", requireAdmin, async (req, res) => {
 app.put("/api/guides/:id", requirePartnerAccess("guia"), async (req, res) => {
   const { id } = req.params;
   const updates = pickFields<Guide>(req.body, GUIDE_FIELDS);
-  const { data, error } = await supabase.from("guides").update(updates).eq("id", id).select().single();
+  // Área de atuação: números válidos ou nada (raio entre 10 e 600 km).
+  for (const k of ["baseLatitude", "baseLongitude"] as const) {
+    if (k in updates) (updates as any)[k] = Number.isFinite(Number((updates as any)[k])) && (updates as any)[k] !== null && (updates as any)[k] !== "" ? Number((updates as any)[k]) : null;
+  }
+  if ("raioKm" in updates) (updates as any).raioKm = Math.min(600, Math.max(10, Math.round(Number((updates as any).raioKm) || 150)));
+  if ("baseCidade" in updates) (updates as any).baseCidade = String((updates as any).baseCidade || "").slice(0, 120);
+  // writeSkipping: sem a migração das oportunidades, salva o resto do perfil.
+  const { data, error } = await writeSkippingMissingColumns(updates as Record<string, any>, row => supabase.from("guides").update(row).eq("id", id).select().single());
   if (error || !data) return res.status(404).json({ error: "Guia não encontrado" });
   await logAdminAction(res.locals.actorUser, "update", "guide", id, data.name);
   res.json(mapGuideRow(data));
