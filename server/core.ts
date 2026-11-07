@@ -26,6 +26,7 @@ import { sendWhatsAppTemplate } from "./whatsapp.js";
 import { wrapEmail, htmlToText } from "./emailLayout.js";
 import { unsubscribeUrl } from "./emailTokens.js";
 import { directionsUrl, directionsQueryUrl } from "../src/lib/mapsLinks.js";
+import { isExpiredHold } from "../src/lib/cartHold.js";
 import { AsyncLocalStorage } from "async_hooks";
 
 
@@ -1339,9 +1340,11 @@ export async function checkPousadaAvailability(pousada: Pousada, checkIn: string
     return { ok: false, status: 400, body: { error: `A pousada não recebe hóspedes em: ${blocked.slice(0, 5).join(", ")}.`, available: false, suggestions } };
   }
 
+  // select("*"): inclui holdUntil quando a migração do carrinho já rodou,
+  // sem quebrar a consulta enquanto a coluna não existe.
   let query = supabase
     .from("bookings")
-    .select("id, checkIn, checkOut, adults, children, roomType")
+    .select("*")
     .eq("pousadaId", pousada.id)
     .neq("status", "cancelado")
     .lt("checkIn", checkOut)
@@ -1349,7 +1352,8 @@ export async function checkPousadaAvailability(pousada: Pousada, checkIn: string
   if (excludeBookingId) query = query.neq("id", excludeBookingId);
   const { data: overlapping, error } = await query;
   if (error) return { ok: false, status: 500, body: { error: "Erro ao consultar a disponibilidade." } };
-  const overlappingBookings = overlapping || [];
+  // Vaga segurada pelo carrinho e não paga a tempo não ocupa mais o quarto.
+  const overlappingBookings = (overlapping || []).filter((b: any) => !isExpiredHold(b));
 
   if (roomType) {
     const room = (pousada.rooms || []).find(r => r.type === roomType);
@@ -1572,7 +1576,10 @@ export async function createCalendarEvent(booking: Booking, req: express.Request
 // Update Status flow (Gateway Pay, Pousada confirm, Guide confirm)
 // Extracted so both the REST endpoint and the Stripe payment-confirmation
 // flow can trigger the same "pago" side effects (notifications, calendar sync).
-export async function applyBookingStatusUpdate(id: string, body: Partial<Booking>, req: express.Request): Promise<Booking | null> {
+
+// opts.silent: o pedido do carrinho manda UM e-mail com todas as reservas
+// (sendPedidoConfirmationEmail) em vez de um por reserva.
+export async function applyBookingStatusUpdate(id: string, body: Partial<Booking>, req: express.Request, opts: { silent?: boolean } = {}): Promise<Booking | null> {
   const { status, guideId } = body;
   const { data: oldBookingRow, error: fetchErr } = await supabase.from("bookings").select("*").eq("id", id).maybeSingle();
   if (fetchErr || !oldBookingRow) {
@@ -1660,7 +1667,7 @@ export async function applyBookingStatusUpdate(id: string, body: Partial<Booking
   }
 
   // Email confirmation with PDF voucher (only sends if RESEND_API_KEY is configured)
-  if (status === "pago" && oldBooking.status !== "pago") {
+  if (status === "pago" && oldBooking.status !== "pago" && !opts.silent) {
     // await: na Vercel a função pode ser congelada logo depois da resposta.
     await sendBookingConfirmationEmail(updated).catch(err => log.warn("Erro ao enviar email de confirmação:", err.message));
     // Mesmo aviso pelo WhatsApp (modelo "reserva_confirmada", ver RUNBOOK).
@@ -2151,11 +2158,129 @@ export async function createBookingCheckoutSession(booking: Booking): Promise<st
     discounts,
     customer_email: booking.customerEmail || undefined,
     metadata: { bookingId: booking.id },
+    payment_intent_data: { metadata: { bookingId: booking.id } },
     success_url: `${SITE_URL}/pagamento-confirmado?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${SITE_URL}/turista?pagamento=cancelado`,
   });
   if (!session.url) throw new Error("Stripe não devolveu a URL do checkout");
   return session.url;
+}
+
+// ----------------------------------------------------
+// CARRINHO: um pagamento, uma reserva por item
+// ----------------------------------------------------
+// Prazo para pagar o carrinho. O Stripe exige no mínimo 30 min para o
+// checkout expirar; damos 1 min de folga para não ser recusado.
+export const CART_HOLD_MINUTES = 31;
+
+export async function createPedidoCheckoutSession(bookings: Booking[], pedidoId: string, holdUntil: string): Promise<{ url: string; sessionId: string }> {
+  if (!stripe) throw new Error("Stripe não configurado");
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
+  for (const b of bookings) {
+    const { lineItems: li } = await buildCheckoutLineItems(b);
+    // Cada linha leva o nome da pousada e as datas — o recibo do Stripe
+    // mostra item por item.
+    const when = ` (${formatBRDate(b.checkIn)} a ${formatBRDate(b.checkOut)})`;
+    for (const item of li) {
+      const pd = (item.price_data as any).product_data;
+      if (pd?.name && !String(pd.name).includes(b.pousadaName)) pd.name = `${b.pousadaName} — ${pd.name}`;
+      if (pd?.name) pd.name = `${pd.name}${when}`.slice(0, 250);
+      lineItems.push(item);
+    }
+  }
+  const bookingIds = bookings.map(b => b.id).join(",");
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    line_items: lineItems,
+    customer_email: bookings[0]?.customerEmail || undefined,
+    metadata: { pedidoId, bookingIds },
+    payment_intent_data: { metadata: { pedidoId } },
+    expires_at: Math.floor(Date.parse(holdUntil) / 1000),
+    success_url: `${SITE_URL}/pagamento-confirmado?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${SITE_URL}/carrinho?pagamento=cancelado`,
+  });
+  if (!session.url) throw new Error("Stripe não devolveu a URL do checkout");
+  return { url: session.url, sessionId: session.id };
+}
+
+const formatBRDate = (iso: string) => String(iso || "").slice(0, 10).split("-").reverse().join("/");
+const sessionPaymentIntent = (session: Stripe.Checkout.Session) =>
+  typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null;
+
+// Devolve o valor de UMA reserva (item do carrinho ou reserva avulsa) no
+// mesmo pagamento — reembolso parcial do Stripe.
+export async function refundBookingAmount(paymentIntentId: string, amount: number, bookingId: string) {
+  if (!stripe) throw new Error("Stripe não configurado");
+  return stripe.refunds.create({
+    payment_intent: paymentIntentId,
+    amount: Math.round(Number(amount) * 100),
+    metadata: { bookingId },
+  });
+}
+
+// Pagamento do carrinho confirmado (webhook ou retorno do navegador; as
+// duas vias podem chegar — reservas já pagas são puladas). Se a vaga de
+// algum item se perdeu, esse item é reembolsado na hora e o resto segue.
+export async function applyPedidoPayment(session: Stripe.Checkout.Session, req: express.Request) {
+  const ids = String(session.metadata?.bookingIds || "").split(",").filter(Boolean);
+  const pedidoId = String(session.metadata?.pedidoId || "");
+  const paymentIntentId = sessionPaymentIntent(session);
+  const { data: rows } = await supabase.from("bookings").select("*").in("id", ids);
+  const all = (rows || []) as Booking[];
+  const newlyPaid: Booking[] = [];
+  const refunded: Booking[] = [];
+
+  for (const b of all) {
+    if (b.status !== "pendente_pagamento" && b.status !== "cancelado") continue; // já processada
+    if (b.status === "cancelado") {
+      // Prazo venceu e a vaga foi liberada antes do pagamento chegar:
+      // tenta recuperar; se alguém já ocupou, devolve o valor deste item.
+      const { data: pRow } = await supabase.from("pousadas").select("*").eq("id", b.pousadaId).maybeSingle();
+      const avail = pRow ? await checkPousadaAvailability(mapPousadaRow(pRow), b.checkIn, b.checkOut, (b.adults || 0) + (b.children || 0), b.roomType, b.id) : { ok: false };
+      if (!avail.ok) {
+        if ((b as any).refundedAt) continue;
+        if (paymentIntentId) {
+          try {
+            await refundBookingAmount(paymentIntentId, b.totalPrice, b.id);
+            await writeSkippingMissingColumns({ refundedAt: new Date().toISOString(), stripePaymentIntentId: paymentIntentId }, row => supabase.from("bookings").update(row).eq("id", b.id));
+            refunded.push(b);
+          } catch (err: any) {
+            log.error(`Falha ao reembolsar item ${b.id} do pedido ${pedidoId}:`, err.message);
+            addNotification("admin", `ATENÇÃO: pedido ${pedidoId} pago, mas a vaga da reserva ${b.id} (${b.pousadaName}) se perdeu e o reembolso automático falhou. Reembolse no painel do Stripe.`, "payment_received", b.id);
+          }
+        }
+        continue;
+      }
+    }
+    await writeSkippingMissingColumns({ stripePaymentIntentId: paymentIntentId, holdUntil: null }, row => supabase.from("bookings").update(row).eq("id", b.id));
+    const updated = await applyBookingStatusUpdate(b.id, { status: "pago" }, req, { silent: true });
+    if (updated) newlyPaid.push(updated);
+  }
+
+  if (newlyPaid.length > 0 || refunded.length > 0) {
+    await sendPedidoConfirmationEmail(newlyPaid, refunded, pedidoId).catch(err => log.warn("Erro ao enviar e-mail do pedido:", err.message));
+    for (const b of newlyPaid) {
+      for (const gestorEmail of await getPousadaGestorEmails(b.pousadaId).catch(() => [] as string[])) {
+        await sendEmail({
+          to: gestorEmail,
+          subject: `Nova reserva paga — ${b.pousadaName} (${formatBRDate(b.checkIn)})`,
+          html: `
+            <h1 style="margin:0 0 12px;font-size:20px;color:#0B1412">Nova reserva paga pelo site</h1>
+            <p style="margin:0 0 12px"><strong>${escapeHtml(b.customerName)}</strong> reservou de <strong>${formatBRDate(b.checkIn)}</strong> a <strong>${formatBRDate(b.checkOut)}</strong> (${b.adults} adulto(s)${b.children ? `, ${b.children} criança(s)` : ""})${b.roomType ? ` — ${escapeHtml(b.roomType)}` : ""}. Nº ${bookingRef(b.id)}.</p>
+            <p style="margin:0 0 12px">O pagamento já foi aprovado. Confirme a reserva na sua agenda.</p>
+            <p style="margin:20px 0"><a href="${SITE_URL}/parceiro" style="display:inline-block;background:#0B1412;color:#fff;padding:10px 20px;text-decoration:none;border-radius:999px">Abrir minha agenda</a></p>
+          `,
+        }).catch(() => {});
+      }
+    }
+  }
+  return { bookings: all.map(b => newlyPaid.find(n => n.id === b.id) || b), newlyPaid, refunded };
+}
+
+// Carrinho não pago no prazo: libera as vagas.
+export async function releasePedidoHold(bookingIds: string[]) {
+  if (bookingIds.length === 0) return;
+  await supabase.from("bookings").update({ status: "cancelado" }).in("id", bookingIds).eq("status", "pendente_pagamento");
 }
 
 // Signature-verified webhook: Stripe calls this directly (server-to-server),
@@ -2178,6 +2303,13 @@ export async function applyConsumoPayment(session: Stripe.Checkout.Session) {
   return true;
 }
 
+// Guarda o pagamento do Stripe na reserva (para reembolso por item).
+export async function saveBookingPaymentIntent(bookingId: string, session: Stripe.Checkout.Session) {
+  const pi = sessionPaymentIntent(session);
+  if (!pi) return;
+  await writeSkippingMissingColumns({ stripePaymentIntentId: pi }, row => supabase.from("bookings").update(row).eq("id", bookingId)).catch(() => {});
+}
+
 export async function handleStripeWebhook(req: express.Request, res: express.Response) {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) {
     return res.status(503).send("Stripe webhook não configurado");
@@ -2192,12 +2324,21 @@ export async function handleStripeWebhook(req: express.Request, res: express.Res
     return res.status(400).send("Webhook Error: assinatura inválida");
   }
 
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const ids = String(session.metadata?.bookingIds || "").split(",").filter(Boolean);
+    await releasePedidoHold(ids).catch(err => log.warn("Erro ao liberar vagas do carrinho:", err.message));
+  }
+
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.payment_status === "paid") {
       const bookingId = session.metadata?.bookingId;
       try {
-        if (bookingId) {
+        if (session.metadata?.bookingIds) {
+          await applyPedidoPayment(session, req);
+        } else if (bookingId) {
+          await saveBookingPaymentIntent(bookingId, session);
           await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
         } else {
           await applyConsumoPayment(session);
@@ -2365,6 +2506,60 @@ export async function sendBookingConfirmationEmail(booking: Booking) {
   });
 }
 
+// Pedido do carrinho pago: UM e-mail com todas as reservas, os contatos de
+// cada pousada/guia e um voucher por item. Itens cuja vaga se perdeu no
+// caminho aparecem como reembolsados.
+export async function sendPedidoConfirmationEmail(paid: Booking[], refunded: Booking[], pedidoId: string) {
+  const first = paid[0] || refunded[0];
+  if (!resend || !first?.customerEmail) return;
+  const nome = escapeHtml((first.customerName || "").split(" ")[0] || "viajante");
+  const pedidoRef = bookingRef(pedidoId.replace(/^ped_/, ""));
+  const attachments: { filename: string; content: string }[] = [];
+  const blocos: string[] = [];
+
+  for (const b of paid) {
+    const contatos = await bookingContacts(b);
+    const pdf = await generateVoucherPdfBuffer(b, contatos);
+    const ref = bookingRef(b.id);
+    attachments.push({ filename: `voucher-${ref}.pdf`, content: pdf.toString("base64") });
+    const p = contatos.pousada;
+    const g = contatos.guia;
+    blocos.push(contactCard(`Reserva ${ref}`, [
+      `<p style="margin:0 0 4px;font-weight:600;font-size:16px">${escapeHtml(b.pousadaName)}</p>`,
+      `<p style="margin:0 0 8px;font-size:14px;line-height:1.6">${formatBR(b.checkIn)} a ${formatBR(b.checkOut)} · ${b.adults} adulto(s)${b.children ? ` e ${b.children} criança(s)` : ""}${b.roomType ? ` · ${escapeHtml(b.roomType)}` : ""}<br/>${escapeHtml(b.experienceType || "")} · <strong>R$ ${Number(b.totalPrice).toLocaleString("pt-BR")}</strong></p>`,
+      p?.whatsappLink ? `<p style="margin:0 0 4px;font-size:14px">WhatsApp da recepção: <a href="${p.whatsappLink}" style="color:#087A55;font-weight:600">${escapeHtml(p.whatsapp || "")}</a></p>` : "",
+      p?.email ? `<p style="margin:0 0 4px;font-size:14px">Email: <a href="mailto:${escapeHtml(p.email)}" style="color:#087A55">${escapeHtml(p.email)}</a></p>` : "",
+      g ? `<p style="margin:0 0 4px;font-size:14px">Guia: <strong>${escapeHtml(g.nome)}</strong>${g.whatsappLink ? ` · <a href="${g.whatsappLink}" style="color:#087A55;font-weight:600">${escapeHtml(g.telefone || "")}</a>` : ""}</p>` : "",
+      p?.rotaUrl ? `<p style="margin:6px 0 0"><a href="${p.rotaUrl}" style="color:#087A55;font-weight:600">Como chegar →</a></p>` : "",
+    ]));
+  }
+  const totalPago = paid.reduce((acc, b) => acc + Number(b.totalPrice || 0), 0);
+  const refundedHtml = refunded.length
+    ? `<div style="margin:0 0 16px;padding:14px 16px;background:#FFF7E6;border:1px solid #F5D58A;border-radius:14px;font-size:14px"><strong>Item reembolsado:</strong> ${refunded.map(b => `${escapeHtml(b.pousadaName)} (${formatBR(b.checkIn)} a ${formatBR(b.checkOut)}) — R$ ${Number(b.totalPrice).toLocaleString("pt-BR")}`).join("; ")}. A vaga acabou antes do pagamento ser concluído, então devolvemos esse valor no mesmo meio de pagamento (o prazo depende do banco/cartão).</div>`
+    : "";
+
+  await sendEmail({
+    to: first.customerEmail,
+    subject: paid.length ? `Pedido confirmado! ${paid.length} reserva(s) · Nº ${pedidoRef}` : `Pedido ${pedidoRef}: valor reembolsado`,
+    preheader: paid.length ? `Pagamento aprovado. Vouchers e contatos de cada reserva neste email.` : "A vaga acabou antes do pagamento ser concluído.",
+    html: `
+      <h1 style="margin:0 0 8px;font-size:24px;line-height:1.25;color:#0B1412">${paid.length ? `Parabéns, ${nome}! Sua viagem está confirmada 🌿` : `${nome}, devolvemos o seu pagamento`}</h1>
+      <p style="margin:0 0 18px">${paid.length ? `O pagamento foi aprovado. São <strong>${paid.length} reserva(s)</strong> neste pedido, cada uma com o seu voucher em anexo.` : "Não foi possível garantir a vaga a tempo."}</p>
+      <div style="margin:0 0 18px;padding:16px;background:#F4F6F5;border-radius:14px">
+        <p style="margin:0 0 4px;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#4F5D58;font-weight:700">Nº do pedido</p>
+        <p style="margin:0 0 6px;font-size:22px;font-weight:700;letter-spacing:2px;color:#0B1412">${pedidoRef}</p>
+        ${paid.length ? `<p style="margin:0;font-size:14px"><strong>Total pago:</strong> R$ ${totalPago.toLocaleString("pt-BR")}</p>` : ""}
+      </div>
+      ${refundedHtml}
+      ${blocos.join("")}
+      ${paid.length ? `<p style="margin:12px 0 6px;font-size:14px">📎 Apresente o voucher de cada reserva no check-in (impresso ou no celular). Eles também ficam em <a href="${SITE_URL}/turista" style="color:#087A55">Minhas reservas</a>. Se alguma viagem incluir guia, mandamos o contato dele quando for confirmado.</p>` : ""}
+      <p style="margin:24px 0"><a href="${SITE_URL}/turista" style="display:inline-block;background:#0B1412;color:#FFFFFF;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px">Ver minhas reservas</a></p>
+      <p style="margin:0;font-size:12px;color:#4F5D58">Cada reserva pode ser cancelada separadamente, conforme a <a href="${SITE_URL}/termos" style="color:#4F5D58">política de cancelamento</a>. Ajuda: WhatsApp <a href="${AGENCY_WHATSAPP_LINK}" style="color:#4F5D58">${AGENCY_WHATSAPP_DISPLAY}</a>.</p>
+    `,
+    attachments,
+  });
+}
+
 // Guia confirmado DEPOIS do pagamento: manda o contato dele ao hóspede.
 export async function sendGuideAssignedEmail(booking: Booking) {
   if (!resend || !booking.customerEmail || !booking.guideId) return;
@@ -2415,7 +2610,8 @@ export async function getAuthorizedBooking(req: express.Request, res: express.Re
   if (stripe && sessionId) {
     try {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      if (session.payment_status === "paid" && session.metadata?.bookingId === booking.id) {
+      const pedidoIds = String(session.metadata?.bookingIds || "").split(",");
+      if (session.payment_status === "paid" && (session.metadata?.bookingId === booking.id || pedidoIds.includes(booking.id))) {
         return booking as Booking;
       }
     } catch {

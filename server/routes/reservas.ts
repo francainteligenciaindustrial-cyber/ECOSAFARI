@@ -294,6 +294,11 @@ app.get("/api/cron/lembretes-cancelamento", async (req, res) => {
   // separado só pra isso.
   await purgeLixeiraExpirada();
 
+  // Carrinho não pago no prazo e sem o webhook "expired" (ex.: webhook
+  // desligado): libera as vagas. Sem a coluna holdUntil, não faz nada.
+  await supabase.from("bookings").update({ status: "cancelado" }).eq("status", "pendente_pagamento").lt("holdUntil", new Date(Date.now() - 5 * 60000).toISOString())
+    .then(({ error }) => { if (error && !/holdUntil/.test(error.message)) log.warn("Erro ao liberar vagas vencidas do carrinho:", error.message); });
+
   // E-mail de avaliação no dia seguinte ao check-out (Resend + este cron).
   const reviewRequestsSent = await enviarPedidosDeAvaliacao();
 

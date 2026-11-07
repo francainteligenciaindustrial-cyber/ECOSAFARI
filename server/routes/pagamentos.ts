@@ -4,6 +4,8 @@ import { Booking } from "../../src/types.js";
 import {
   applyBookingStatusUpdate,
   applyConsumoPayment,
+  applyPedidoPayment,
+  saveBookingPaymentIntent,
   checkoutLimiter,
   createBookingCheckoutSession,
   log,
@@ -59,6 +61,17 @@ app.get("/api/payments/confirm", checkoutLimiter, async (req, res) => {
     if (session.payment_status !== "paid") {
       return res.status(402).json({ error: "Pagamento ainda não confirmado" });
     }
+    // Carrinho: várias reservas num pagamento só.
+    if (session.metadata?.bookingIds) {
+      const result = await applyPedidoPayment(session, req);
+      return res.json({
+        pedido: {
+          id: session.metadata.pedidoId,
+          bookings: result.bookings.map(b => ({ id: b.id, pousadaName: b.pousadaName, checkIn: b.checkIn, checkOut: b.checkOut, totalPrice: b.totalPrice, status: b.status, customerEmail: b.customerEmail })),
+          refunded: result.refunded.map(b => b.id),
+        },
+      });
+    }
     const bookingId = session.metadata?.bookingId;
     if (!bookingId) {
       // Sem bookingId: é uma cobrança de consumo, não de reserva (ver
@@ -67,6 +80,7 @@ app.get("/api/payments/confirm", checkoutLimiter, async (req, res) => {
       if (!settled) return res.status(400).json({ error: "Sessão de pagamento não identificada." });
       return res.json({ consumo: true });
     }
+    await saveBookingPaymentIntent(bookingId, session);
     const updated = await applyBookingStatusUpdate(bookingId, { status: "pago" }, req);
     if (!updated) {
       return res.status(404).json({ error: "Reserva não encontrada" });

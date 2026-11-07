@@ -6,6 +6,8 @@ import { adminFetch } from "../lib/adminFetch";
 import { navigate } from "../lib/router";
 import { RETURN_TO_KEY } from "../lib/returnTo";
 import WishlistItemCard, { WishItem } from "./WishlistItemCard";
+import { addToCart, readCart, writeCart } from "../lib/cart";
+import { ShoppingBag } from "lucide-react";
 
 const AGENCY_WHATSAPP = "5565999868334";
 
@@ -69,6 +71,41 @@ export default function TuristaListasPage() {
       setNovaNome("");
     } finally {
       setCreating(false);
+    }
+  };
+
+  // Pousadas e pacotes da lista vão para o carrinho com as datas da lista
+  // (ou daqui a um mês, se não houver) e 2 adultos — tudo editável lá.
+  // Guias e atrações não têm pagamento online: ficam de fora, com aviso.
+  const [reservando, setReservando] = useState<string | null>(null);
+  const reservarTudo = async (l: Lista) => {
+    setReservando(l.id);
+    try {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const plus = (iso: string, d: number) => new Date(Date.parse(iso) + d * 86400000).toISOString().slice(0, 10);
+      const ci = l.checkIn && l.checkIn > hoje ? l.checkIn : plus(hoje, 30);
+      const co = l.checkOut && l.checkOut > ci ? l.checkOut : plus(ci, 3);
+      let list = readCart();
+      let cheio = false;
+      for (const it of l.itens) {
+        if (it.tipo === "pousada") {
+          const r = addToCart(list, { pousadaId: it.refId, pousadaName: it.nome, image: it.imagem, checkIn: ci, checkOut: co, adults: 2, children: 0 });
+          cheio = cheio || r.full;
+          list = r.list;
+        } else if (it.tipo === "pacote") {
+          const pk = await fetch(`/api/pacotes/${encodeURIComponent(it.refId)}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+          if (!pk) continue;
+          const r = addToCart(list, { pousadaId: pk.pousadaId, pousadaName: pk.pousadaName, image: pk.imageUrl || it.imagem, checkIn: ci, checkOut: plus(ci, pk.nights), adults: 2, children: 0, pacoteId: pk.id, pacoteName: pk.name, pacoteNights: pk.nights });
+          cheio = cheio || r.full;
+          list = r.list;
+        }
+      }
+      writeCart(list);
+      const ignorados = l.itens.filter(i => i.tipo === "guia" || i.tipo === "atracao").length;
+      if (cheio) window.alert("O carrinho chegou ao limite de itens — alguns ficaram de fora.");
+      navigate(`/carrinho${ignorados ? `?ignorados=${ignorados}` : ""}`);
+    } finally {
+      setReservando(null);
     }
   };
 
@@ -160,6 +197,9 @@ export default function TuristaListasPage() {
                   </button>
                   <button type="button" onClick={() => compartilhar(l)} className="inline-flex items-center gap-1.5 border border-editorial-border text-xs font-semibold px-3 py-2 rounded-full hover:bg-editorial-secondary cursor-pointer">
                     <Share2 className="h-4 w-4" /> Compartilhar com quem vai comigo
+                  </button>
+                  <button type="button" onClick={() => reservarTudo(l)} disabled={!l.itens.some(i => i.tipo === "pousada" || i.tipo === "pacote") || reservando === l.id} className="inline-flex items-center gap-1.5 bg-editorial-accent text-white text-xs font-semibold px-4 py-2 rounded-full hover:opacity-90 disabled:opacity-40 cursor-pointer">
+                    {reservando === l.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />} Reservar tudo desta lista
                   </button>
                   <button type="button" onClick={() => montarRoteiro(l)} disabled={!l.itens.length} className="inline-flex items-center gap-1.5 bg-editorial-primary text-white text-xs font-semibold px-4 py-2 rounded-full hover:opacity-90 disabled:opacity-40 cursor-pointer">
                     <Sparkles className="h-4 w-4" /> Montar roteiro com estes itens

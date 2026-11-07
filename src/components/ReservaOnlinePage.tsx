@@ -11,6 +11,8 @@ import { RETURN_TO_KEY } from "../lib/returnTo";
 import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
 import { lodgingTotal } from "../lib/pricing";
+import { addToCart, readCart, writeCart, MAX_CART_ITEMS } from "../lib/cart";
+import { ShoppingBag } from "lucide-react";
 
 // Os valores enviados à pousada ficam em português (é quem lê); só o rótulo
 // exibido muda com o idioma do turista — ver arrival.N / diet.N / need.N.
@@ -180,6 +182,37 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
   }, [subtotal]);
 
   const joinChoices = (list: string[], other: string) => [...list, other.trim()].filter(Boolean).join(", ");
+
+  // Carrinho: guarda esta estadia (com tudo que foi preenchido) para pagar
+  // junto com outras. Cupom não vai — ele vale só na reserva avulsa.
+  const [cartMsg, setCartMsg] = useState("");
+  const handleAddToCart = () => {
+    setError("");
+    setCartMsg("");
+    if (!pousada) return;
+    if (nights < 1) return setError(t("booking.err.dates"));
+    if (selectedRoom && guests > selectedRoom.capacity) {
+      return setError(t("booking.err.capacity", { room: selectedRoom.type, n: selectedRoom.capacity }));
+    }
+    const r = addToCart(readCart(), {
+      pousadaId,
+      pousadaName: pousada.name,
+      image: pacote?.imageUrl || pousada.images?.[0],
+      checkIn, checkOut, adults, children, childAges,
+      roomType: roomType || undefined,
+      experienceTypes: pacote ? [] : experienceTypes,
+      pacoteId: pacote?.id,
+      pacoteName: pacote?.name,
+      pacoteNights: pacote?.nights,
+      dietaryRestrictions: joinChoices(diets, dietOther),
+      specialNeeds: joinChoices(needs, needOther),
+      details: { arrivalTime, needsTransfer, notes, language: lang },
+      estimate: estimate ?? undefined,
+    });
+    if (r.full) return setError(`O carrinho aceita até ${MAX_CART_ITEMS} reservas. Pague as atuais ou remova alguma.`);
+    writeCart(r.list);
+    setCartMsg(r.replaced ? "Atualizado no carrinho." : "Adicionado ao carrinho.");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -506,6 +539,15 @@ export default function ReservaOnlinePage({ pousadaId }: { pousadaId: string }) 
               <button type="submit" disabled={submitting} className="w-full bg-editorial-primary text-white text-[11px] uppercase tracking-widest font-bold py-3 rounded-md hover:opacity-90 transition disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2">
                 {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />} {t("booking.submit")}
               </button>
+              <button type="button" onClick={handleAddToCart} className="w-full border border-editorial-primary text-editorial-primary text-[11px] uppercase tracking-widest font-bold py-3 rounded-md hover:bg-editorial-secondary transition cursor-pointer flex items-center justify-center gap-2">
+                <ShoppingBag className="h-4 w-4" /> Adicionar ao carrinho
+              </button>
+              {cartMsg && (
+                <p role="status" className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 flex items-center justify-between gap-2">
+                  <span>{cartMsg} Junte outras estadias e pague tudo de uma vez.</span>
+                  <button type="button" onClick={() => navigate("/carrinho")} className="font-bold underline cursor-pointer whitespace-nowrap">Ver carrinho</button>
+                </p>
+              )}
             </aside>
           </form>
         )}

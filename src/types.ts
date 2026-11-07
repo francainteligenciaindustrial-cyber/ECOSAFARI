@@ -271,6 +271,14 @@ export interface Booking {
   guideName?: string;
   dateCreated: string;
   googleCalendarEventId?: string;
+  // Carrinho: reservas pagas juntas compartilham o pedidoId; holdUntil é o
+  // prazo para pagar (depois disso a vaga é liberada).
+  pedidoId?: string;
+  holdUntil?: string | null;
+  stripePaymentIntentId?: string;
+  refundedAt?: string;
+  refundedAmount?: number;
+  stripeSessionId?: string;
   turistaId?: string;
   // JSON com o que o turista informou na reserva online (chegada, ocasião,
   // transfer, interesses, observações).

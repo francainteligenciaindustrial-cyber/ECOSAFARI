@@ -28,6 +28,8 @@ que é a fonte da verdade) — é só "o site caiu, e agora?".
 2. Se o webhook está falhando: confira se `STRIPE_WEBHOOK_SECRET` na Vercel bate com o "Signing secret" mostrado no dashboard do Stripe pra esse endpoint — costuma ser o motivo nº 1.
 3. Sem `STRIPE_WEBHOOK_SECRET` configurada, a confirmação de pagamento ainda funciona via `GET /api/payments/confirm` (chamado quando o cliente volta do checkout pro navegador) — mas fica vulnerável a alguém fechar a aba antes de voltar. Configurar o webhook é o caminho correto.
 4. Pra confirmar manualmente uma reserva que ficou presa em "pendente_pagamento" mas o cliente já pagou (confirmado no dashboard do Stripe): painel de Gestão → Reservas → mude o status manualmente.
+5. **Eventos do webhook**: marque `checkout.session.completed`, `checkout.session.async_payment_succeeded` (Pix/boleto) e `checkout.session.expired` (libera as vagas do carrinho não pago em ~30 min; sem ele, o cron diário faz essa limpeza).
+6. **Carrinho**: cada item é uma reserva própria com o mesmo nº de pedido. Para cancelar só um item pago: Gestão → Reservas → **Cancelar e reembolsar** (reembolso parcial do mesmo pagamento no Stripe). Se a vaga de um item se perder durante o pagamento, ele é reembolsado sozinho e a Gestão recebe um aviso.
 
 ## 3. "Emails de confirmação não estão chegando"
 

@@ -12,6 +12,7 @@ import GuiaDetailsView from "./components/GuiaDetailsView";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import TouristProfileWidget from "./components/TouristProfileWidget";
+import CartButton from "./components/CartButton";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { getSupabaseClient } from "./lib/supabaseClient";
 import { isAdminUser, isTouristUser, isPartnerUser } from "./lib/authRoles";
@@ -40,6 +41,7 @@ const UnsubscribePage = lazy(() => import("./components/UnsubscribePage"));
 const TuristaListasPage = lazy(() => import("./components/TuristaListasPage"));
 const TuristaMensagensPage = lazy(() => import("./components/TuristaMensagensPage"));
 const SharedListPage = lazy(() => import("./components/SharedListPage"));
+const CarrinhoPage = lazy(() => import("./components/CarrinhoPage"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("./components/TermsPage"));
 const FaqPage = lazy(() => import("./components/FaqPage"));
@@ -74,6 +76,7 @@ const STANDALONE_ROUTES: Record<string, React.ComponentType> = {
   "/descadastrar": UnsubscribePage,
   "/turista/listas": TuristaListasPage,
   "/turista/mensagens": TuristaMensagensPage,
+  "/carrinho": CarrinhoPage,
   "/privacidade": PrivacyPolicyPage,
   "/termos": TermsPage,
   "/faq": FaqPage,
@@ -447,6 +450,9 @@ export default function App() {
           <div className="hidden sm:block">
             <LanguageSwitcher />
           </div>
+
+          {/* Carrinho (só aparece com itens) */}
+          <CartButton />
 
           {/* Tourist account menu — Jaguars, favoritos, histórico */}
           <TouristProfileWidget />

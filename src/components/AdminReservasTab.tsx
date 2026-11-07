@@ -78,6 +78,16 @@ export default function AdminReservasTab({ pousadas, onRefreshData, fetchBooking
     }
   };
 
+  // Cancela só esta reserva e devolve o valor dela no mesmo pagamento do
+  // Stripe (as outras do mesmo pedido do carrinho continuam).
+  const handleRefund = async (b: Booking) => {
+    if (!window.confirm(`Cancelar a reserva de ${b.customerName} na ${b.pousadaName} e reembolsar R$ ${Number(b.totalPrice).toLocaleString("pt-BR")} pelo Stripe?`)) return;
+    const response = await adminFetch(`/api/admin/bookings/${b.id}/reembolso`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) window.alert(body.error || "Não foi possível reembolsar.");
+    else { onRefreshData(); fetchBookings(); }
+  };
+
   // Filters bookings list
   const filteredBookings = bookings.filter(b => {
     const matchesSearch = b.customerName.toLowerCase().includes(searchQuery.toLowerCase()) || b.pousadaName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -207,6 +217,17 @@ export default function AdminReservasTab({ pousadas, onRefreshData, fetchBooking
                           {b.guideName && (
                             <span className="block text-[10px] text-indigo-700 font-semibold text-right">🧭 Guia Alocado: {b.guideName}</span>
                           )}
+
+                          {b.pedidoId && (
+                            <span className="block text-[10px] text-zinc-500 text-right">🛒 Pedido {b.pedidoId.replace(/^ped_/, "").slice(0, 8).toUpperCase()}</span>
+                          )}
+
+                          {b.stripePaymentIntentId && !b.refundedAt && b.status !== "pendente_pagamento" && b.status !== "cancelado" && (
+                            <button onClick={() => handleRefund(b)} className="text-amber-600 hover:text-amber-800 font-bold text-[10px] hover:underline">
+                              Cancelar e reembolsar
+                            </button>
+                          )}
+                          {b.refundedAt && <span className="block text-[10px] text-amber-700 text-right">Reembolsado</span>}
 
                           {b.status !== "cancelado" && b.status !== "confirmado_total" && (
                             <button

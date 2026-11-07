@@ -38,6 +38,7 @@ import {
   VISITED_BOOKING_STATUSES,
   writeSkippingMissingColumns,
 } from "../core.js";
+import { insertTouristBooking, loadTouristProfile, prepareTouristBooking } from "../touristBooking.js";
 
 // Novo link de confirmação para um turista que ainda não confirmou. Usa
 // magiclink (não "signup"): não precisa da senha e, ao clicar, o Supabase
@@ -294,143 +295,15 @@ app.post("/api/turista/resend-confirmation", publicFormLimiter, async (req, res)
 // decididos aqui no servidor.
 app.post("/api/turista/bookings", checkoutLimiter, requireTourist, async (req, res) => {
   const user = res.locals.touristUser as { id: string; email?: string };
-  const pousadaId = clip(req.body.pousadaId, 100);
-  const checkIn = clip(req.body.checkIn, 10);
-  const checkOut = clip(req.body.checkOut, 10);
-  const adults = Math.trunc(Number(req.body.adults));
-  const children = Math.trunc(Number(req.body.children) || 0);
-  const roomType = clip(req.body.roomType, 120) || undefined;
-  // Vários passeios (experienceTypes) ou um só (experienceType, legado).
-  const experienceTitles = Array.from(new Set(
-    (Array.isArray(req.body.experienceTypes) ? req.body.experienceTypes : [req.body.experienceType])
-      .map((t: unknown) => clip(t, 200))
-      .filter(Boolean) as string[]
-  )).slice(0, 15);
-  const pacoteId = clip(req.body.pacoteId, 100) || undefined;
-
-  const today = new Date().toISOString().slice(0, 10);
-  if (!ISO_DATE.test(checkIn) || !ISO_DATE.test(checkOut) || Number.isNaN(Date.parse(checkIn)) || Number.isNaN(Date.parse(checkOut))) {
-    return res.status(400).json({ error: "Datas inválidas." });
-  }
-  if (checkIn < today) return res.status(400).json({ error: "O check-in não pode ser no passado." });
-  if (checkOut <= checkIn) return res.status(400).json({ error: "O check-out precisa ser depois do check-in." });
-  if ((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000 > 60) return res.status(400).json({ error: "Reservas online vão até 60 noites — para estadias maiores, fale com a equipe." });
-  if (checkIn > shiftDays(today, 730)) return res.status(400).json({ error: "Reservas online podem ser feitas com até 2 anos de antecedência." });
-  if (!Number.isInteger(adults) || adults < 1 || adults > 30 || children < 0 || children > 30) {
-    return res.status(400).json({ error: "Número de hóspedes inválido." });
-  }
-
-  const { data: pousadaRow } = await supabase.from("pousadas").select("*").eq("id", pousadaId).maybeSingle();
-  if (!pousadaRow) return res.status(404).json({ error: "Pousada não encontrada." });
-  const pousada = mapPousadaRow(pousadaRow);
-  if ((pousada.rooms || []).length > 0 && !roomType) return res.status(400).json({ error: "Escolha o tipo de quarto." });
-  const missingExperience = experienceTitles.find(title => !(pousada.experiences || []).some(e => e.title === title));
-  if (missingExperience) {
-    return res.status(400).json({ error: `Experiência não encontrada nesta pousada: ${missingExperience}.` });
-  }
-  const experienceType = experienceTitles.length ? experienceTitles.join(" + ").slice(0, 300) : undefined;
-
-  // Pacote: preço por pessoa definido pelo admin e noites fixas.
-  let pacote: Pacote | null = null;
-  if (pacoteId) {
-    pacote = await loadPacote(pacoteId);
-    if (!pacote || !pacote.active || pacote.pousadaId !== pousadaId) return res.status(400).json({ error: "Este pacote não está mais disponível." });
-    const noites = Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000);
-    if (noites !== pacote.nights) return res.status(400).json({ error: `Este pacote é de ${pacote.nights} noites.` });
-  }
-  const subtotal = pacote
-    ? Math.round(pacotePricePerPerson(pacote) * (adults + children) * 100) / 100
-    : computeBookingTotal(pousada, checkIn, checkOut, adults, experienceTitles);
-
-  let cupom: Cupom | null = null;
-  let discountAmount = 0;
-  if (req.body.cupomCode) {
-    const cr = await validarCupom(req.body.cupomCode, pousadaId, subtotal);
-    if ("error" in cr) return res.status(400).json({ error: cr.error });
-    cupom = cr.cupom;
-    discountAmount = cr.discount;
-  }
-
-  const { data: profile } = await supabase.from("turistas").select("name, whatsapp, country").eq("id", user.id).maybeSingle();
+  const profile = await loadTouristProfile(user);
   if (!profile) return res.status(403).json({ error: "Complete seu perfil de turista antes de reservar." });
-
-  const availability = await checkPousadaAvailability(pousada, checkIn, checkOut, adults + children, roomType);
-  if (!availability.ok) return res.status(availability.status || 400).json(availability.body);
-
-  const details = {
-    arrivalTime: clip(req.body.details?.arrivalTime, 40),
-    occasion: clip(req.body.details?.occasion, 120),
-    needsTransfer: !!req.body.details?.needsTransfer,
-    interests: clip(req.body.details?.interests, 500),
-    notes: clip(req.body.details?.notes, 1000),
-  };
-  const detailsSummary = [
-    pacote && `Pacote: ${pacote.name}`,
-    cupom && `Cupom: ${cupom.code}`,
-    details.arrivalTime && `Horário de chegada: ${details.arrivalTime}`,
-    details.occasion && `Ocasião: ${details.occasion}`,
-    details.needsTransfer && "Precisa de transfer",
-    details.interests && `Interesses: ${details.interests}`,
-    details.notes && `Observações: ${details.notes}`,
-  ].filter(Boolean).join(" | ");
-
-  const newBooking = {
-    id: `b_${randomUUID()}`,
-    pousadaId,
-    pousadaName: pousada.name,
-    customerName: profile.name,
-    customerEmail: user.email || "",
-    customerPhone: profile.whatsapp || "",
-    nationality: profile.country || "",
-    adults,
-    children,
-    childAges: clip(req.body.childAges, 200),
-    dietaryRestrictions: clip(req.body.dietaryRestrictions, 500) || "Nenhuma",
-    specialNeeds: clip(req.body.specialNeeds, 500) || "Nenhuma",
-    checkIn,
-    checkOut,
-    experienceType: pacote ? `Pacote: ${pacote.name}` : experienceType || "Hospedagem",
-    totalPrice: Math.round((subtotal - discountAmount) * 100) / 100,
-    pacoteId: pacote?.id,
-    cupomCode: cupom?.code,
-    discountAmount: discountAmount || undefined,
-    // Comissão/afiliado/conservação congelados no momento da reserva; o
-    // afiliado vem do link de indicação (?ref=) guardado no navegador.
-    ...(await bookingFinance(pousada, Math.round((subtotal - discountAmount) * 100) / 100, req.body.afiliadoCode)),
-    status: "pendente_pagamento" as const,
-    dateCreated: new Date().toISOString(),
-    roomType,
-    turistaId: user.id,
-    guestDetails: JSON.stringify(details),
-    origem: "site",
-  };
-
-  const { error: insertErr, skipped } = await writeSkippingMissingColumns(newBooking, row => supabase.from("bookings").insert(row));
-  if (isOverbookingError(insertErr)) return res.status(409).json({ error: OVERBOOKING_MESSAGE, available: false });
-  if (insertErr) {
-    log.error("Erro ao salvar reserva online:", insertErr.message);
-    return res.status(500).json({ error: "Não foi possível registrar sua reserva. Tente novamente." });
-  }
-  // Sem a coluna guestDetails (migração pendente), os detalhes não se
-  // perdem: vão junto do campo de necessidades especiais.
-  if (skipped.includes("guestDetails") && detailsSummary) {
-    await supabase.from("bookings").update({ specialNeeds: `${newBooking.specialNeeds} | ${detailsSummary}`.slice(0, 1800) }).eq("id", newBooking.id);
-  }
-
-  // Duas reservas simultâneas podem passar pela checagem ao mesmo tempo —
-  // revalida já contando a outra e desfaz esta se o quarto estourou.
-  const recheck = await checkPousadaAvailability(pousada, checkIn, checkOut, adults + children, roomType, newBooking.id);
-  if (!recheck.ok) {
-    await supabase.from("bookings").delete().eq("id", newBooking.id);
-    return res.status(409).json({ error: OVERBOOKING_MESSAGE, available: false });
-  }
-
-  // Cupom consumido só depois da reserva confirmada no banco; se esgotou
-  // no meio do caminho (corrida com outro uso), desfaz a reserva.
-  if (cupom && !(await registrarUsoCupom(cupom))) {
-    await supabase.from("bookings").delete().eq("id", newBooking.id);
-    return res.status(409).json({ error: "Este cupom acabou de esgotar. Tente de novo sem o cupom." });
-  }
+  const prep = await prepareTouristBooking(req.body);
+  if ("body" in prep) return res.status(prep.status).json(prep.body);
+  const inserted = await insertTouristBooking(prep, profile, { afiliadoCode: req.body.afiliadoCode });
+  if ("body" in inserted) return res.status(inserted.status).json(inserted.body);
+  const newBooking = inserted.booking;
+  const { pousada, detailsSummary } = prep;
+  const { checkIn, checkOut, adults, children, roomType, pousadaId } = newBooking;
 
   addNotification("admin", `Nova reserva online: ${newBooking.customerName} na ${newBooking.pousadaName} (${checkIn} a ${checkOut}).`, "booking_new", newBooking.id);
   addNotification("pousada", `Nova reserva online de ${newBooking.customerName} (${checkIn} a ${checkOut}).`, "booking_new", newBooking.id);
