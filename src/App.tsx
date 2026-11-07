@@ -167,6 +167,9 @@ export default function App() {
   
   // Inside the Portal module we can have four views: "catalog", "details", "video", "whatsapp-gate"
   const [portalView, setPortalView] = useState<"catalog" | "details" | "video" | "whatsapp-gate">("catalog");
+  // De onde o visitante abriu o vídeo/WhatsApp: o "Voltar" leva de volta à
+  // pousada quando veio dela (e da pousada se volta ao catálogo).
+  const [returnTo, setReturnTo] = useState<"catalog" | "details">("catalog");
   const [selectedPousada, setSelectedPousada] = useState<Pousada | null>(null);
 
   // States fetched from Full-Stack Express Backend
@@ -255,13 +258,26 @@ export default function App() {
   };
 
   const handleSelectVideo = (pousada: Pousada) => {
+    setReturnTo(portalView === "details" ? "details" : "catalog");
     setSelectedPousada(pousada);
     setPortalView("video");
   };
 
+  const backFromMedia = () => {
+    if (returnTo === "details" && selectedPousada) {
+      setPortalView("details");
+      navigate(`/pousadas/${selectedPousada.id}`);
+    } else {
+      setPortalView("catalog");
+      navigate("/");
+    }
+  };
+  const backLabel = returnTo === "details" && selectedPousada ? `Voltar para ${selectedPousada.name}` : "Voltar ao catálogo";
+
   // Opens the dedicated video-gate screen (its own URL) that hands off to the
   // real agency WhatsApp once the clip finishes.
   const openWhatsAppGate = (pousada?: Pousada) => {
+    setReturnTo(portalView === "details" ? "details" : "catalog");
     if (pousada) setSelectedPousada(pousada);
     setPortalView("whatsapp-gate");
     navigate("/fale-conosco");
@@ -556,14 +572,16 @@ export default function App() {
                 {portalView === "video" && (
                   <VideoPlayerView
                     pousada={selectedPousada}
-                    onBack={() => setPortalView("catalog")}
+                    onBack={backFromMedia}
+                    backLabel={backLabel}
                     onOpenBot={handleOpenBotWithPousada}
                   />
                 )}
                 {portalView === "whatsapp-gate" && (
                   <WhatsAppGateView
                     pousada={selectedPousada}
-                    onBack={() => { setPortalView("catalog"); navigate("/"); }}
+                    onBack={backFromMedia}
+                    backLabel={backLabel}
                   />
                 )}
 

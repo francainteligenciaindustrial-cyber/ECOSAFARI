@@ -8,13 +8,14 @@ const AGENCY_WHATSAPP_NUMBER = "5565999868334";
 interface WhatsAppGateViewProps {
   pousada: Pousada | null;
   onBack: () => void;
+  backLabel?: string;
 }
 
 function agencyWhatsappLink(message: string) {
   return `https://wa.me/${AGENCY_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
-export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewProps) {
+export default function WhatsAppGateView({ pousada, onBack, backLabel = "Voltar ao catálogo" }: WhatsAppGateViewProps) {
   // Vídeo de apresentação da própria pousada (cadastrado pelo gestor na
   // Galeria de Fotos). Sem vídeo, ou com vídeo do YouTube/Drive (onde não dá
   // pra saber quando terminou), o botão do WhatsApp já aparece direto.
@@ -43,7 +44,7 @@ export default function WhatsAppGateView({ pousada, onBack }: WhatsAppGateViewPr
             onClick={onBack}
             className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#F4F6F5]/80 hover:text-white transition cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo
+            <ArrowLeft className="h-4 w-4" /> {backLabel}
           </button>
 
           <div className="bg-[#F4F6F5]/10 border border-[#F4F6F5]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#F4F6F5] font-bold flex items-center gap-1.5 animate-pulse">

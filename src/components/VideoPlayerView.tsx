@@ -7,9 +7,10 @@ interface VideoPlayerViewProps {
   pousada: Pousada | null;
   onBack: () => void;
   onOpenBot: (pousada: Pousada) => void;
+  backLabel?: string;
 }
 
-export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPlayerViewProps) {
+export default function VideoPlayerView({ pousada, onBack, onOpenBot, backLabel = "Voltar ao catálogo" }: VideoPlayerViewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
   const [activeChapter, setActiveChapter] = useState(0);
@@ -63,7 +64,7 @@ export default function VideoPlayerView({ pousada, onBack, onOpenBot }: VideoPla
             onClick={onBack}
             className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#F4F6F5]/80 hover:text-white transition cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" /> Voltar ao catálogo
+            <ArrowLeft className="h-4 w-4" /> {backLabel}
           </button>
           
           <div className="bg-[#F4F6F5]/10 border border-[#F4F6F5]/25 px-3 py-1 text-[10px] uppercase tracking-widest text-[#F4F6F5] font-bold flex items-center gap-1.5 animate-pulse">
