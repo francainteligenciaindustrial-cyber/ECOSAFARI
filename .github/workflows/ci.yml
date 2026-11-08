@@ -27,6 +27,12 @@ jobs:
 
       - name: Test
         run: npm test
+        env:
+          # Alguns testes importam o núcleo do servidor, que cria o cliente
+          # Supabase ao carregar — valores falsos bastam (nenhum teste chama o
+          # banco). Sem eles, emails.test.ts e core.mappers.test.ts falham.
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
 
       - name: Build
         run: npm run build
